@@ -28,6 +28,6 @@ const getSupabaseUrl = () => {
 };
 
 const supabaseUrl = getSupabaseUrl();
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'build-time-placeholder-key';
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
