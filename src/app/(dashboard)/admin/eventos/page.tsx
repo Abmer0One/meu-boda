@@ -1,0 +1,320 @@
+'use client';
+
+import React, { useEffect, useState } from 'react';
+import { useEvent } from '@/contexts/EventContext';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { eventSchema } from '@/validations/schemas';
+import { EventRepository } from '@/repositories/event.repository';
+import { Input } from '@/components/ui/Input';
+import { Button } from '@/components/ui/Button';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
+import { Heart, MapPin, Calendar, Palette, Loader2 } from 'lucide-react';
+
+export default function EventosPage() {
+  const { currentEvent, refreshEvents, setCurrentEvent } = useEvent();
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm({
+    resolver: zodResolver(eventSchema),
+  });
+
+  // Reset form when active event changes
+  useEffect(() => {
+    if (currentEvent) {
+      // Format ISO string to datetime-local compatible string (YYYY-MM-DDTHH:MM)
+      const dateObj = new Date(currentEvent.date);
+      const tzOffset = dateObj.getTimezoneOffset() * 60000;
+      const localISOTime = new Date(dateObj.getTime() - tzOffset).toISOString().slice(0, 16);
+
+      reset({
+        title: currentEvent.title,
+        slug: currentEvent.slug,
+        date: localISOTime,
+        ceremony_location: currentEvent.ceremony_location || '',
+        party_location: currentEvent.party_location || '',
+        theme: currentEvent.theme || '',
+        cover_image: currentEvent.cover_image || '',
+        description: currentEvent.description || '',
+        ceremony_time: currentEvent.ceremony_time || '',
+        ceremony_maps_url: currentEvent.ceremony_maps_url || '',
+        party_time: currentEvent.party_time || '',
+        party_maps_url: currentEvent.party_maps_url || '',
+      });
+    }
+  }, [currentEvent, reset]);
+
+  const onSubmit = async (data: any) => {
+    if (!currentEvent) return;
+
+    setIsSaving(true);
+    setSuccessMessage(null);
+    setErrorMessage(null);
+
+    try {
+      const updatedEvent = await EventRepository.update(currentEvent.id, {
+        title: data.title,
+        slug: data.slug,
+        date: new Date(data.date).toISOString(),
+        ceremony_location: data.ceremony_location || null,
+        party_location: data.party_location || null,
+        theme: data.theme || null,
+        cover_image: data.cover_image || null,
+        description: data.description || null,
+        ceremony_time: data.ceremony_time || null,
+        ceremony_maps_url: data.ceremony_maps_url || null,
+        party_time: data.party_time || null,
+        party_maps_url: data.party_maps_url || null,
+      });
+
+      if (updatedEvent) {
+        setSuccessMessage('Configurações do evento guardadas com sucesso!');
+        await refreshEvents();
+        setCurrentEvent(updatedEvent);
+      } else {
+        setErrorMessage('Não foi possível guardar as alterações.');
+      }
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Ocorreu um erro ao guardar.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (!currentEvent) {
+    return (
+      <div className="flex h-[50vh] items-center justify-center text-center">
+        <p className="text-foreground/50 text-sm">Nenhum evento selecionado.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 max-w-4xl">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
+          <Heart className="h-6 w-6 text-primary" /> O Evento
+        </h1>
+        <p className="text-sm text-foreground/60">
+          Gerencie as informações principais do seu evento, datas, locais e detalhes.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+        {/* Left Side: Form */}
+        <div className="md:col-span-8">
+          <Card className="bg-card-bg">
+            <CardHeader>
+              <CardTitle>Editar Detalhes do Evento</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                {successMessage && (
+                  <div className="rounded-xl bg-success/15 p-3 text-xs text-success font-medium">
+                    {successMessage}
+                  </div>
+                )}
+                {errorMessage && (
+                  <div className="rounded-xl bg-error/15 p-3 text-xs text-error font-medium">
+                    {errorMessage}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Input
+                    label="Título do Evento"
+                    placeholder="Ana & Pedro"
+                    error={errors.title?.message}
+                    {...register('title')}
+                  />
+                  <Input
+                    label="Slug da URL"
+                    placeholder="ana-pedro"
+                    error={errors.slug?.message}
+                    {...register('slug')}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Input
+                    label="Data e Hora"
+                    type="datetime-local"
+                    error={errors.date?.message}
+                    {...register('date')}
+                  />
+                  <Input
+                    label="Tema do Evento (ex: Rústico, Boho)"
+                    placeholder="Minimalista Elegante"
+                    error={errors.theme?.message}
+                    {...register('theme')}
+                  />
+                </div>
+
+                {currentEvent.type === 'casamento' ? (
+                  <>
+                    <div className="border-t border-border-custom pt-4 mt-2 space-y-4">
+                      <h4 className="text-sm font-semibold text-primary">Cerimónia / Igreja</h4>
+                      <Input
+                        label="Igreja / Local da Cerimónia"
+                        placeholder="Igreja de Nossa Senhora de Fátima, Luanda"
+                        error={errors.ceremony_location?.message}
+                        {...register('ceremony_location')}
+                      />
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <Input
+                          label="Hora da Cerimónia"
+                          placeholder="Ex: 15:30"
+                          error={errors.ceremony_time?.message}
+                          {...register('ceremony_time')}
+                        />
+                        <Input
+                          label="Link Google Maps / Endereço / Coordenadas"
+                          placeholder="Ex: -8.8159,13.2306 ou link maps"
+                          error={errors.ceremony_maps_url?.message}
+                          {...register('ceremony_maps_url')}
+                          helperText="Cole coordenadas (latitude, longitude), link do Google Maps ou endereço."
+                        />
+                      </div>
+                    </div>
+
+                    <div className="border-t border-border-custom pt-4 mt-2 space-y-4">
+                      <h4 className="text-sm font-semibold text-primary">Copo d'Água / Festa</h4>
+                      <Input
+                        label="Local do Copo d'Água / Festa"
+                        placeholder="Salão de Festas Lookal, Ilha de Luanda"
+                        error={errors.party_location?.message}
+                        {...register('party_location')}
+                      />
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <Input
+                          label="Hora da Festa"
+                          placeholder="Ex: 18:00"
+                          error={errors.party_time?.message}
+                          {...register('party_time')}
+                        />
+                        <Input
+                          label="Link Google Maps / Endereço / Coordenadas"
+                          placeholder="Ex: -8.7992,13.2185 ou link maps"
+                          error={errors.party_maps_url?.message}
+                          {...register('party_maps_url')}
+                          helperText="Cole coordenadas (latitude, longitude), link do Google Maps ou endereço."
+                        />
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <Input
+                      label="Local do Evento"
+                      placeholder="Local de celebração"
+                      error={errors.ceremony_location?.message}
+                      {...register('ceremony_location')}
+                    />
+                    <Input
+                      label="Local da Recepção / Festa (Opcional)"
+                      placeholder="Local secundário"
+                      error={errors.party_location?.message}
+                      {...register('party_location')}
+                    />
+                  </>
+                )}
+
+                <Input
+                  label="URL da Imagem de Capa"
+                  placeholder="https://exemplo.com/foto-capa.jpg"
+                  error={errors.cover_image?.message}
+                  {...register('cover_image')}
+                />
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold text-foreground/75 tracking-wide">
+                    Descrição do Evento
+                  </label>
+                  <textarea
+                    rows={4}
+                    placeholder="Escreva uma mensagem de boas-vindas aos convidados..."
+                    className="w-full rounded-xl border border-border-custom bg-card-bg px-3.5 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                    {...register('description')}
+                  />
+                </div>
+
+                <div className="flex justify-end pt-2">
+                  <Button type="submit" isLoading={isSaving}>
+                    Guardar Alterações
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Right Side: Preview Card */}
+        <div className="md:col-span-4 space-y-4">
+          <Card className="bg-card-bg overflow-hidden p-0 border border-border-custom">
+            <div className="h-32 bg-primary/20 relative">
+              {currentEvent.cover_image ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={currentEvent.cover_image}
+                  alt="Capa"
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-primary/30">
+                  <Heart className="h-10 w-10 fill-current" />
+                </div>
+              )}
+              <div className="absolute top-2 right-2">
+                <Badge variant="primary">Ativo</Badge>
+              </div>
+            </div>
+
+            <div className="p-4 space-y-4">
+              <div>
+                <h3 className="text-lg font-bold truncate">{currentEvent.title}</h3>
+                <p className="text-xs text-primary font-medium tracking-wide">/convite/{currentEvent.slug}</p>
+              </div>
+
+              <div className="space-y-2 text-xs text-foreground/70">
+                <div className="flex items-start gap-2">
+                  <Calendar className="h-4 w-4 shrink-0 text-foreground/50" />
+                  <span>
+                    {new Date(currentEvent.date).toLocaleDateString('pt-PT', {
+                      day: '2-digit',
+                      month: 'long',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </span>
+                </div>
+
+                {currentEvent.ceremony_location && (
+                  <div className="flex items-start gap-2">
+                    <MapPin className="h-4 w-4 shrink-0 text-foreground/50" />
+                    <span className="line-clamp-2">Local: {currentEvent.ceremony_location}</span>
+                  </div>
+                )}
+
+                {currentEvent.theme && (
+                  <div className="flex items-start gap-2">
+                    <Palette className="h-4 w-4 shrink-0 text-foreground/50" />
+                    <span>Tema: {currentEvent.theme}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}
