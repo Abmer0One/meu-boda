@@ -6,26 +6,42 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { eventSchema } from '@/validations/schemas';
 import { EventRepository } from '@/repositories/event.repository';
+import { ScheduleRepository } from '@/repositories/schedule.repository';
+import { supabase } from '@/lib/supabase';
+import { EventSchedule } from '@/types';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
-import { Heart, MapPin, Calendar, Palette, Loader2 } from 'lucide-react';
+import { Heart, MapPin, Calendar, Palette, Loader2, Plus, Trash2, Clock } from 'lucide-react';
 
 export default function EventosPage() {
   const { currentEvent, refreshEvents, setCurrentEvent } = useEvent();
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+
+  // Timeline / Schedules States
+  const [schedules, setSchedules] = useState<EventSchedule[]>([]);
+  const [isLoadingSchedules, setIsLoadingSchedules] = useState(false);
+  const [newTime, setNewTime] = useState('');
+  const [newTitle, setNewTitle] = useState('');
+  const [newLocation, setNewLocation] = useState('');
+  const [isAddingSchedule, setIsAddingSchedule] = useState(false);
 
   const {
     register,
     handleSubmit,
     reset,
+    setValue,
+    watch,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(eventSchema),
   });
+
+  const coverImageUrl = watch('cover_image');
 
   // Reset form when active event changes
   useEffect(() => {
@@ -51,6 +67,94 @@ export default function EventosPage() {
       });
     }
   }, [currentEvent, reset]);
+
+  // Load schedules
+  const loadSchedules = async () => {
+    if (!currentEvent) return;
+    setIsLoadingSchedules(true);
+    try {
+      const data = await ScheduleRepository.getAll(currentEvent.id);
+      setSchedules(data);
+    } catch (err) {
+      console.error('Error loading schedules:', err);
+    } finally {
+      setIsLoadingSchedules(false);
+    }
+  };
+
+  useEffect(() => {
+    loadSchedules();
+  }, [currentEvent]);
+
+  // Handle Cover Image Upload
+  const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !currentEvent) return;
+
+    setIsUploading(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${currentEvent.id}/capa_${Date.now()}.${fileExt}`;
+
+      const { data, error } = await supabase.storage
+        .from('invitations')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: true,
+        });
+
+      if (error) throw error;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('invitations')
+        .getPublicUrl(fileName);
+
+      setValue('cover_image', publicUrl);
+    } catch (err: any) {
+      alert('Erro ao carregar a imagem: ' + err.message);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // Add Schedule Item
+  const handleAddSchedule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentEvent || !newTime || !newTitle || !newLocation) return;
+
+    setIsAddingSchedule(true);
+    try {
+      const newSched = await ScheduleRepository.create({
+        event_id: currentEvent.id,
+        time: newTime,
+        title: newTitle,
+        location: newLocation,
+      });
+      if (newSched) {
+        setNewTime('');
+        setNewTitle('');
+        setNewLocation('');
+        loadSchedules();
+      }
+    } catch (err: any) {
+      alert('Erro ao criar item na agenda: ' + err.message);
+    } finally {
+      setIsAddingSchedule(false);
+    }
+  };
+
+  // Delete Schedule Item
+  const handleDeleteSchedule = async (id: string) => {
+    if (!confirm('Deseja realmente eliminar este item da agenda?')) return;
+    try {
+      const success = await ScheduleRepository.delete(id);
+      if (success) {
+        loadSchedules();
+      }
+    } catch (err: any) {
+      alert('Erro ao eliminar item da agenda: ' + err.message);
+    }
+  };
 
   const onSubmit = async (data: any) => {
     if (!currentEvent) return;
@@ -227,12 +331,54 @@ export default function EventosPage() {
                   </>
                 )}
 
-                <Input
-                  label="URL da Imagem de Capa"
-                  placeholder="https://exemplo.com/foto-capa.jpg"
-                  error={errors.cover_image?.message}
-                  {...register('cover_image')}
-                />
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-foreground/75 tracking-wide block">
+                    Imagem de Capa / Convite
+                  </label>
+                  
+                  {coverImageUrl && (
+                    <div className="relative rounded-xl overflow-hidden border border-border-custom bg-secondary/10 h-40 w-full mb-3 group">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={coverImageUrl}
+                        alt="Preview da Capa"
+                        className="w-full h-full object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setValue('cover_image', '')}
+                        className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1.5 hover:bg-red-700 transition-colors shadow-md text-xs font-bold"
+                      >
+                        Remover
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="flex gap-4 items-center">
+                    <Input
+                      placeholder="Cole o URL da imagem ou carregue um ficheiro..."
+                      error={errors.cover_image?.message}
+                      className="flex-1"
+                      {...register('cover_image')}
+                    />
+                    <label className="shrink-0">
+                      <div className="flex items-center gap-1.5 px-4 py-2 bg-primary text-white rounded-xl text-sm font-semibold hover:bg-primary/95 transition-all cursor-pointer shadow-md">
+                        {isUploading ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          'Carregar Ficheiro'
+                        )}
+                      </div>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleCoverUpload}
+                        disabled={isUploading}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                </div>
 
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-semibold text-foreground/75 tracking-wide">
@@ -252,6 +398,99 @@ export default function EventosPage() {
                   </Button>
                 </div>
               </form>
+            </CardContent>
+          </Card>
+
+          {/* Agenda do Dia Card */}
+          <Card className="bg-card-bg mt-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="h-5 w-5 text-primary" /> Agenda do Dia
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-xs text-foreground/60">
+                Crie um cronograma dos principais acontecimentos do dia do casamento. Isso aparecerá no convite e no ambiente dos convidados.
+              </p>
+
+              {/* Form to Add Schedule Item */}
+              <form onSubmit={handleAddSchedule} className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-secondary/10 p-3 rounded-xl border border-border-custom">
+                <Input
+                  label="Hora (ex: 16:30)"
+                  placeholder="16:30"
+                  value={newTime}
+                  onChange={(e) => setNewTime(e.target.value)}
+                  required
+                />
+                <Input
+                  label="O que vai acontecer"
+                  placeholder="Cerimónia Religiosa"
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  required
+                />
+                <div className="flex items-end gap-2">
+                  <div className="flex-1">
+                    <Input
+                      label="Onde vai acontecer"
+                      placeholder="Igreja de Fátima"
+                      value={newLocation}
+                      onChange={(e) => setNewLocation(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    className="h-10 px-3 flex items-center justify-center shrink-0 rounded-xl"
+                    isLoading={isAddingSchedule}
+                  >
+                    <Plus className="h-5 w-5" />
+                  </Button>
+                </div>
+              </form>
+
+              {/* Schedules List */}
+              {isLoadingSchedules ? (
+                <div className="flex items-center justify-center py-6">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                </div>
+              ) : schedules.length > 0 ? (
+                <div className="relative border-l-2 border-primary/30 ml-3 pl-6 space-y-4 py-2">
+                  {schedules.map((sched) => (
+                    <div key={sched.id} className="relative group">
+                      {/* Timeline Dot */}
+                      <span className="absolute -left-[31px] top-1.5 flex h-4 w-4 items-center justify-center rounded-full border-2 border-primary bg-background">
+                        <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                      </span>
+
+                      <div className="flex items-start justify-between bg-card-bg hover:bg-secondary/10 border border-border-custom/50 rounded-xl p-3 shadow-sm transition-all">
+                        <div className="space-y-1">
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-primary uppercase tracking-wide">
+                            <Clock className="h-3 w-3" /> {sched.time}
+                          </span>
+                          <h4 className="text-sm font-semibold text-foreground">{sched.title}</h4>
+                          <span className="text-xs text-foreground/60 flex items-center gap-1">
+                            <MapPin className="h-3.5 w-3.5 opacity-70" /> {sched.location}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteSchedule(sched.id)}
+                          className="text-foreground/40 hover:text-red-500 p-1.5 rounded-xl hover:bg-red-500/10 transition-all"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 border border-dashed border-border-custom rounded-xl">
+                  <Clock className="h-8 w-8 text-foreground/30 mx-auto mb-2" />
+                  <p className="text-xs text-foreground/50">Nenhum evento adicionado à agenda do dia.</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

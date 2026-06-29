@@ -5,7 +5,8 @@ import { GuestRepository } from '@/repositories/guest.repository';
 import { EventRepository } from '@/repositories/event.repository';
 import { TableRepository } from '@/repositories/table.repository';
 import { MediaRepository, EventMedia } from '@/repositories/media.repository';
-import { Guest, Event, Table } from '@/types';
+import { ScheduleRepository } from '@/repositories/schedule.repository';
+import { Guest, Event, Table, EventSchedule } from '@/types';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -26,6 +27,7 @@ import {
   Download,
   Camera,
   Upload,
+  Clock,
 } from 'lucide-react';
 
 interface RSVPPageProps {
@@ -50,6 +52,7 @@ export default function PublicRSVPPage({ params }: RSVPPageProps) {
   const [event, setEvent] = useState<Event | null>(null);
   const [table, setTable] = useState<Table | null>(null);
   const [qrCodeUrl, setQrCodeUrl] = useState('');
+  const [schedules, setSchedules] = useState<EventSchedule[]>([]);
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -79,10 +82,13 @@ export default function PublicRSVPPage({ params }: RSVPPageProps) {
       setCompanions(fetchedGuest.companions);
       setNotes(fetchedGuest.notes || '');
 
-      const [fetchedEvent, fetchedTables] = await Promise.all([
+      const [fetchedEvent, fetchedTables, fetchedSchedules] = await Promise.all([
         EventRepository.getById(fetchedGuest.event_id),
         TableRepository.getAll(fetchedGuest.event_id),
+        ScheduleRepository.getAll(fetchedGuest.event_id),
       ]);
+
+      setSchedules(fetchedSchedules);
 
       setEvent(fetchedEvent);
 
@@ -201,7 +207,7 @@ export default function PublicRSVPPage({ params }: RSVPPageProps) {
     setDownloading(true);
     try {
       const tableName = table ? table.name : 'Sem Mesa';
-      const pdf = await generateGuestPDF(guest, event, tableName, qrCodeUrl);
+      const pdf = await generateGuestPDF(guest, event, tableName, qrCodeUrl, schedules);
       pdf.save(`convite_${guest.name.replace(/\s+/g, '_')}.pdf`);
     } catch (err) {
       console.error(err);
@@ -418,6 +424,38 @@ export default function PublicRSVPPage({ params }: RSVPPageProps) {
               )}
             </CardContent>
           </Card>
+
+          {/* Agenda do Dia Timeline */}
+          {schedules.length > 0 && (
+            <Card className="bg-card-bg border border-border-custom">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="h-5 w-5 text-primary" /> Agenda do Dia
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="relative border-l-2 border-primary/30 ml-3 pl-6 space-y-4 py-2">
+                  {schedules.map((sched) => (
+                    <div key={sched.id} className="relative">
+                      {/* Dot */}
+                      <span className="absolute -left-[31px] top-1.5 flex h-4 w-4 items-center justify-center rounded-full border-2 border-primary bg-background">
+                        <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                      </span>
+                      <div className="space-y-1">
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-primary uppercase tracking-wide">
+                          <Clock className="h-3 w-3" /> {sched.time}
+                        </span>
+                        <h4 className="text-sm font-semibold text-foreground">{sched.title}</h4>
+                        <span className="text-xs text-foreground/60 flex items-center gap-1">
+                          <MapPin className="h-3.5 w-3.5 opacity-70" /> {sched.location}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* RSVP confirmation forms */}
           <Card className="bg-card-bg border border-border-custom">

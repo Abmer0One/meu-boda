@@ -5,7 +5,8 @@ import { useEvent } from '@/contexts/EventContext';
 import { GuestRepository } from '@/repositories/guest.repository';
 import { TableRepository } from '@/repositories/table.repository';
 import { EventRepository } from '@/repositories/event.repository';
-import { Guest, Table } from '@/types';
+import { ScheduleRepository } from '@/repositories/schedule.repository';
+import { Guest, Table, EventSchedule } from '@/types';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -31,6 +32,7 @@ export default function ConvitesPage() {
   const { currentEvent, setCurrentEvent, refreshEvents } = useEvent();
   const [guests, setGuests] = useState<Guest[]>([]);
   const [tables, setTables] = useState<Table[]>([]);
+  const [schedules, setSchedules] = useState<EventSchedule[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
@@ -159,12 +161,14 @@ export default function ConvitesPage() {
     if (!currentEvent) return;
     setLoading(true);
     try {
-      const [fetchedGuests, fetchedTables] = await Promise.all([
+      const [fetchedGuests, fetchedTables, fetchedSchedules] = await Promise.all([
         GuestRepository.getAll(currentEvent.id),
         TableRepository.getAll(currentEvent.id),
+        ScheduleRepository.getAll(currentEvent.id),
       ]);
       setGuests(fetchedGuests);
       setTables(fetchedTables);
+      setSchedules(fetchedSchedules);
     } catch (err) {
       console.error(err);
     } finally {
@@ -244,7 +248,7 @@ export default function ConvitesPage() {
       };
 
       const qrCodeUrl = await generateQRCode(qrData);
-      const pdf = await generateGuestPDF(guest, currentEvent, tableName, qrCodeUrl);
+      const pdf = await generateGuestPDF(guest, currentEvent, tableName, qrCodeUrl, schedules);
       
       pdf.save(`convite_${guest.name.replace(/\s+/g, '_')}.pdf`);
 

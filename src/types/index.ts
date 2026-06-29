@@ -108,3 +108,12 @@ export interface DashboardStats {
   pendingTasksCount: number;
   upcomingPaymentsCount: number;
 }
+
+export interface EventSchedule {
+  id: string;
+  event_id: string;
+  time: string;
+  title: string;
+  location: string;
+  created_at: string;
+}
