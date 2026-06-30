@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
-import { Heart, MapPin, Calendar, Palette, Loader2, Plus, Trash2, Clock } from 'lucide-react';
+import { Heart, MapPin, Calendar, Palette, Loader2, Plus, Trash2, Clock, Users, Gift, Link2, Shirt, Info } from 'lucide-react';
 
 export default function EventosPage() {
   const { currentEvent, refreshEvents, setCurrentEvent } = useEvent();
@@ -64,6 +64,16 @@ export default function EventosPage() {
         ceremony_maps_url: currentEvent.ceremony_maps_url || '',
         party_time: currentEvent.party_time || '',
         party_maps_url: currentEvent.party_maps_url || '',
+        // Guest Manual & Important Info
+        dress_code_style: currentEvent.dress_code_style || '',
+        dress_code_colors: currentEvent.dress_code_colors || '',
+        gift_suggestions: currentEvent.gift_suggestions || '',
+        gift_iban: currentEvent.gift_iban || '',
+        gift_iban_holder: currentEvent.gift_iban_holder || '',
+        kids_restriction_note: currentEvent.kids_restriction_note || '',
+        instagram_host_1: currentEvent.instagram_host_1 || '',
+        instagram_host_2: currentEvent.instagram_host_2 || '',
+        rsvp_deadline: currentEvent.rsvp_deadline || '',
       });
     }
   }, [currentEvent, reset]);
@@ -177,6 +187,16 @@ export default function EventosPage() {
         ceremony_maps_url: data.ceremony_maps_url || null,
         party_time: data.party_time || null,
         party_maps_url: data.party_maps_url || null,
+        // Guest Manual & Important Info
+        dress_code_style: data.dress_code_style || null,
+        dress_code_colors: data.dress_code_colors || null,
+        gift_suggestions: data.gift_suggestions || null,
+        gift_iban: data.gift_iban || null,
+        gift_iban_holder: data.gift_iban_holder || null,
+        kids_restriction_note: data.kids_restriction_note || null,
+        instagram_host_1: data.instagram_host_1 || null,
+        instagram_host_2: data.instagram_host_2 || null,
+        rsvp_deadline: data.rsvp_deadline || null,
       });
 
       if (updatedEvent) {
@@ -220,7 +240,7 @@ export default function EventosPage() {
               <CardTitle>Editar Detalhes do Evento</CardTitle>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+              <form id="event-main-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                 {successMessage && (
                   <div className="rounded-xl bg-success/15 p-3 text-xs text-success font-medium">
                     {successMessage}
@@ -494,6 +514,129 @@ export default function EventosPage() {
             </CardContent>
           </Card>
         </div>
+
+          {/* Manual & Informações Importantes Card */}
+          <Card className="bg-card-bg mt-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Info className="h-5 w-5 text-primary" /> Manual do Convidado & Informações Importantes
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-xs text-foreground/60 mb-4">
+                Estas informações aparecerão no convite digital do convidado. Preencha apenas o que for relevante para o seu evento.
+              </p>
+              <div className="space-y-6">
+
+                {/* Dress Code */}
+                <div className="space-y-3 border-t border-border-custom pt-4">
+                  <h4 className="text-sm font-semibold text-primary flex items-center gap-2">
+                    <Shirt className="h-4 w-4" /> Dress Code
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <Input
+                      label="Estilo (ex: Formal, Esporte Fino)"
+                      placeholder="Formal"
+                      {...register('dress_code_style')}
+                    />
+                    <Input
+                      label="Restrições de Cores"
+                      placeholder="Não usar a cor branca"
+                      {...register('dress_code_colors')}
+                    />
+                  </div>
+                </div>
+
+                {/* RSVP Deadline */}
+                <div className="space-y-3 border-t border-border-custom pt-4">
+                  <h4 className="text-sm font-semibold text-primary flex items-center gap-2">
+                    <Clock className="h-4 w-4" /> Data Limite de RSVP
+                  </h4>
+                  <Input
+                    label="Confirmar Presença até (Data Limite)"
+                    type="date"
+                    helperText="Aparecerá no formulário de confirmação de presença do convidado."
+                    {...register('rsvp_deadline')}
+                  />
+                </div>
+
+                {/* Kids */}
+                <div className="space-y-3 border-t border-border-custom pt-4">
+                  <h4 className="text-sm font-semibold text-primary flex items-center gap-2">
+                    <Users className="h-4 w-4" /> Nota sobre Crianças (Opcional)
+                  </h4>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-semibold text-foreground/75 tracking-wide">
+                      Mensagem sobre Crianças
+                    </label>
+                    <textarea
+                      rows={2}
+                      placeholder="Ex: Esta é uma celebração reservada a adultos. Com os mais novos celebraremos noutro momento especial."
+                      className="w-full rounded-xl border border-border-custom bg-card-bg px-3.5 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                      {...register('kids_restriction_note')}
+                    />
+                  </div>
+                </div>
+
+                {/* Instagram */}
+                <div className="space-y-3 border-t border-border-custom pt-4">
+                  <h4 className="text-sm font-semibold text-primary flex items-center gap-2">
+                    <Link2 className="h-4 w-4" /> Redes Sociais (Instagram)
+                  </h4>
+                  <p className="text-xs text-foreground/50">Apenas o nome de utilizador sem o @. Os convidados verão botões que abrem diretamente a app do Instagram.</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <Input
+                      label="Instagram Anfitrião 1"
+                      placeholder="vivalda.tito"
+                      {...register('instagram_host_1')}
+                    />
+                    <Input
+                      label="Instagram Anfitrião 2 (Opcional)"
+                      placeholder="typsichvivi"
+                      {...register('instagram_host_2')}
+                    />
+                  </div>
+                </div>
+
+                {/* Gifts */}
+                <div className="space-y-3 border-t border-border-custom pt-4">
+                  <h4 className="text-sm font-semibold text-primary flex items-center gap-2">
+                    <Gift className="h-4 w-4" /> Sugestões de Presente
+                  </h4>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-semibold text-foreground/75 tracking-wide">
+                      Mensagem e sugestões (uma por linha)
+                    </label>
+                    <textarea
+                      rows={4}
+                      placeholder={`A sua presença já é um presente inestimável, mas caso queira presentear:\nPerfume\nCosméticos\nVale-presente\nAcessórios`}
+                      className="w-full rounded-xl border border-border-custom bg-card-bg px-3.5 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                      {...register('gift_suggestions')}
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <Input
+                      label="IBAN (Opcional)"
+                      placeholder="AO06 0040 0000 1234 5678 1016 7"
+                      {...register('gift_iban')}
+                    />
+                    <Input
+                      label="Titular da Conta"
+                      placeholder="Ana Silva"
+                      {...register('gift_iban_holder')}
+                    />
+                  </div>
+                </div>
+
+              </div>
+
+              <div className="flex justify-end pt-4 border-t border-border-custom mt-6">
+                <Button type="submit" form="event-main-form" isLoading={isSaving}>
+                  Guardar Alterações
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
 
         {/* Right Side: Preview Card */}
         <div className="md:col-span-4 space-y-4">

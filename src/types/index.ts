@@ -16,7 +16,18 @@ export interface Event {
   ceremony_maps_url?: string | null;
   party_time?: string | null;
   party_maps_url?: string | null;
+  // Guest Manual & Important Info
+  dress_code_style?: string | null;
+  dress_code_colors?: string | null;
+  gift_suggestions?: string | null;
+  gift_iban?: string | null;
+  gift_iban_holder?: string | null;
+  kids_restriction_note?: string | null;
+  instagram_host_1?: string | null;
+  instagram_host_2?: string | null;
+  rsvp_deadline?: string | null;
 }
+
 
 export interface Table {
   id: string;
