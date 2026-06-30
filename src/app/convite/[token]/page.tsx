@@ -6,7 +6,8 @@ import { EventRepository } from '@/repositories/event.repository';
 import { TableRepository } from '@/repositories/table.repository';
 import { MediaRepository, EventMedia } from '@/repositories/media.repository';
 import { ScheduleRepository } from '@/repositories/schedule.repository';
-import { Guest, Event, Table, EventSchedule } from '@/types';
+import { InfoBlockRepository } from '@/repositories/infoblock.repository';
+import { Guest, Event, Table, EventSchedule, EventInfoBlock } from '@/types';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -90,7 +91,7 @@ export default function PublicRSVPPage({ params }: RSVPPageProps) {
   const [table, setTable] = useState<Table | null>(null);
   const [qrCodeUrl, setQrCodeUrl] = useState('');
   const [schedules, setSchedules] = useState<EventSchedule[]>([]);
-  const [ibanCopied, setIbanCopied] = useState(false);
+  const [infoBlocks, setInfoBlocks] = useState<EventInfoBlock[]>([]);
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -120,13 +121,15 @@ export default function PublicRSVPPage({ params }: RSVPPageProps) {
       setCompanions(fetchedGuest.companions);
       setNotes(fetchedGuest.notes || '');
 
-      const [fetchedEvent, fetchedTables, fetchedSchedules] = await Promise.all([
+      const [fetchedEvent, fetchedTables, fetchedSchedules, fetchedInfoBlocks] = await Promise.all([
         EventRepository.getById(fetchedGuest.event_id),
         TableRepository.getAll(fetchedGuest.event_id),
         ScheduleRepository.getAll(fetchedGuest.event_id),
+        InfoBlockRepository.getAll(fetchedGuest.event_id),
       ]);
 
       setSchedules(fetchedSchedules);
+      setInfoBlocks(fetchedInfoBlocks);
 
       setEvent(fetchedEvent);
 
@@ -645,7 +648,7 @@ export default function PublicRSVPPage({ params }: RSVPPageProps) {
       </div>
 
       {/* Informações Importantes Card */}
-      {(event.dress_code_style || event.kids_restriction_note || event.gift_suggestions || event.instagram_host_1) && (
+      {(event.dress_code_style || event.kids_restriction_note || event.gift_suggestions || event.instagram_host_1 || infoBlocks.length > 0) && (
         <Card className="mt-8 bg-card-bg border border-border-custom shadow-md">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg font-bold">
@@ -683,7 +686,7 @@ export default function PublicRSVPPage({ params }: RSVPPageProps) {
               </div>
             )}
 
-            {/* Gift Suggestions + IBAN */}
+            {/* Gift Suggestions */}
             {event.gift_suggestions && (
               <div className="p-4 rounded-2xl border border-border-custom/60 bg-secondary/10 space-y-3">
                 <h4 className="font-bold text-sm flex items-center gap-2">
@@ -697,27 +700,6 @@ export default function PublicRSVPPage({ params }: RSVPPageProps) {
                     </p>
                   ))}
                 </div>
-                {event.gift_iban && (
-                  <div className="bg-background border border-border-custom rounded-xl p-3 mt-2 space-y-1">
-                    <p className="text-[11px] font-semibold text-foreground/60 uppercase tracking-wide">Transferência Bancária</p>
-                    {event.gift_iban_holder && (
-                      <p className="text-xs font-semibold text-foreground">{event.gift_iban_holder}</p>
-                    )}
-                    <div className="flex items-center gap-2">
-                      <p className="text-xs font-mono text-foreground/80 flex-1 break-all">{event.gift_iban}</p>
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(event.gift_iban!);
-                          setIbanCopied(true);
-                          setTimeout(() => setIbanCopied(false), 2500);
-                        }}
-                        className="shrink-0 text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-primary text-white hover:bg-primary/90 transition-all active:scale-95"
-                      >
-                        {ibanCopied ? '✓ Copiado' : 'Copiar'}
-                      </button>
-                    </div>
-                  </div>
-                )}
               </div>
             )}
 
@@ -760,6 +742,15 @@ export default function PublicRSVPPage({ params }: RSVPPageProps) {
                 </div>
               </div>
             )}
+            {/* Dynamic Info Blocks */}
+            {infoBlocks.length > 0 && infoBlocks.map((block) => (
+              <div key={block.id} className="p-4 rounded-2xl border border-border-custom/60 bg-secondary/10 space-y-2">
+                <h4 className="font-bold text-sm flex items-center gap-2">
+                  ℹ️ {block.title}
+                </h4>
+                <p className="text-xs text-foreground/80 leading-relaxed whitespace-pre-line">{block.content}</p>
+              </div>
+            ))}
 
           </CardContent>
         </Card>

@@ -32,8 +32,6 @@ export const eventSchema = z.object({
   dress_code_style: z.string().nullable().optional(),
   dress_code_colors: z.string().nullable().optional(),
   gift_suggestions: z.string().nullable().optional(),
-  gift_iban: z.string().nullable().optional(),
-  gift_iban_holder: z.string().nullable().optional(),
   kids_restriction_note: z.string().nullable().optional(),
   instagram_host_1: z.string().nullable().optional(),
   instagram_host_2: z.string().nullable().optional(),

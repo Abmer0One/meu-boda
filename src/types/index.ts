@@ -20,8 +20,6 @@ export interface Event {
   dress_code_style?: string | null;
   dress_code_colors?: string | null;
   gift_suggestions?: string | null;
-  gift_iban?: string | null;
-  gift_iban_holder?: string | null;
   kids_restriction_note?: string | null;
   instagram_host_1?: string | null;
   instagram_host_2?: string | null;
@@ -126,5 +124,14 @@ export interface EventSchedule {
   time: string;
   title: string;
   location: string;
+  created_at: string;
+}
+
+export interface EventInfoBlock {
+  id: string;
+  event_id: string;
+  title: string;
+  content: string;
+  sort_order: number;
   created_at: string;
 }

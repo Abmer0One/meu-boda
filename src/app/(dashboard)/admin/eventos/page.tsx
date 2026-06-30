@@ -7,13 +7,15 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { eventSchema } from '@/validations/schemas';
 import { EventRepository } from '@/repositories/event.repository';
 import { ScheduleRepository } from '@/repositories/schedule.repository';
+import { InfoBlockRepository } from '@/repositories/infoblock.repository';
 import { supabase } from '@/lib/supabase';
-import { EventSchedule } from '@/types';
+import { EventSchedule, EventInfoBlock } from '@/types';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
-import { Heart, MapPin, Calendar, Palette, Loader2, Plus, Trash2, Clock, Users, Gift, Link2, Shirt, Info } from 'lucide-react';
+import { Dialog } from '@/components/ui/Dialog';
+import { Heart, MapPin, Calendar, Palette, Loader2, Plus, Trash2, Clock, Users, Gift, Link2, Shirt, Info, Pencil } from 'lucide-react';
 
 export default function EventosPage() {
   const { currentEvent, refreshEvents, setCurrentEvent } = useEvent();
@@ -29,6 +31,15 @@ export default function EventosPage() {
   const [newTitle, setNewTitle] = useState('');
   const [newLocation, setNewLocation] = useState('');
   const [isAddingSchedule, setIsAddingSchedule] = useState(false);
+
+  // Info Blocks States
+  const [infoBlocks, setInfoBlocks] = useState<EventInfoBlock[]>([]);
+  const [isLoadingBlocks, setIsLoadingBlocks] = useState(false);
+  const [infoBlockModalOpen, setInfoBlockModalOpen] = useState(false);
+  const [editingBlock, setEditingBlock] = useState<EventInfoBlock | null>(null);
+  const [blockTitle, setBlockTitle] = useState('');
+  const [blockContent, setBlockContent] = useState('');
+  const [isSavingBlock, setIsSavingBlock] = useState(false);
 
   const {
     register,
@@ -68,8 +79,6 @@ export default function EventosPage() {
         dress_code_style: currentEvent.dress_code_style || '',
         dress_code_colors: currentEvent.dress_code_colors || '',
         gift_suggestions: currentEvent.gift_suggestions || '',
-        gift_iban: currentEvent.gift_iban || '',
-        gift_iban_holder: currentEvent.gift_iban_holder || '',
         kids_restriction_note: currentEvent.kids_restriction_note || '',
         instagram_host_1: currentEvent.instagram_host_1 || '',
         instagram_host_2: currentEvent.instagram_host_2 || '',
@@ -92,8 +101,23 @@ export default function EventosPage() {
     }
   };
 
+  // Load info blocks
+  const loadInfoBlocks = async () => {
+    if (!currentEvent) return;
+    setIsLoadingBlocks(true);
+    try {
+      const data = await InfoBlockRepository.getAll(currentEvent.id);
+      setInfoBlocks(data);
+    } catch (err) {
+      console.error('Error loading info blocks:', err);
+    } finally {
+      setIsLoadingBlocks(false);
+    }
+  };
+
   useEffect(() => {
     loadSchedules();
+    loadInfoBlocks();
   }, [currentEvent]);
 
   // Handle Cover Image Upload
@@ -166,6 +190,57 @@ export default function EventosPage() {
     }
   };
 
+  // Info Block CRUD
+  const openAddBlockModal = () => {
+    setEditingBlock(null);
+    setBlockTitle('');
+    setBlockContent('');
+    setInfoBlockModalOpen(true);
+  };
+
+  const openEditBlockModal = (block: EventInfoBlock) => {
+    setEditingBlock(block);
+    setBlockTitle(block.title);
+    setBlockContent(block.content);
+    setInfoBlockModalOpen(true);
+  };
+
+  const handleSaveBlock = async () => {
+    if (!currentEvent || !blockTitle.trim() || !blockContent.trim()) return;
+    setIsSavingBlock(true);
+    try {
+      if (editingBlock) {
+        await InfoBlockRepository.update(editingBlock.id, {
+          title: blockTitle.trim(),
+          content: blockContent.trim(),
+        });
+      } else {
+        await InfoBlockRepository.create({
+          event_id: currentEvent.id,
+          title: blockTitle.trim(),
+          content: blockContent.trim(),
+          sort_order: infoBlocks.length,
+        });
+      }
+      setInfoBlockModalOpen(false);
+      loadInfoBlocks();
+    } catch (err: any) {
+      alert('Erro ao guardar bloco: ' + err.message);
+    } finally {
+      setIsSavingBlock(false);
+    }
+  };
+
+  const handleDeleteBlock = async (id: string) => {
+    if (!confirm('Deseja eliminar esta informação?')) return;
+    try {
+      await InfoBlockRepository.delete(id);
+      loadInfoBlocks();
+    } catch (err: any) {
+      alert('Erro ao eliminar: ' + err.message);
+    }
+  };
+
   const onSubmit = async (data: any) => {
     if (!currentEvent) return;
 
@@ -191,8 +266,6 @@ export default function EventosPage() {
         dress_code_style: data.dress_code_style || null,
         dress_code_colors: data.dress_code_colors || null,
         gift_suggestions: data.gift_suggestions || null,
-        gift_iban: data.gift_iban || null,
-        gift_iban_holder: data.gift_iban_holder || null,
         kids_restriction_note: data.kids_restriction_note || null,
         instagram_host_1: data.instagram_host_1 || null,
         instagram_host_2: data.instagram_host_2 || null,
@@ -222,7 +295,7 @@ export default function EventosPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6 max-w-6xl">
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
           <Heart className="h-6 w-6 text-primary" /> O Evento
@@ -232,9 +305,9 @@ export default function EventosPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Side: Form */}
-        <div className="md:col-span-8">
+        <div className="lg:col-span-8 space-y-6">
           <Card className="bg-card-bg">
             <CardHeader>
               <CardTitle>Editar Detalhes do Evento</CardTitle>
@@ -422,7 +495,7 @@ export default function EventosPage() {
           </Card>
 
           {/* Agenda do Dia Card */}
-          <Card className="bg-card-bg mt-6">
+          <Card className="bg-card-bg">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Clock className="h-5 w-5 text-primary" /> Agenda do Dia
@@ -430,7 +503,7 @@ export default function EventosPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-xs text-foreground/60">
-                Crie um cronograma dos principais acontecimentos do dia do casamento. Isso aparecerá no convite e no ambiente dos convidados.
+                Crie um cronograma dos principais acontecimentos do dia. Isso aparecerá no convite e no ambiente dos convidados.
               </p>
 
               {/* Form to Add Schedule Item */}
@@ -513,10 +586,9 @@ export default function EventosPage() {
               )}
             </CardContent>
           </Card>
-        </div>
 
-          {/* Manual & Informações Importantes Card */}
-          <Card className="bg-card-bg mt-6">
+          {/* Manual do Convidado & Informações Importantes Card */}
+          <Card className="bg-card-bg">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Info className="h-5 w-5 text-primary" /> Manual do Convidado & Informações Importantes
@@ -614,18 +686,6 @@ export default function EventosPage() {
                       {...register('gift_suggestions')}
                     />
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                    <Input
-                      label="IBAN (Opcional)"
-                      placeholder="AO06 0040 0000 1234 5678 1016 7"
-                      {...register('gift_iban')}
-                    />
-                    <Input
-                      label="Titular da Conta"
-                      placeholder="Ana Silva"
-                      {...register('gift_iban_holder')}
-                    />
-                  </div>
                 </div>
 
               </div>
@@ -638,9 +698,76 @@ export default function EventosPage() {
             </CardContent>
           </Card>
 
+          {/* Informações Extra (Blocos Dinâmicos) */}
+          <Card className="bg-card-bg">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Plus className="h-5 w-5 text-primary" /> Informações Extra
+              </CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                leftIcon={<Plus className="h-3.5 w-3.5" />}
+                onClick={openAddBlockModal}
+              >
+                Adicionar
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-xs text-foreground/60">
+                Adicione informações personalizadas que aparecerão no convite do convidado. Ex: IBAN, dados de transporte, estacionamento, alojamento, etc.
+              </p>
+
+              {isLoadingBlocks ? (
+                <div className="flex items-center justify-center py-6">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                </div>
+              ) : infoBlocks.length > 0 ? (
+                <div className="space-y-3">
+                  {infoBlocks.map((block) => (
+                    <div
+                      key={block.id}
+                      className="flex items-start justify-between gap-3 bg-secondary/10 border border-border-custom/50 rounded-xl p-4 hover:bg-secondary/20 transition-all"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-sm font-bold text-foreground">{block.title}</h4>
+                        <p className="text-xs text-foreground/70 mt-1 whitespace-pre-line">{block.content}</p>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => openEditBlockModal(block)}
+                          className="text-foreground/40 hover:text-primary p-1.5 rounded-lg hover:bg-primary/10 transition-all"
+                          title="Editar"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteBlock(block.id)}
+                          className="text-foreground/40 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-500/10 transition-all"
+                          title="Eliminar"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 border border-dashed border-border-custom rounded-xl">
+                  <Info className="h-8 w-8 text-foreground/30 mx-auto mb-2" />
+                  <p className="text-xs text-foreground/50">Nenhuma informação extra adicionada.</p>
+                  <p className="text-[10px] text-foreground/40 mt-1">Use o botão &quot;Adicionar&quot; para criar blocos personalizados.</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
         {/* Right Side: Preview Card */}
-        <div className="md:col-span-4 space-y-4">
-          <Card className="bg-card-bg overflow-hidden p-0 border border-border-custom">
+        <div className="lg:col-span-4 space-y-4">
+          <Card className="bg-card-bg overflow-hidden p-0 border border-border-custom lg:sticky lg:top-8">
             <div className="h-32 bg-primary/20 relative">
               {currentEvent.cover_image ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -697,6 +824,48 @@ export default function EventosPage() {
           </Card>
         </div>
       </div>
+
+      {/* Info Block Add/Edit Dialog */}
+      <Dialog
+        isOpen={infoBlockModalOpen}
+        onClose={() => setInfoBlockModalOpen(false)}
+        title={editingBlock ? 'Editar Informação Extra' : 'Adicionar Informação Extra'}
+      >
+        <div className="space-y-4">
+          <Input
+            label="Título"
+            placeholder="Ex: Transferência Bancária, Estacionamento, Alojamento..."
+            value={blockTitle}
+            onChange={(e) => setBlockTitle(e.target.value)}
+            required
+          />
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-foreground/75 tracking-wide">
+              Conteúdo
+            </label>
+            <textarea
+              rows={5}
+              placeholder={`Escreva aqui as informações que deseja partilhar com os convidados.\n\nEx:\nIBAN: AO06 0040 0000 1234 5678 1016 7\nTitular: Ana Silva`}
+              value={blockContent}
+              onChange={(e) => setBlockContent(e.target.value)}
+              className="w-full rounded-xl border border-border-custom bg-card-bg px-3.5 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+              required
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setInfoBlockModalOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleSaveBlock}
+              isLoading={isSavingBlock}
+              disabled={!blockTitle.trim() || !blockContent.trim()}
+            >
+              {editingBlock ? 'Guardar' : 'Adicionar'}
+            </Button>
+          </div>
+        </div>
+      </Dialog>
     </div>
   );
 }
