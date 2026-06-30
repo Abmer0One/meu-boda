@@ -23,6 +23,7 @@ export const eventSchema = z.object({
   party_location: z.string().nullable().optional(),
   theme: z.string().nullable().optional(),
   cover_image: z.string().nullable().optional(),
+  background_image: z.string().nullable().optional(),
   description: z.string().nullable().optional(),
   ceremony_time: z.string().nullable().optional(),
   ceremony_maps_url: z.string().nullable().optional(),

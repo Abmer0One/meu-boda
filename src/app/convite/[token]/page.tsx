@@ -248,7 +248,7 @@ export default function PublicRSVPPage({ params }: RSVPPageProps) {
     setDownloading(true);
     try {
       const tableName = table ? table.name : 'Sem Mesa';
-      const pdf = await generateGuestPDF(guest, event, tableName, qrCodeUrl, schedules);
+      const pdf = await generateGuestPDF(guest, event, tableName, qrCodeUrl, schedules, infoBlocks);
       pdf.save(`convite_${guest.name.replace(/\s+/g, '_')}.pdf`);
     } catch (err) {
       console.error(err);
@@ -600,32 +600,67 @@ export default function PublicRSVPPage({ params }: RSVPPageProps) {
 
           {/* QR Code and complement sheet card */}
           {isConfirmed && qrCodeUrl && (
-            <Card className="bg-card-bg text-center space-y-4">
-              <CardHeader>
-                <CardTitle className="text-center">Acesso ao Evento</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4 flex flex-col items-center">
-                <div className="border border-border-custom rounded-2xl p-4 bg-white inline-block shadow-sm">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={qrCodeUrl} alt="QR Code Checkin" className="h-44 w-44 object-contain" />
+            <Card className="bg-card-bg border border-primary/20 shadow-lg overflow-hidden p-0">
+              {/* Ticket Header Banner */}
+              <div className="bg-gradient-to-r from-primary to-primary/80 px-4 py-3 text-white text-center">
+                <span className="text-[10px] font-bold tracking-widest uppercase opacity-90">Passe de Acesso Digital</span>
+                <h3 className="font-bold text-sm truncate mt-0.5">{event.title}</h3>
+              </div>
+
+              <CardContent className="p-5 space-y-4 flex flex-col items-center">
+                {/* Guest & Seating Quick Info */}
+                <div className="w-full bg-secondary/10 rounded-xl p-3 text-left space-y-2 border border-border-custom/50">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-foreground/50">Titular:</span>
+                    <span className="font-bold text-foreground">{guest.name}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-foreground/50">Mesa / Lugar:</span>
+                    <span className="font-bold text-primary">{table ? table.name : 'Pendente'}</span>
+                  </div>
+                  {guest.companions > 0 && (
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-foreground/50">Acompanhantes:</span>
+                      <span className="font-bold text-foreground">+{guest.companions}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center text-xs border-t border-border-custom/40 pt-1.5 mt-1">
+                    <span className="text-foreground/50">Data:</span>
+                    <span className="font-semibold text-foreground">
+                      {new Date(event.date).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                    </span>
+                  </div>
                 </div>
 
-                <div className="space-y-1">
-                  <p className="text-xs font-semibold">Este é o seu QR Code individual.</p>
-                  <p className="text-[10px] text-foreground/50 max-w-[220px] mx-auto">
-                    Apresente-o no seu telemóvel ou imprima o PDF para validação de check-in na entrada.
+                {/* Ticket Dotted Separator Line */}
+                <div className="w-full flex items-center justify-between my-1">
+                  <div className="-ml-6 w-3 h-6 bg-background rounded-r-full border-r border-y border-primary/20 shrink-0"></div>
+                  <div className="flex-1 border-b-2 border-dashed border-border-custom/80 mx-2"></div>
+                  <div className="-mr-6 w-3 h-6 bg-background rounded-l-full border-l border-y border-primary/20 shrink-0"></div>
+                </div>
+
+                {/* QR Code Container */}
+                <div className="border-2 border-primary/10 rounded-2xl p-3 bg-white inline-block shadow-md hover:scale-102 transition-transform duration-200">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={qrCodeUrl} alt="QR Code Checkin" className="h-40 w-40 object-contain" />
+                </div>
+
+                <div className="space-y-1 text-center">
+                  <p className="text-xs font-semibold text-foreground">Apresente este código na entrada.</p>
+                  <p className="text-[10px] text-foreground/50 max-w-[240px] mx-auto leading-normal">
+                    Pode descarregar o PDF completo para imprimir ou guardar no seu telemóvel.
                   </p>
                 </div>
 
                 <Button
                   variant="outline"
                   size="sm"
-                  className="w-full justify-center"
+                  className="w-full justify-center mt-1 border-primary/30 text-primary hover:bg-primary/5"
                   leftIcon={downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
                   onClick={handleDownloadInvite}
                   disabled={downloading}
                 >
-                  Descarregar Folha PDF
+                  Descarregar Convite PDF
                 </Button>
               </CardContent>
             </Card>

@@ -23,6 +23,7 @@ export default function EventosPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isUploadingBg, setIsUploadingBg] = useState(false);
 
   // Timeline / Schedules States
   const [schedules, setSchedules] = useState<EventSchedule[]>([]);
@@ -53,6 +54,7 @@ export default function EventosPage() {
   });
 
   const coverImageUrl = watch('cover_image');
+  const backgroundImage = watch('background_image');
 
   // Reset form when active event changes
   useEffect(() => {
@@ -70,6 +72,7 @@ export default function EventosPage() {
         party_location: currentEvent.party_location || '',
         theme: currentEvent.theme || '',
         cover_image: currentEvent.cover_image || '',
+        background_image: currentEvent.background_image || '',
         description: currentEvent.description || '',
         ceremony_time: currentEvent.ceremony_time || '',
         ceremony_maps_url: currentEvent.ceremony_maps_url || '',
@@ -148,6 +151,37 @@ export default function EventosPage() {
       alert('Erro ao carregar a imagem: ' + err.message);
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  // Handle Background Image Upload
+  const handleBgUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !currentEvent) return;
+
+    setIsUploadingBg(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${currentEvent.id}/fundo_${Date.now()}.${fileExt}`;
+
+      const { data, error } = await supabase.storage
+        .from('invitations')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: true,
+        });
+
+      if (error) throw error;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('invitations')
+        .getPublicUrl(fileName);
+
+      setValue('background_image', publicUrl);
+    } catch (err: any) {
+      alert('Erro ao carregar a imagem de fundo: ' + err.message);
+    } finally {
+      setIsUploadingBg(false);
     }
   };
 
@@ -257,6 +291,7 @@ export default function EventosPage() {
         party_location: data.party_location || null,
         theme: data.theme || null,
         cover_image: data.cover_image || null,
+        background_image: data.background_image || null,
         description: data.description || null,
         ceremony_time: data.ceremony_time || null,
         ceremony_maps_url: data.ceremony_maps_url || null,
@@ -471,6 +506,58 @@ export default function EventosPage() {
                       />
                     </label>
                   </div>
+                </div>
+
+                <div className="space-y-2 border-t border-border-custom pt-4">
+                  <label className="text-xs font-semibold text-foreground/75 tracking-wide block">
+                    Imagem de Fundo do Convite (PDF)
+                  </label>
+                  
+                  {backgroundImage && (
+                    <div className="relative rounded-xl overflow-hidden border border-border-custom bg-secondary/10 h-40 w-full mb-3 group">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={backgroundImage}
+                        alt="Preview do Fundo"
+                        className="w-full h-full object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setValue('background_image', '')}
+                        className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1.5 hover:bg-red-700 transition-colors shadow-md text-xs font-bold"
+                      >
+                        Remover
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="flex gap-4 items-center">
+                    <Input
+                      placeholder="Cole o URL da imagem de fundo ou carregue um ficheiro..."
+                      error={errors.background_image?.message}
+                      className="flex-1"
+                      {...register('background_image')}
+                    />
+                    <label className="shrink-0">
+                      <div className="flex items-center gap-1.5 px-4 py-2 bg-primary text-white rounded-xl text-sm font-semibold hover:bg-primary/95 transition-all cursor-pointer shadow-md">
+                        {isUploadingBg ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          'Carregar Ficheiro'
+                        )}
+                      </div>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleBgUpload}
+                        disabled={isUploadingBg}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                  <p className="text-[10px] text-foreground/50">
+                    *Esta imagem de fundo será usada nas outras páginas do PDF do convite (como a página do QR Code, agenda, etc.).
+                  </p>
                 </div>
 
                 <div className="flex flex-col gap-1.5">

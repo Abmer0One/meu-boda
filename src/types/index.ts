@@ -10,6 +10,7 @@ export interface Event {
   party_location: string | null;
   theme: string | null;
   cover_image: string | null;
+  background_image?: string | null;
   created_at: string;
   updated_at: string;
   ceremony_time?: string | null;
