@@ -21,6 +21,7 @@ import {
   AlertCircle,
   Loader2,
   CheckCircle,
+  Edit2,
 } from 'lucide-react';
 
 export default function MesasPage() {
@@ -31,6 +32,7 @@ export default function MesasPage() {
 
   // Modals state
   const [tableModalOpen, setTableModalOpen] = useState(false);
+  const [tableToEdit, setTableToEdit] = useState<Table | null>(null);
   const [tableToDelete, setTableToDelete] = useState<Table | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
@@ -69,15 +71,41 @@ export default function MesasPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentEvent]);
 
-  const handleCreateTable = async (data: any) => {
+  const handleAddTableClick = () => {
+    setTableToEdit(null);
+    reset({
+      name: '',
+      capacity: 8,
+    });
+    setTableModalOpen(true);
+  };
+
+  const handleEditTableClick = (table: Table) => {
+    setTableToEdit(table);
+    reset({
+      name: table.name,
+      capacity: table.capacity,
+    });
+    setTableModalOpen(true);
+  };
+
+  const handleSaveTable = async (data: any) => {
     if (!currentEvent) return;
     try {
-      await TableRepository.create({
-        event_id: currentEvent.id,
-        name: data.name,
-        capacity: Number(data.capacity),
-      });
+      if (tableToEdit) {
+        await TableRepository.update(tableToEdit.id, {
+          name: data.name,
+          capacity: Number(data.capacity),
+        });
+      } else {
+        await TableRepository.create({
+          event_id: currentEvent.id,
+          name: data.name,
+          capacity: Number(data.capacity),
+        });
+      }
       setTableModalOpen(false);
+      setTableToEdit(null);
       reset({ name: '', capacity: 8 });
       loadData();
     } catch (err) {
@@ -193,7 +221,7 @@ export default function MesasPage() {
           </p>
         </div>
 
-        <Button leftIcon={<Plus className="h-4 w-4" />} onClick={() => setTableModalOpen(true)} size="sm">
+        <Button leftIcon={<Plus className="h-4 w-4" />} onClick={handleAddTableClick} size="sm">
           Adicionar Mesa
         </Button>
       </div>
@@ -277,6 +305,13 @@ export default function MesasPage() {
                           {seatedCount} / {table.capacity}
                         </Badge>
                         <button
+                          onClick={() => handleEditTableClick(table)}
+                          className="p-1 rounded-full text-foreground/40 hover:bg-secondary hover:text-primary transition-colors cursor-pointer"
+                          title="Editar Mesa"
+                        >
+                          <Edit2 className="h-3.5 w-3.5" />
+                        </button>
+                        <button
                           onClick={() => handleDeleteTableClick(table)}
                           className="p-1 rounded-full text-foreground/40 hover:bg-error/15 hover:text-error transition-colors cursor-pointer"
                           title="Remover Mesa"
@@ -326,8 +361,8 @@ export default function MesasPage() {
       )}
 
       {/* CREATE TABLE DIALOG */}
-      <Dialog isOpen={tableModalOpen} onClose={() => setTableModalOpen(false)} title="Adicionar Mesa">
-        <form onSubmit={handleSubmit(handleCreateTable)} className="space-y-4">
+      <Dialog isOpen={tableModalOpen} onClose={() => setTableModalOpen(false)} title={tableToEdit ? "Editar Mesa" : "Adicionar Mesa"}>
+        <form onSubmit={handleSubmit(handleSaveTable)} className="space-y-4">
           <Input
             label="Identificação da Mesa (ex: Mesa 1, Mesa de Honra)"
             placeholder="Mesa 10"
@@ -344,7 +379,7 @@ export default function MesasPage() {
             <Button variant="outline" type="button" onClick={() => setTableModalOpen(false)}>
               Cancelar
             </Button>
-            <Button type="submit">Criar Mesa</Button>
+            <Button type="submit">{tableToEdit ? "Guardar Alterações" : "Criar Mesa"}</Button>
           </div>
         </form>
       </Dialog>

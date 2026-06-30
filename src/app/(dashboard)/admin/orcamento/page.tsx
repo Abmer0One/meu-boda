@@ -7,25 +7,11 @@ import { Budget } from '@/types';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { Badge } from '@/components/ui/Badge';
 import { Dialog } from '@/components/ui/Dialog';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { budgetSchema } from '@/validations/schemas';
-import { DollarSign, Plus, Edit2, Loader2, TrendingUp, CreditCard } from 'lucide-react';
-
-const CATEGORIES = [
-  'Salão',
-  'Buffet',
-  'Fotografia',
-  'Vídeo',
-  'DJ',
-  'Flores',
-  'Transporte',
-  'Convites',
-  'Lua de Mel',
-  'Outros',
-];
+import { DollarSign, Plus, Edit2, Loader2, TrendingUp, CreditCard, Trash2, AlertCircle } from 'lucide-react';
 
 export default function OrcamentoPage() {
   const { currentEvent } = useEvent();
@@ -34,7 +20,9 @@ export default function OrcamentoPage() {
 
   // Modals state
   const [budgetModalOpen, setBudgetModalOpen] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [budgetToEdit, setBudgetToEdit] = useState<Budget | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [budgetToDelete, setBudgetToDelete] = useState<Budget | null>(null);
 
   const {
     register,
@@ -43,16 +31,86 @@ export default function OrcamentoPage() {
     formState: { errors },
   } = useForm({
     resolver: zodResolver(budgetSchema),
+    defaultValues: {
+      category: '',
+      estimated_amount: 0,
+      paid_amount: 0,
+    },
   });
 
   const loadData = async () => {
     if (!currentEvent) return;
     setLoading(true);
     try {
-      const fetchedBudgets = await BudgetRepository.getAll(currentEvent.id);
+      let fetchedBudgets = await BudgetRepository.getAll(currentEvent.id);
+
+      // Pre-populate default categories if this event has NO budget records yet
+      if (fetchedBudgets.length === 0) {
+        let defaultCategories: string[] = [];
+        if (currentEvent.type === 'casamento') {
+          defaultCategories = [
+            'Salão',
+            'Buffet',
+            'Fotografia',
+            'Vídeo',
+            'DJ',
+            'Flores',
+            'Transporte',
+            'Convites',
+            'Lua de Mel',
+            'Outros',
+          ];
+        } else if (currentEvent.type === 'aniversario') {
+          defaultCategories = [
+            'Espaço / Salão',
+            'Buffet & Bebidas',
+            'Bolo de Aniversário',
+            'Decoração',
+            'DJ & Equipamento de Som',
+            'Fotografia',
+            'Convites Digitais',
+            'Animação / Entretenimento',
+            'Outros',
+          ];
+        } else if (currentEvent.type === 'pedido') {
+          defaultCategories = [
+            'Anel / Alianças',
+            'Restaurante / Espaço',
+            'Flores / Rosas',
+            'Música ao Vivo / Violinista',
+            'Fotografia',
+            'Outros',
+          ];
+        } else {
+          defaultCategories = [
+            'Espaço / Local',
+            'Alimentação / Catering',
+            'Decoração',
+            'Som & Iluminação',
+            'Fotografia',
+            'Outros',
+          ];
+        }
+
+        // Sequential insert to avoid race conditions or use upsert
+        await Promise.all(
+          defaultCategories.map((cat) =>
+            BudgetRepository.upsert({
+              event_id: currentEvent.id,
+              category: cat,
+              estimated_amount: 0,
+              paid_amount: 0,
+            })
+          )
+        );
+
+        // Reload from DB
+        fetchedBudgets = await BudgetRepository.getAll(currentEvent.id);
+      }
+
       setBudgets(fetchedBudgets);
     } catch (err) {
-      console.error(err);
+      console.error('Error loading budget details:', err);
     } finally {
       setLoading(false);
     }
@@ -63,14 +121,22 @@ export default function OrcamentoPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentEvent]);
 
-  const handleEditBudget = (category: string) => {
-    setSelectedCategory(category);
-    const existing = budgets.find((b) => b.category === category);
-
+  const handleAddBudget = () => {
+    setBudgetToEdit(null);
     reset({
-      category: category,
-      estimated_amount: existing ? Number(existing.estimated_amount) : 0,
-      paid_amount: existing ? Number(existing.paid_amount) : 0,
+      category: '',
+      estimated_amount: 0,
+      paid_amount: 0,
+    });
+    setBudgetModalOpen(true);
+  };
+
+  const handleEditBudget = (budget: Budget) => {
+    setBudgetToEdit(budget);
+    reset({
+      category: budget.category,
+      estimated_amount: Number(budget.estimated_amount),
+      paid_amount: Number(budget.paid_amount),
     });
     setBudgetModalOpen(true);
   };
@@ -79,28 +145,48 @@ export default function OrcamentoPage() {
     if (!currentEvent) return;
 
     try {
-      await BudgetRepository.upsert({
-        event_id: currentEvent.id,
-        category: data.category,
-        estimated_amount: Number(data.estimated_amount),
-        paid_amount: Number(data.paid_amount),
-      });
+      if (budgetToEdit) {
+        // Edit category using update by ID (allows renaming category names safely)
+        await BudgetRepository.update(budgetToEdit.id, {
+          category: data.category,
+          estimated_amount: Number(data.estimated_amount),
+          paid_amount: Number(data.paid_amount),
+        });
+      } else {
+        // Create new category entry
+        await BudgetRepository.upsert({
+          event_id: currentEvent.id,
+          category: data.category,
+          estimated_amount: Number(data.estimated_amount),
+          paid_amount: Number(data.paid_amount),
+        });
+      }
       setBudgetModalOpen(false);
+      setBudgetToEdit(null);
       loadData();
     } catch (err) {
-      console.error(err);
+      console.error('Error saving budget item:', err);
+    }
+  };
+
+  const handleDeleteBudgetClick = (budget: Budget) => {
+    setBudgetToDelete(budget);
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDeleteBudget = async () => {
+    if (!budgetToDelete) return;
+    try {
+      await BudgetRepository.delete(budgetToDelete.id);
+      setDeleteConfirmOpen(false);
+      setBudgetToDelete(null);
+      loadData();
+    } catch (err) {
+      console.error('Error deleting budget item:', err);
     }
   };
 
   // Calculations
-  const getCategoryStats = (category: string) => {
-    const found = budgets.find((b) => b.category === category);
-    const estimated = found ? Number(found.estimated_amount) : 0;
-    const paid = found ? Number(found.paid_amount) : 0;
-    const remaining = estimated - paid;
-    return { estimated, paid, remaining };
-  };
-
   const totalEstimated = budgets.reduce((sum, b) => sum + Number(b.estimated_amount), 0);
   const totalPaid = budgets.reduce((sum, b) => sum + Number(b.paid_amount), 0);
   const totalRemaining = totalEstimated - totalPaid;
@@ -108,21 +194,40 @@ export default function OrcamentoPage() {
   if (!currentEvent) {
     return (
       <div className="flex h-[50vh] items-center justify-center text-center">
-        <p className="text-foreground/50 text-sm">Selecione um casamento para gerir o orçamento.</p>
+        <p className="text-foreground/50 text-sm">Selecione um evento para gerir o orçamento.</p>
       </div>
     );
   }
 
+  // Get localized title depending on event type
+  const getEventName = () => {
+    switch (currentEvent.type) {
+      case 'casamento':
+        return 'casamento';
+      case 'aniversario':
+        return 'aniversário';
+      case 'pedido':
+        return 'pedido de casamento';
+      default:
+        return 'evento';
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
-          <DollarSign className="h-6 w-6 text-primary" /> Gestão Financeira & Orçamento
-        </h1>
-        <p className="text-sm text-foreground/60">
-          Gerencie despesas, planeamento de gastos e valores pagos por categorias.
-        </p>
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
+            <DollarSign className="h-6 w-6 text-primary" /> Gestão Financeira & Orçamento
+          </h1>
+          <p className="text-sm text-foreground/60">
+            Gerencie despesas, planeamento de gastos e valores pagos por categorias.
+          </p>
+        </div>
+        <Button leftIcon={<Plus className="h-4 w-4" />} onClick={handleAddBudget} size="sm">
+          Adicionar Gasto
+        </Button>
       </div>
 
       {/* Financial Summary Cards */}
@@ -186,7 +291,7 @@ export default function OrcamentoPage() {
             <div className="flex h-32 items-center justify-center">
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
             </div>
-          ) : (
+          ) : budgets.length > 0 ? (
             <div className="overflow-x-auto rounded-xl border border-border-custom">
               <table className="w-full text-left border-collapse text-sm">
                 <thead>
@@ -196,19 +301,25 @@ export default function OrcamentoPage() {
                     <th className="p-3.5">Pago</th>
                     <th className="p-3.5">Restante</th>
                     <th className="p-3.5 text-center">Progresso Pago</th>
-                    <th className="p-3.5 text-center">Editar</th>
+                    <th className="p-3.5 text-center">Ações</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border-custom">
-                  {CATEGORIES.map((category) => {
-                    const { estimated, paid, remaining } = getCategoryStats(category);
+                  {budgets.map((budget) => {
+                    const estimated = Number(budget.estimated_amount);
+                    const paid = Number(budget.paid_amount);
+                    const remaining = estimated - paid;
                     const paidPercent = estimated > 0 ? Math.min(100, Math.round((paid / estimated) * 100)) : 0;
 
                     return (
-                      <tr key={category} className="hover:bg-secondary/15 transition-colors">
-                        <td className="p-3.5 font-medium">{category}</td>
-                        <td className="p-3.5 font-medium">{estimated.toLocaleString('pt-AO', { minimumFractionDigits: 2 })} Kz</td>
-                        <td className="p-3.5 font-medium text-success">{paid.toLocaleString('pt-AO', { minimumFractionDigits: 2 })} Kz</td>
+                      <tr key={budget.id} className="hover:bg-secondary/15 transition-colors">
+                        <td className="p-3.5 font-medium">{budget.category}</td>
+                        <td className="p-3.5 font-medium">
+                          {estimated.toLocaleString('pt-AO', { minimumFractionDigits: 2 })} Kz
+                        </td>
+                        <td className="p-3.5 font-medium text-success">
+                          {paid.toLocaleString('pt-AO', { minimumFractionDigits: 2 })} Kz
+                        </td>
                         <td className={`p-3.5 font-medium ${remaining < 0 ? 'text-error' : 'text-foreground/70'}`}>
                           {remaining.toLocaleString('pt-AO', { minimumFractionDigits: 2 })} Kz
                         </td>
@@ -220,14 +331,23 @@ export default function OrcamentoPage() {
                             <span className="text-[10px] font-bold text-foreground/60 w-8">{paidPercent}%</span>
                           </div>
                         </td>
-                        <td className="p-3.5 text-center">
-                          <button
-                            onClick={() => handleEditBudget(category)}
-                            className="p-1.5 rounded-lg text-foreground/50 hover:bg-secondary hover:text-primary transition-all cursor-pointer"
-                            title="Editar Orçamento"
-                          >
-                            <Edit2 className="h-4 w-4" />
-                          </button>
+                        <td className="p-3.5">
+                          <div className="flex items-center justify-center gap-1">
+                            <button
+                              onClick={() => handleEditBudget(budget)}
+                              className="p-1.5 rounded-lg text-foreground/50 hover:bg-secondary hover:text-primary transition-all cursor-pointer"
+                              title="Editar Orçamento"
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteBudgetClick(budget)}
+                              className="p-1.5 rounded-lg text-foreground/50 hover:bg-error/15 hover:text-error transition-all cursor-pointer"
+                              title="Eliminar Gasto"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -235,20 +355,31 @@ export default function OrcamentoPage() {
                 </tbody>
               </table>
             </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center text-center py-10 text-foreground/40 border border-dashed border-border-custom rounded-xl">
+              <DollarSign className="h-10 w-10 text-foreground/20 mb-2" />
+              <p className="text-sm font-semibold">Nenhum gasto registado</p>
+              <p className="text-xs text-foreground/50 mt-1">
+                Adicione categorias personalizadas clicando no botão &quot;Adicionar Gasto&quot;.
+              </p>
+            </div>
           )}
         </CardContent>
       </Card>
 
-      {/* EDIT BUDGET DIALOG */}
+      {/* EDIT/ADD BUDGET DIALOG */}
       <Dialog
         isOpen={budgetModalOpen}
         onClose={() => setBudgetModalOpen(false)}
-        title={`Ajustar Orçamento - ${selectedCategory}`}
+        title={budgetToEdit ? 'Editar Categoria / Gasto' : 'Adicionar Gasto / Categoria'}
       >
         <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
-          {/* Hidden input for category */}
-          <input type="hidden" {...register('category')} />
-
+          <Input
+            label="Nome da Categoria / Gasto"
+            placeholder="Ex: Decoração de Mesa, Bolo extra"
+            error={errors.category?.message}
+            {...register('category')}
+          />
           <Input
             label="Estimativa Orçada (Kz)"
             type="number"
@@ -268,9 +399,36 @@ export default function OrcamentoPage() {
             <Button variant="outline" type="button" onClick={() => setBudgetModalOpen(false)}>
               Cancelar
             </Button>
-            <Button type="submit">Guardar Valores</Button>
+            <Button type="submit">{budgetToEdit ? 'Guardar Valores' : 'Adicionar Gasto'}</Button>
           </div>
         </form>
+      </Dialog>
+
+      {/* DELETE CONFIRM DIALOG */}
+      <Dialog
+        isOpen={deleteConfirmOpen}
+        onClose={() => setDeleteConfirmOpen(false)}
+        title="Eliminar Gasto do Orçamento"
+      >
+        <div className="space-y-4">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="h-6 w-6 text-error shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold">Deseja eliminar este gasto?</p>
+              <p className="text-xs text-foreground/60 mt-1">
+                Ao eliminar a categoria <span className="font-semibold">{budgetToDelete?.category}</span>, ela será permanentemente removida do orçamento do {getEventName()}. Esta ação não pode ser desfeita.
+              </p>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)}>
+              Cancelar
+            </Button>
+            <Button variant="danger" onClick={confirmDeleteBudget}>
+              Eliminar Gasto
+            </Button>
+          </div>
+        </div>
       </Dialog>
     </div>
   );

@@ -30,6 +30,21 @@ export const BudgetRepository = {
     return data as Budget;
   },
 
+  async update(id: string, budget: Partial<Omit<Budget, 'id' | 'event_id' | 'created_at'>>): Promise<Budget | null> {
+    const { data, error } = await supabase
+      .from('budgets')
+      .update(budget)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating budget:', error);
+      return null;
+    }
+    return data as Budget;
+  },
+
   async delete(id: string): Promise<boolean> {
     const { error } = await supabase
       .from('budgets')

@@ -43,6 +43,43 @@ function getGoogleMapsLink(locationName: string | null | undefined, mapsUrlOrCoo
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
 }
 
+const getEventTypeLabel = (type: string) => {
+  switch (type) {
+    case 'casamento':
+      return {
+        title: 'Casamento',
+        invitation: 'Convite de Casamento',
+        details: 'Detalhes do Casamento',
+        theme: 'Tema do Casamento',
+        rsvpQuestion: 'comparecer ao nosso casamento',
+      };
+    case 'aniversario':
+      return {
+        title: 'Aniversário',
+        invitation: 'Convite de Aniversário',
+        details: 'Detalhes do Aniversário',
+        theme: 'Tema do Aniversário',
+        rsvpQuestion: 'comparecer ao nosso aniversário',
+      };
+    case 'pedido':
+      return {
+        title: 'Pedido de Casamento',
+        invitation: 'Convite de Pedido de Casamento',
+        details: 'Detalhes do Pedido',
+        theme: 'Tema do Pedido',
+        rsvpQuestion: 'comparecer ao nosso pedido de casamento',
+      };
+    default:
+      return {
+        title: 'Evento',
+        invitation: 'Convite do Evento',
+        details: 'Detalhes do Evento',
+        theme: 'Tema do Evento',
+        rsvpQuestion: 'comparecer ao nosso evento',
+      };
+  }
+};
+
 export default function PublicRSVPPage({ params }: RSVPPageProps) {
   // Await params promise in Next.js 15
   const resolvedParams = use(params);
@@ -235,7 +272,7 @@ export default function PublicRSVPPage({ params }: RSVPPageProps) {
             <XCircle className="h-14 w-14 text-error mx-auto" />
             <h2 className="text-xl font-bold">Convite não encontrado</h2>
             <p className="text-sm text-foreground/60">
-              O link que utilizou parece estar inválido ou expirado. Por favor, verifique com os noivos.
+              O link que utilizou parece estar inválido ou expirado. Por favor, verifique com o organizador.
             </p>
           </CardContent>
         </Card>
@@ -245,6 +282,7 @@ export default function PublicRSVPPage({ params }: RSVPPageProps) {
 
   const isConfirmed = rsvpStatus === 'Confirmed';
   const isDeclined = rsvpStatus === 'Declined';
+  const eventLabels = getEventTypeLabel(event.type);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-secondary/40 via-background to-secondary/30 py-8 px-4 flex flex-col justify-between max-w-5xl mx-auto">
@@ -255,7 +293,7 @@ export default function PublicRSVPPage({ params }: RSVPPageProps) {
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={event.cover_image}
-              alt="Capa Casamento"
+              alt={`Capa ${eventLabels.title}`}
               className="w-full h-full object-cover"
             />
           ) : (
@@ -268,7 +306,7 @@ export default function PublicRSVPPage({ params }: RSVPPageProps) {
           {/* Header Info overlays */}
           <div className="absolute bottom-6 left-6 right-6 flex flex-col items-center text-center">
             <Badge variant="secondary" className="mb-2">
-              Convite de Casamento
+              {eventLabels.invitation}
             </Badge>
             <h1 className="text-2xl md:text-3xl font-extrabold text-foreground tracking-wide">
               {event.title}
@@ -286,7 +324,7 @@ export default function PublicRSVPPage({ params }: RSVPPageProps) {
         <div className="md:col-span-7 space-y-6">
           <Card className="bg-card-bg">
             <CardHeader>
-              <CardTitle>Detalhes do Casamento</CardTitle>
+              <CardTitle>{eventLabels.details}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 text-sm text-foreground/80">
               {event.description && <p className="italic text-center text-foreground/60 my-2">&quot;{event.description}&quot;</p>}
@@ -312,7 +350,7 @@ export default function PublicRSVPPage({ params }: RSVPPageProps) {
                   <div className="flex items-start gap-3 p-3.5 border border-border-custom/50 rounded-xl bg-secondary/10">
                     <Palette className="h-5 w-5 text-primary shrink-0 mt-0.5" />
                     <div>
-                      <h4 className="font-bold text-xs text-foreground/50 uppercase">Tema do Casamento</h4>
+                      <h4 className="font-bold text-xs text-foreground/50 uppercase">{eventLabels.theme}</h4>
                       <p className="font-semibold text-xs mt-1">{event.theme}</p>
                     </div>
                   </div>
@@ -465,7 +503,7 @@ export default function PublicRSVPPage({ params }: RSVPPageProps) {
             <CardContent className="space-y-4">
               <div className="text-center py-2">
                 <p className="text-xs text-foreground/60">
-                  Olá <span className="font-bold text-foreground">{guest.name}</span>, por favor informe-nos se poderá comparecer ao nosso casamento.
+                  Olá <span className="font-bold text-foreground">{guest.name}</span>, por favor informe-nos se poderá comparecer ao nosso {eventLabels.title.toLowerCase()}.
                 </p>
               </div>
 
