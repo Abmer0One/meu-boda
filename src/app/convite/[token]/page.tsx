@@ -552,22 +552,16 @@ export default function PublicRSVPPage({ params }: RSVPPageProps) {
 
               {isConfirmed && (
                 <div className="space-y-4 pt-2">
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-semibold text-foreground/75 tracking-wide flex items-center gap-1">
-                      <Users className="h-4 w-4 text-primary" /> Acompanhantes Extra
-                    </label>
-                    <input
-                      type="number"
-                      min={0}
-                      max={guest.companions || 5}
-                      value={companions}
-                      onChange={(e) => setCompanions(Math.max(0, Number(e.target.value)))}
-                      className="rounded-xl border border-border-custom bg-card-bg px-3.5 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                    />
-                    <p className="text-[10px] text-foreground/50">
-                      *Autorizado no máximo {guest.companions} acompanhantes extra.
-                    </p>
-                  </div>
+                  {guest.companions > 0 && (
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold text-foreground/75 tracking-wide flex items-center gap-1">
+                        <Users className="h-4 w-4 text-primary" /> Acompanhantes Extra
+                      </label>
+                      <div className="rounded-xl border border-border-custom bg-secondary/10 px-3.5 py-2.5 text-sm font-semibold text-foreground">
+                        {guest.companions} {guest.companions === 1 ? 'acompanhante autorizado' : 'acompanhantes autorizados'}
+                      </div>
+                    </div>
+                  )}
 
                   <div className="flex flex-col gap-1.5">
                     <label className="text-xs font-semibold text-foreground/75 tracking-wide">
@@ -581,14 +575,6 @@ export default function PublicRSVPPage({ params }: RSVPPageProps) {
                       className="w-full rounded-xl border border-border-custom bg-card-bg px-3.5 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
                     />
                   </div>
-
-                  <Button
-                    onClick={() => handleRSVPSubmit('Confirmed')}
-                    isLoading={saving}
-                    className="w-full justify-center"
-                  >
-                    Guardar Informações
-                  </Button>
                 </div>
               )}
             </CardContent>
