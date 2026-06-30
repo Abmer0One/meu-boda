@@ -1,6 +1,24 @@
 import { jsPDF } from 'jspdf';
 import { Guest, Event, EventSchedule, EventInfoBlock } from '@/types';
 
+// Helper to strip emojis and other unsupported multi-byte characters from PDF strings
+function stripEmojis(text: string | null | undefined): string {
+  if (!text) return '';
+  // Regex to remove typical emojis, symbols, and pictographs
+  return text.replace(/[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2000-\u2BFF]|\uD83E[\uDC00-\uDFFF]/g, '');
+}
+
+// Helper to parse image format from base64 string
+function getImageFormat(base64: string): 'JPEG' | 'PNG' | 'UNKNOWN' {
+  if (base64.startsWith('data:image/png') || base64.includes('image/png')) {
+    return 'PNG';
+  }
+  if (base64.startsWith('data:image/jpeg') || base64.includes('image/jpeg') || base64.includes('image/jpg')) {
+    return 'JPEG';
+  }
+  return 'UNKNOWN';
+}
+
 // Helper to convert an image URL to base64 safely via fetch
 async function getBase64ImageFromUrl(imageUrl: string): Promise<string | null> {
   try {
@@ -41,15 +59,27 @@ export async function generateGuestPDF(
 
   // Draw background image and overlays helper
   const applyPageDecoration = (titleText: string, subtitleText?: string) => {
+    let backgroundSuccess = false;
+    
     if (base64Bg) {
-      // Draw background full page (A4: 210 x 297)
-      doc.addImage(base64Bg, 'JPEG', 0, 0, 210, 297);
-      
-      // Semi-transparent clean white overlay card for contrast and readability
-      doc.setFillColor(255, 255, 255);
-      doc.roundedRect(12, 12, 186, 273, 4, 4, 'F');
-    } else {
-      // Fallback elegant borders
+      try {
+        const format = getImageFormat(base64Bg);
+        if (format !== 'UNKNOWN') {
+          // Draw background full page (A4: 210 x 297)
+          doc.addImage(base64Bg, format, 0, 0, 210, 297);
+          
+          // Semi-transparent clean white overlay card for contrast and readability
+          doc.setFillColor(255, 255, 255);
+          doc.roundedRect(12, 12, 186, 273, 4, 4, 'F');
+          backgroundSuccess = true;
+        }
+      } catch (err) {
+        console.error('Error drawing background image:', err);
+      }
+    }
+
+    // Fallback card/borders if background drawing failed or was not set
+    if (!backgroundSuccess) {
       doc.setDrawColor(183, 110, 121); // #B76E79
       doc.setLineWidth(1);
       doc.rect(10, 10, 190, 277);
@@ -63,13 +93,13 @@ export async function generateGuestPDF(
     doc.setTextColor(183, 110, 121);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(22);
-    doc.text(titleText, 105, 24, { align: 'center' });
+    doc.text(stripEmojis(titleText), 105, 24, { align: 'center' });
 
     if (subtitleText) {
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(100, 100, 100);
-      doc.text(subtitleText, 105, 32, { align: 'center' });
+      doc.text(stripEmojis(subtitleText), 105, 32, { align: 'center' });
     }
   };
 
@@ -79,8 +109,15 @@ export async function generateGuestPDF(
   if (event.cover_image) {
     const base64Image = await getBase64ImageFromUrl(event.cover_image);
     if (base64Image) {
-      hasImagePage = true;
-      doc.addImage(base64Image, 'JPEG', 10, 10, 190, 277);
+      try {
+        const format = getImageFormat(base64Image);
+        if (format !== 'UNKNOWN') {
+          hasImagePage = true;
+          doc.addImage(base64Image, format, 10, 10, 190, 277);
+        }
+      } catch (err) {
+        console.error('Error drawing cover image on Page 1:', err);
+      }
     }
   }
 
@@ -100,7 +137,7 @@ export async function generateGuestPDF(
   doc.setTextColor(50, 50, 50);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(16);
-  doc.text(event.title, 105, 60, { align: 'center' });
+  doc.text(stripEmojis(event.title), 105, 60, { align: 'center' });
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(11);
@@ -113,10 +150,10 @@ export async function generateGuestPDF(
     hour: '2-digit',
     minute: '2-digit',
   });
-  doc.text(`Data: ${eventDate}`, 105, 68, { align: 'center' });
-  doc.text(`Local / Cerimónia: ${event.ceremony_location || 'A definir'}`, 105, 75, { align: 'center' });
+  doc.text(`Data: ${stripEmojis(eventDate)}`, 105, 68, { align: 'center' });
+  doc.text(`Local / Cerimonia: ${stripEmojis(event.ceremony_location || 'A definir')}`, 105, 75, { align: 'center' });
   if (event.party_location) {
-    doc.text(`Copo d'Água / Festa: ${event.party_location}`, 105, 82, { align: 'center' });
+    doc.text(`Copo d'Agua / Festa: ${stripEmojis(event.party_location)}`, 105, 82, { align: 'center' });
   }
 
   // Guest Specific Details (Bold card below the event details)
@@ -127,39 +164,43 @@ export async function generateGuestPDF(
   doc.setTextColor(183, 110, 121);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(13);
-  doc.text(`Convidado: ${guest.name}`, 105, 115, { align: 'center' });
+  doc.text(`Convidado: ${stripEmojis(guest.name)}`, 105, 115, { align: 'center' });
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(11);
   doc.setTextColor(80, 80, 80);
-  doc.text(`Lugar: ${tableName || 'Mesa pendente'}`, 105, 123, { align: 'center' });
+  doc.text(`Lugar: ${stripEmojis(tableName || 'Mesa pendente')}`, 105, 123, { align: 'center' });
   doc.text(`Acompanhantes autorizados: ${guest.companions || 0}`, 105, 130, { align: 'center' });
 
   // QR Code Pass Instructions
   doc.setFont('helvetica', 'italic');
   doc.setFontSize(9.5);
   doc.setTextColor(110, 110, 110);
-  doc.text('Apresente este QR Code no check-in à entrada do evento:', 105, 148, { align: 'center' });
+  doc.text('Apresente este QR Code no check-in a entrada do evento:', 105, 148, { align: 'center' });
 
   // Embed QR Code inside a clean border box
   if (qrCodeDataUrl) {
-    doc.setFillColor(255, 255, 255);
-    doc.setDrawColor(200, 200, 200);
-    doc.roundedRect(65, 154, 80, 80, 3, 3, 'FD');
-    doc.addImage(qrCodeDataUrl, 'PNG', 67, 156, 76, 76);
+    try {
+      doc.setFillColor(255, 255, 255);
+      doc.setDrawColor(200, 200, 200);
+      doc.roundedRect(65, 154, 80, 80, 3, 3, 'FD');
+      doc.addImage(qrCodeDataUrl, 'PNG', 67, 156, 76, 76);
+    } catch (err) {
+      console.error('Error drawing QR code image:', err);
+    }
   }
 
   // Footer Instructions
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.5);
   doc.setTextColor(150, 150, 150);
-  doc.text('Este documento é pessoal e indispensável para a entrada.', 105, 260, { align: 'center' });
-  doc.text('Desenvolvido por Meu Boda - Gestão de Eventos.', 105, 266, { align: 'center' });
+  doc.text('Este documento e pessoal e indispensavel para a entrada.', 105, 260, { align: 'center' });
+  doc.text('Desenvolvido por Meu Boda - Gestao de Eventos.', 105, 266, { align: 'center' });
 
   // PAGE 3: Daily Timeline/Schedules if present
   if (schedules && schedules.length > 0) {
     doc.addPage();
-    applyPageDecoration('AGENDA DO DIA', 'Cronograma de celebração e acontecimentos');
+    applyPageDecoration('AGENDA DO DIA', 'Cronograma de celebracao e acontecimentos');
 
     // Draw vertical line for timeline
     doc.setDrawColor(216, 167, 177); // Accent: #D8A7B1
@@ -178,27 +219,27 @@ export async function generateGuestPDF(
       doc.setTextColor(183, 110, 121);
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(12);
-      doc.text(sched.time, 43, y + 1.2);
+      doc.text(stripEmojis(sched.time), 43, y + 1.2);
 
       // Title/Activity Text
       doc.setTextColor(50, 50, 50);
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(12);
-      doc.text(sched.title, 62, y + 1.2);
+      doc.text(stripEmojis(sched.title), 62, y + 1.2);
 
       // Location Text
       doc.setTextColor(120, 120, 120);
       doc.setFont('helvetica', 'italic');
       doc.setFontSize(9.5);
-      doc.text(`Local: ${sched.location}`, 62, y + 6);
+      doc.text(`Local: ${stripEmojis(sched.location)}`, 62, y + 6);
     });
 
     // Footer on page 3
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8.5);
     doc.setTextColor(150, 150, 150);
-    doc.text('Este documento é pessoal e indispensável para a entrada.', 105, 260, { align: 'center' });
-    doc.text('Desenvolvido por Meu Boda - Gestão de Eventos.', 105, 266, { align: 'center' });
+    doc.text('Este documento e pessoal e indispensavel para a entrada.', 105, 260, { align: 'center' });
+    doc.text('Desenvolvido por Meu Boda - Gestao de Eventos.', 105, 266, { align: 'center' });
   }
 
   // PAGE 4: Manual do Convidado & Informações Importantes
@@ -210,7 +251,7 @@ export async function generateGuestPDF(
 
   if (hasDressCode || hasKids || hasInstagram || hasGifts || hasBlocks) {
     doc.addPage();
-    applyPageDecoration('MANUAL DO CONVIDADO', 'Informações importantes sobre o evento');
+    applyPageDecoration('MANUAL DO CONVIDADO', 'Informacoes importantes sobre o evento');
 
     let currentY = 52;
 
@@ -223,42 +264,42 @@ export async function generateGuestPDF(
       doc.setTextColor(183, 110, 121);
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(12);
-      doc.text(title.toUpperCase(), 20, currentY);
+      doc.text(stripEmojis(title).toUpperCase(), 20, currentY);
       currentY += 6;
     };
 
     // 1. Dress Code
     if (hasDressCode) {
-      drawSectionHeader('👗 Dress Code');
+      drawSectionHeader('Dress Code');
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(10.5);
       doc.setTextColor(60, 60, 60);
       
       if (event.dress_code_style) {
-        doc.text(`Estilo sugerido: ${event.dress_code_style}`, 20, currentY);
+        doc.text(`Estilo sugerido: ${stripEmojis(event.dress_code_style)}`, 20, currentY);
         currentY += 5.5;
       }
       if (event.dress_code_colors) {
-        doc.text(`Cores sugeridas: ${event.dress_code_colors}`, 20, currentY);
+        doc.text(`Cores sugeridas: ${stripEmojis(event.dress_code_colors)}`, 20, currentY);
         currentY += 7;
       }
     }
 
     // 2. Kids Restriction Note
     if (hasKids) {
-      drawSectionHeader('👶 Crianças');
+      drawSectionHeader('Criancas');
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(10.5);
       doc.setTextColor(60, 60, 60);
 
-      const splitText = doc.splitTextToSize(event.kids_restriction_note!, 170);
+      const splitText = doc.splitTextToSize(stripEmojis(event.kids_restriction_note!), 170);
       doc.text(splitText, 20, currentY);
       currentY += splitText.length * 5.5 + 2;
     }
 
     // 3. Instagram Handles
     if (hasInstagram) {
-      drawSectionHeader('📸 Partilhe Conosco');
+      drawSectionHeader('Partilhe Connosco');
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(10.5);
       doc.setTextColor(60, 60, 60);
@@ -272,20 +313,20 @@ export async function generateGuestPDF(
         event.instagram_host_2 ? `@${event.instagram_host_2}` : ''
       ].filter(Boolean).join('  /  ');
       
-      doc.text(handles, 20, currentY);
+      doc.text(stripEmojis(handles), 20, currentY);
       currentY += 8;
     }
 
     // 4. Gift Suggestions
     if (hasGifts) {
-      drawSectionHeader('🎁 Sugestões de Presente');
+      drawSectionHeader('Sugestoes de Presente');
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(10.5);
       doc.setTextColor(60, 60, 60);
 
       const giftLines = event.gift_suggestions!.split('\n').filter(Boolean);
       giftLines.forEach((line) => {
-        doc.text(`• ${line.trim()}`, 24, currentY);
+        doc.text(`• ${stripEmojis(line.trim())}`, 24, currentY);
         currentY += 5.5;
       });
       currentY += 2;
@@ -297,7 +338,7 @@ export async function generateGuestPDF(
         // Prevent printing over footer or page boundaries
         if (currentY > 230) {
           doc.addPage();
-          applyPageDecoration('MANUAL DO CONVIDADO', 'Informações importantes sobre o evento');
+          applyPageDecoration('MANUAL DO CONVIDADO', 'Informacoes importantes sobre o evento');
           currentY = 52;
         }
 
@@ -306,7 +347,7 @@ export async function generateGuestPDF(
         doc.setFontSize(10.5);
         doc.setTextColor(60, 60, 60);
 
-        const splitBlockText = doc.splitTextToSize(block.content, 170);
+        const splitBlockText = doc.splitTextToSize(stripEmojis(block.content), 170);
         doc.text(splitBlockText, 20, currentY);
         currentY += splitBlockText.length * 5.5 + 4;
       });
@@ -316,8 +357,8 @@ export async function generateGuestPDF(
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8.5);
     doc.setTextColor(150, 150, 150);
-    doc.text('Este documento é pessoal e indispensável para a entrada.', 105, 260, { align: 'center' });
-    doc.text('Desenvolvido por Meu Boda - Gestão de Eventos.', 105, 266, { align: 'center' });
+    doc.text('Este documento e pessoal e indispensavel para a entrada.', 105, 260, { align: 'center' });
+    doc.text('Desenvolvido por Meu Boda - Gestao de Eventos.', 105, 266, { align: 'center' });
   }
 
   return doc;
