@@ -55,28 +55,37 @@ Esta aplicação foi desenvolvida com foco em alta performance, UX/UI premium (R
 - **Drag & Drop Nativo:** Arrastamento de convidados unseated (não alocados) diretamente para as mesas com atualização instantânea no banco de dados e contadores dinâmicos de capacidade máxima por mesa.
 
 ### 5. Configuração e Multi-tipo de Eventos
-- **Suporte Geral de Eventos:** Suporta Casamentos (Weddings), Aniversários, Pedidos de Casamento/Noivados e Outros Eventos. O formulário de criação adapta-se dinamicamente às terminologias de cada tipo de celebração.
-- **Campos Específicos para Casamento:** Registo de Igreja/Local da Cerimónia com hora de início, e Local da Festa/Copo d'Água com hora de início.
+- **Suporte Geral de Eventos:** Suporta Casamentos, Aniversários, Pedidos de Casamento/Noivados e Outros Eventos. O formulário de criação e as descrições no portal do convidado adaptam-se dinamicamente ao tipo de celebração.
 - **Suporte a Coordenadas GPS (Google Maps):** Campos dedicados para links do Google Maps, coordenadas geográficas ou endereços. O sistema resolve automaticamente as informações e cria um botão direto de navegação por GPS para o convidado.
+- **Upload de Imagens Canva e Fundo do Convite:**
+  - **Imagem de Capa:** A capa gráfica do convite (Canva).
+  - **Imagem de Fundo (PDF Background):** Uma imagem de fundo que é aplicada de forma limpa a todas as páginas complementares do PDF exportado (QR Code, Agenda e Manual).
 
 ### 6. Portal Público do Convidado (RSVP & Acesso)
 - **Página de Boas-vindas Personalizada:** Apresentação da imagem de capa, contagem regressiva personalizada, e descrição do evento.
-- **Formulário de Confirmação:** Confirmação de presença (Sim/Não), especificação exata de acompanhantes adicionais (dentro do limite configurado) e envio de restrições alimentares.
-- **GPS "Como Chegar":** Botões intuitivos baseados em ícones que redirecionam o convidado diretamente para as direções do Google Maps para a cerimónia e para a festa.
-- **Passe de Entrada com QR Code:** Geração de bilhete de acesso individual com QR Code legível no telemóvel para validação na portaria.
-- **Download do Convite Completo (PDF de 2 Páginas):**
-  - **Página 1:** Imagem do convite gráfico (importado diretamente do Canva pelo painel de administração).
+- **Formulário de Confirmação:** Confirmação de presença (Sim/Não) e envio de restrições alimentares. A contagem de acompanhantes extras é definida apenas pelo administrador para maior controlo de entradas.
+- **GPS "Como Chegar":** Botões intuitivos que redirecionam o convidado diretamente para as direções do Google Maps para a cerimónia e para a festa.
+- **Passe de Acesso Digital (Premium):** Exibição do QR Code individual no formato de um bilhete de acesso elegante contendo o nome do convidado, a mesa atribuída, a contagem de acompanhantes e a data do evento.
+- **Download do Convite Completo (PDF):**
+  - **Página 1:** Imagem gráfica do convite (Canva).
   - **Página 2:** O passe de entrada oficial com os dados do evento, mesa atribuída e o QR Code.
+  - **Página 3:** Agenda do dia detalhada e cronograma.
+  - **Página 4:** Manual do Convidado e Informações Importantes.
+  - *Otimização:* Todas as páginas complementares herdam a imagem de fundo do convite com uma máscara branca de opacidade para legibilidade perfeita, livre de emojis corrompidos (higienização automática).
 
 ### 7. Controlo de Portaria (Check-in)
 - **Validação de Entrada:** Validação rápida de entradas através da leitura de QR Codes (simulado por introdução de token ou via câmara) contra a base de dados em tempo real.
 - **Confetti Celebration:** Disparo de animação visual ao detetar entradas válidas e feedback sonoro/visual para controlo de acesso rápido.
 
 ### 8. Gestão Financeira, Tarefas, Contratos e Documentos
-- **Orçamento por Categorias:** Categorização de despesas (Buffet, Salão, Dj, Flores, Lua de Mel...) com barras de progresso financeiro e balanço em Kwanza.
+- **Orçamento por Categorias:** Categorização de despesas com barras de progresso financeiro e balanço em Kwanza.
 - **Gestão de Fornecedores:** Registo de contactos, links de sites e valores de contratos para controlo de pagamentos.
-- **Lista de Tarefas:** Checklist interativo filtrado por prioridade (Alta, Média, Baixa) com prazos de conclusão.
+- **Lista de Tarefas:** Checklist interativo filtrado por prioridade com prazos de conclusão.
 - **Documentos:** Envio de contratos em PDF ou imagens dos fornecedores para pastas seguras de armazenamento (Supabase Storage) com pré-visualização.
+
+### 9. Manual do Convidado & Informações Importantes
+- **Campos Estruturados Padrão:** Dress code (estilo e sugestão de cores), data limite de RSVP no formulário, nota sobre crianças e links rápidos integrados com a app do Instagram dos anfitriões.
+- **Informações Extra (Blocos Dinâmicos):** Área dinâmica no painel de administração com CRUD completo para criar e ordenar blocos livres de informação adicional para os convidados (ex: IBAN, hotéis próximos, transporte de convidados).
 
 ---
 
