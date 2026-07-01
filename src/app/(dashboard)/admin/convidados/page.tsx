@@ -236,35 +236,6 @@ export default function ConvidadosPage() {
             Exportar Lista
           </Button>
 
-          {/* Download Template */}
-          <Button
-            variant="outline"
-            size="sm"
-            leftIcon={<FileSpreadsheet className="h-4 w-4" />}
-            onClick={handleExcelTemplateDownload}
-          >
-            Baixar Modelo Excel
-          </Button>
-
-          {/* Import Excel */}
-          <div className="relative">
-            <input
-              type="file"
-              accept=".xlsx, .xls"
-              onChange={handleExcelImport}
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:pointer-events-none"
-              id="excel-upload"
-              disabled={importingExcel}
-            />
-            <Button
-              variant="outline"
-              size="sm"
-              leftIcon={importingExcel ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-            >
-              Importar Excel
-            </Button>
-          </div>
-
           <Button leftIcon={<Plus className="h-4 w-4" />} onClick={handleNewGuestClick} size="sm">
             Novo Convidado
           </Button>
