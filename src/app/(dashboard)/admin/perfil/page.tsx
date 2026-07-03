@@ -12,10 +12,12 @@ export default function PerfilPage() {
   const { user } = useAuth();
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   
   const [isSaving, setIsSaving] = useState(false);
+  const [isSendingResetEmail, setIsSendingResetEmail] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -27,6 +29,25 @@ export default function PerfilPage() {
     }
   }, [user]);
 
+  const handleSendResetEmail = async () => {
+    if (!user || !user.email) return;
+    setIsSendingResetEmail(true);
+    setSuccessMessage(null);
+    setErrorMessage(null);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
+        redirectTo: `${window.location.origin}/admin/perfil`,
+      });
+      if (error) throw error;
+      setSuccessMessage('E-mail de recuperação de senha enviado! Verifique a sua caixa de entrada.');
+    } catch (err: any) {
+      console.error('Error sending reset email:', err);
+      setErrorMessage(err.message || 'Erro ao enviar e-mail de recuperação de senha.');
+    } finally {
+      setIsSendingResetEmail(false);
+    }
+  };
+
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
@@ -37,19 +58,38 @@ export default function PerfilPage() {
 
     // Validate passwords if user wants to change password
     if (password) {
+      if (!currentPassword) {
+        setErrorMessage('Para alterar a sua senha, deve digitar a sua senha atual.');
+        setIsSaving(false);
+        return;
+      }
       if (password.length < 6) {
         setErrorMessage('A nova senha deve ter pelo menos 6 caracteres.');
         setIsSaving(false);
         return;
       }
       if (password !== confirmPassword) {
-        setErrorMessage('As senhas não coincidem.');
+        setErrorMessage('As novas senhas não coincidem.');
         setIsSaving(false);
         return;
       }
     }
 
     try {
+      // Re-authenticate user if changing password to verify current password
+      if (password) {
+        const { error: reAuthError } = await supabase.auth.signInWithPassword({
+          email: user.email!,
+          password: currentPassword,
+        });
+
+        if (reAuthError) {
+          setErrorMessage('A senha atual inserida está incorreta.');
+          setIsSaving(false);
+          return;
+        }
+      }
+
       // Build update payload
       const updateData: any = {
         data: {
@@ -66,11 +106,12 @@ export default function PerfilPage() {
 
       if (error) throw error;
 
-      setSuccessMessage('Perfil atualizado com sucesso!');
+      setSuccessMessage('Dados atualizados com sucesso!');
+      setCurrentPassword('');
       setPassword('');
       setConfirmPassword('');
       
-      // Update local storage/state if needed
+      // Update local state
       if (data.user) {
         setFullName(data.user.user_metadata?.full_name || '');
         setPhone(data.user.user_metadata?.phone || '');
@@ -206,21 +247,49 @@ export default function PerfilPage() {
                     <Lock className="h-4 w-4" /> Alterar Senha de Acesso
                   </h4>
                   
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-4">
                     <Input
-                      label="Nova Senha"
-                      placeholder="Mínimo 6 caracteres"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
+                      label="Senha Atual"
+                      placeholder="Digite a sua senha atual"
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
                       type="password"
+                      helperText="Obrigatório caso pretenda definir uma nova senha abaixo."
                     />
-                    <Input
-                      label="Confirmar Nova Senha"
-                      placeholder="Digite novamente"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      type="password"
-                    />
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <Input
+                        label="Nova Senha"
+                        placeholder="Mínimo 6 caracteres"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        type="password"
+                      />
+                      <Input
+                        label="Confirmar Nova Senha"
+                        placeholder="Digite novamente"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        type="password"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="bg-secondary/5 border border-border-custom/50 rounded-2xl p-4 space-y-3 mt-4">
+                    <h5 className="text-xs font-bold text-foreground/75 uppercase tracking-wide">Alternativa por Email</h5>
+                    <p className="text-xs text-foreground/60 leading-relaxed">
+                      Se preferir ou não se lembrar da sua senha atual, podemos enviar um link seguro de recuperação para a sua caixa de correio para redefini-la.
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleSendResetEmail}
+                      isLoading={isSendingResetEmail}
+                      className="border-primary/30 text-primary hover:bg-primary/5"
+                    >
+                      Enviar Link de Recuperação
+                    </Button>
                   </div>
                 </div>
 
