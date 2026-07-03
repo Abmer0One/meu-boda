@@ -28,6 +28,7 @@ import {
   ChevronDown,
   Loader2,
   Camera,
+  User,
 } from 'lucide-react';
 
 interface SidebarItem {
@@ -49,6 +50,7 @@ const menuItems: SidebarItem[] = [
   { name: 'Documentos', href: '/admin/documentos', icon: FileText },
   { name: 'Relatórios', href: '/admin/relatorios', icon: FileSpreadsheet },
   { name: 'Portaria (Check-in)', href: '/admin/checkin', icon: QrCode },
+  { name: 'Meu Perfil', href: '/admin/perfil', icon: User },
 ];
 
 const mobileTabItems = [
