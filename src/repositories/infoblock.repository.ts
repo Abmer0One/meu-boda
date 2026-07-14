@@ -10,7 +10,12 @@ export const InfoBlockRepository = {
       .order('sort_order', { ascending: true });
 
     if (error) {
-      console.error('Error fetching info blocks:', error);
+      console.error('Error fetching info blocks:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code,
+      });
       return [];
     }
     return data as EventInfoBlock[];
