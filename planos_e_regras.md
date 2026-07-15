@@ -6,17 +6,20 @@ Este documento serve como registo oficial da estratégia de preços, estrutura d
 
 ## 1. Estrutura de Planos e Preços
 
-Para atender tanto o cliente final (Noivos) quanto o cliente corporativo (*Wedding Planners* que trazem volume de vendas), dividimos a plataforma em três planos principais baseados no conceito de **Slots de Eventos Ativos em Simultâneo**.
+Para atender tanto o cliente final (Noivos) quanto o cliente corporativo (*Wedding Planners*), a plataforma disponibiliza três planos comerciais baseados no conceito de **Slots de Eventos Ativos em Simultâneo**:
 
 | Plano | Público-Alvo | Capacidade de Slots Ativos | Preço Sugerido (AOA) | Faturamento |
 | :--- | :--- | :--- | :--- | :--- |
 | **Plano Noivos** | Casal individual | **1 Slot** (morre após a festa) | **45.000 Kz (Taxa Única)** | Transação Única |
-| **Planner Starter** | Organizadores independentes | Até **3 Slots Ativos** em simultâneo | **20.000 Kz / mês** ou **200.000 Kz / ano** | Recorrência (SaaS) |
-| **Planner Pro** | Grandes agências de eventos | Até **10 Slots Ativos** em simultâneo | **50.000 Kz / mês** ou **500.000 Kz / ano** | Recorrência (SaaS) |
+| **Planner Starter** | Organizadores independentes | Até **2 Slots Ativos** em simultâneo | **20.000 Kz / mês** ou **200.000 Kz / ano** | Recorrência (SaaS) |
+| **Planner Pro** | Médias e grandes agências | Até **5 Slots Ativos** em simultâneo | **40.000 Kz** ou **45.000 Kz / mês** | Recorrência (SaaS) |
 
 > [!NOTE]
 > **O que é um Slot Ativo?** 
-> É o espaço reservado para um evento que está a decorrer (fase de planeamento, RSVP ou no dia da festa). Assim que o casamento termina e é arquivado pelo sistema, o slot liberta-se de forma automática na conta do organizador para que possa registar o cliente seguinte.
+> É o espaço reservado para um evento ativo (em planeamento ou RSVP). Assim que o casamento é concluído e arquivado pelo sistema (48h após a data da festa), o slot liberta-se automaticamente na conta do organizador para que possa criar um novo evento.
+> *   **Plano Noivos:** Entrada B2C acessível (1 único slot não reutilizável).
+> *   **Planner Starter:** Ideal para iniciantes. Se o planner tiver 3 clientes ao mesmo tempo, é obrigado a fazer o upgrade para o Pro.
+> *   **Planner Pro:** Protege a integridade financeira do SaaS contra a partilha de contas e reflete o volume operacional real de uma agência de casamentos saudável (máximo de 5 casamentos simultâneos).
 
 ---
 
