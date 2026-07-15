@@ -29,6 +29,7 @@ import {
   Loader2,
   Camera,
   User,
+  ShieldAlert,
 } from 'lucide-react';
 
 interface SidebarItem {
@@ -51,6 +52,7 @@ const menuItems: SidebarItem[] = [
   { name: 'Relatórios', href: '/admin/relatorios', icon: FileSpreadsheet },
   { name: 'Portaria (Check-in)', href: '/admin/checkin', icon: QrCode },
   { name: 'Meu Perfil', href: '/admin/perfil', icon: User },
+  { name: 'Consola Admin', href: '/admin/super', icon: ShieldAlert },
 ];
 
 const mobileTabItems = [
@@ -66,6 +68,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter();
   const pathname = usePathname();
 
+  const isAdmin = user?.app_metadata?.role === 'admin'
+    || user?.email?.includes('admin')
+    || user?.email === 'amota@example.com';
+
+  const visibleMenuItems = isAdmin
+    ? menuItems.filter(item => item.href === '/admin/super' || item.href === '/admin/perfil')
+    : menuItems.filter(item => item.href !== '/admin/super');
+
+  const visibleMobileTabItems = isAdmin
+    ? [
+        { name: 'Consola', href: '/admin/super', icon: ShieldAlert },
+        { name: 'Perfil', href: '/admin/perfil', icon: User },
+      ]
+    : mobileTabItems;
+
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [newEventModalOpen, setNewEventModalOpen] = useState(false);
   const [eventTitle, setEventTitle] = useState('');
@@ -76,10 +93,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   // Authentication guard redirect
   useEffect(() => {
-    if (!authLoading && !user) {
-      router.push('/login');
+    if (!authLoading) {
+      if (!user) {
+        router.push('/login');
+      } else if (isAdmin && (pathname === '/admin/dashboard' || pathname === '/admin')) {
+        router.push('/admin/super');
+      }
     }
-  }, [user, authLoading, router]);
+  }, [user, authLoading, router, isAdmin, pathname]);
 
   // Sync slug on title change
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -163,32 +184,34 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
 
         {/* EVENT SELECTOR */}
-        <div className="p-4 border-b border-border-custom">
-          {events.length > 0 ? (
-            <div>
-              <label className="text-[10px] font-bold text-foreground/50 uppercase tracking-wider block mb-1">
-                Evento Ativo
-              </label>
-              <div className="flex items-center gap-2 w-full rounded-xl border border-border-custom/50 bg-secondary/20 px-3 py-2 text-xs font-bold text-foreground/80">
-                <span className="truncate">{currentEvent?.title}</span>
+        {!isAdmin && (
+          <div className="p-4 border-b border-border-custom">
+            {events.length > 0 ? (
+              <div>
+                <label className="text-[10px] font-bold text-foreground/50 uppercase tracking-wider block mb-1">
+                  Evento Ativo
+                </label>
+                <div className="flex items-center gap-2 w-full rounded-xl border border-border-custom/50 bg-secondary/20 px-3 py-2 text-xs font-bold text-foreground/80">
+                  <span className="truncate">{currentEvent?.title}</span>
+                </div>
               </div>
-            </div>
-          ) : (
-            <Button
-              variant="secondary"
-              size="sm"
-              className="w-full justify-center text-xs"
-              leftIcon={<Plus className="h-3 w-3" />}
-              onClick={() => setNewEventModalOpen(true)}
-            >
-              Criar Evento
-            </Button>
-          )}
-        </div>
+            ) : (
+              <Button
+                variant="secondary"
+                size="sm"
+                className="w-full justify-center text-xs"
+                leftIcon={<Plus className="h-3 w-3" />}
+                onClick={() => setNewEventModalOpen(true)}
+              >
+                Criar Evento
+              </Button>
+            )}
+          </div>
+        )}
 
         {/* NAV LINKS */}
         <nav className="flex-1 space-y-1 px-3 py-4 overflow-y-auto">
-          {menuItems.map((item) => {
+          {visibleMenuItems.map((item) => {
             const isActive = pathname === item.href;
             const Icon = item.icon;
             return (
@@ -227,7 +250,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* MOBILE HEADER & CONTENT CONTAINER */}
       <div className="flex flex-1 flex-col overflow-hidden">
         <header className="flex h-16 shrink-0 items-center justify-between border-b border-border-custom bg-card-bg px-4 md:hidden">
-          <Link href="/admin/dashboard" className="flex items-center">
+          <Link href={isAdmin ? '/admin/super' : '/admin/dashboard'} className="flex items-center">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/logo.png" alt="Logo Meu Boda" className="h-10 w-auto object-contain" />
           </Link>
@@ -250,7 +273,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* MAIN PAGE BODY */}
         <main className="flex-1 overflow-y-auto p-4 pb-24 md:p-8 bg-background relative">
-          {events.length === 0 && !eventLoading ? (
+          {events.length === 0 && !eventLoading && !isAdmin ? (
             <div className="flex h-[70vh] flex-col items-center justify-center text-center max-w-md mx-auto">
               <Heart className="h-16 w-16 text-accent animate-pulse mb-4" />
               <h2 className="text-xl font-bold mb-2">Bem-vindo ao Meu Boda!</h2>
@@ -268,7 +291,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* MOBILE BOTTOM NAVIGATION */}
         <nav className="fixed bottom-0 inset-x-0 h-16 bg-card-bg border-t border-border-custom flex items-center justify-around z-40 md:hidden pb-safe">
-          {mobileTabItems.map((item) => {
+          {visibleMobileTabItems.map((item) => {
             const isActive = pathname === item.href;
             const Icon = item.icon;
             return (
@@ -303,7 +326,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           )}
 
           <nav className="flex flex-col gap-1.5">
-            {menuItems.map((item) => {
+            {visibleMenuItems.map((item) => {
               const isActive = pathname === item.href;
               const Icon = item.icon;
               return (
