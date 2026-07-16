@@ -179,7 +179,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div className="flex h-20 items-center justify-center px-6 border-b border-border-custom bg-card-bg/50">
           <Link href="/admin/dashboard" className="flex items-center justify-center w-full">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.png" alt="Logo Meu Boda" className="h-14 w-auto object-contain" />
+            <img src="/meu_boda_hybrid-removebg-preview.png" alt="Logo Meu Boda" className="h-14 w-auto object-contain" />
           </Link>
         </div>
 
@@ -252,7 +252,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <header className="flex h-16 shrink-0 items-center justify-between border-b border-border-custom bg-card-bg px-4 md:hidden">
           <Link href={isAdmin ? '/admin/super' : '/admin/dashboard'} className="flex items-center">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.png" alt="Logo Meu Boda" className="h-10 w-auto object-contain" />
+            <img src="/meu_boda_hybrid-removebg-preview.png" alt="Logo Meu Boda" className="h-10 w-auto object-contain" />
           </Link>
 
           <div className="flex items-center gap-2">

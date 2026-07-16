@@ -58,7 +58,7 @@ export default function RegisterPage() {
         <FadeInUp>
           <div className="text-center mb-6 flex flex-col items-center">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.png" alt="Logo Meu Boda" className="h-32 w-auto object-contain" />
+            <img src="/meu_boda_hybrid-removebg-preview.png" alt="Logo Meu Boda" className="h-32 w-auto object-contain" />
             <p className="text-sm text-foreground/60 mt-3 font-semibold">Painel de Organização de Eventos</p>
           </div>
 
