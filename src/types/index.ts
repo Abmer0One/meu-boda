@@ -47,7 +47,7 @@ export interface Guest {
   family_group: string | null;
   companions: number;
   table_id: string | null;
-  status: 'Pending' | 'Confirmed' | 'Declined';
+  status: string;
   qr_token: string;
   invitation_sent: boolean;
   notes: string | null;

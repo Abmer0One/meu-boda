@@ -124,7 +124,12 @@ export default function ConvidadosPage() {
       family_group: guest.family_group || '',
       companions: guest.companions,
       table_id: guest.table_id || '',
-      status: guest.status,
+      status: (() => {
+        const s = guest.status?.toLowerCase() || '';
+        if (s === 'confirmed' || s === 'confirmado' || s === 'sim' || s === 'yes') return 'Confirmed';
+        if (s === 'declined' || s === 'recusado' || s === 'recusada' || s === 'não' || s === 'no') return 'Declined';
+        return 'Pending';
+      })() as 'Pending' | 'Confirmed' | 'Declined',
       notes: guest.notes || '',
     });
     setGuestModalOpen(true);
@@ -214,7 +219,15 @@ export default function ConvidadosPage() {
       (g.email && g.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (g.family_group && g.family_group.toLowerCase().includes(searchTerm.toLowerCase()));
 
-    const matchesStatus = statusFilter === 'All' || g.status === statusFilter;
+    const normalizeStatus = (status: string) => {
+      if (!status) return 'Pending';
+      const s = status.toLowerCase();
+      if (s === 'confirmed' || s === 'confirmado' || s === 'sim' || s === 'yes') return 'Confirmed';
+      if (s === 'declined' || s === 'recusado' || s === 'recusada' || s === 'não' || s === 'no') return 'Declined';
+      return 'Pending';
+    };
+
+    const matchesStatus = statusFilter === 'All' || normalizeStatus(g.status) === statusFilter;
 
     return matchesSearch && matchesStatus;
   });
@@ -345,18 +358,20 @@ export default function ConvidadosPage() {
                     <td className="p-3.5">
                       <Badge
                         variant={
-                          guest.status === 'Confirmed'
-                            ? 'success'
-                            : guest.status === 'Declined'
-                            ? 'error'
-                            : 'warning'
+                          (() => {
+                            const s = guest.status?.toLowerCase() || '';
+                            if (s === 'confirmed' || s === 'confirmado' || s === 'sim' || s === 'yes') return 'success';
+                            if (s === 'declined' || s === 'recusado' || s === 'recusada' || s === 'não' || s === 'no') return 'error';
+                            return 'warning';
+                          })()
                         }
                       >
-                        {guest.status === 'Confirmed'
-                          ? 'Confirmado'
-                          : guest.status === 'Declined'
-                          ? 'Recusado'
-                          : 'Pendente'}
+                        {(() => {
+                          const s = guest.status?.toLowerCase() || '';
+                          if (s === 'confirmed' || s === 'confirmado' || s === 'sim' || s === 'yes') return 'Confirmado';
+                          if (s === 'declined' || s === 'recusado' || s === 'recusada' || s === 'não' || s === 'no') return 'Recusado';
+                          return 'Pendente';
+                        })()}
                       </Badge>
                     </td>
                     <td className="p-3.5 text-center">

@@ -76,7 +76,12 @@ export default function RelatoriosPage() {
       Grupo: g.family_group || '',
       Acompanhantes: g.companions,
       Mesa: getTableName(g.table_id),
-      RSVP: g.status === 'Confirmed' ? 'Confirmado' : g.status === 'Declined' ? 'Recusado' : 'Pendente',
+      RSVP: (() => {
+        const s = g.status?.toLowerCase() || '';
+        if (s === 'confirmed' || s === 'confirmado' || s === 'sim' || s === 'yes') return 'Confirmado';
+        if (s === 'declined' || s === 'recusado' || s === 'recusada' || s === 'não' || s === 'no') return 'Recusado';
+        return 'Pendente';
+      })(),
     }));
     const worksheet = XLSX.utils.json_to_sheet(data);
     const workbook = XLSX.utils.book_new();
@@ -186,7 +191,12 @@ export default function RelatoriosPage() {
       g.name,
       g.companions.toString(),
       getTableName(g.table_id),
-      g.status === 'Confirmed' ? 'Confirmado' : g.status === 'Declined' ? 'Recusado' : 'Pendente',
+      (() => {
+        const s = g.status?.toLowerCase() || '';
+        if (s === 'confirmed' || s === 'confirmado' || s === 'sim' || s === 'yes') return 'Confirmado';
+        if (s === 'declined' || s === 'recusado' || s === 'recusada' || s === 'não' || s === 'no') return 'Recusado';
+        return 'Pendente';
+      })(),
     ]);
     generatePDFReport('Relatório de RSVP e Convidados', headers, rows, `relatorio_convidados_${currentEvent?.slug}.pdf`);
   };

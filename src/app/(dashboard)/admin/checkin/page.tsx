@@ -215,7 +215,9 @@ export default function CheckinPage() {
   const filteredGuests = guests.filter((g) => {
     const isSeated = g.name.toLowerCase().includes(searchTerm.toLowerCase());
     const isCheckedIn = checkins.some((ci) => ci.guest_id === g.id);
-    return isSeated && !isCheckedIn && g.status === 'Confirmed';
+    const s = g.status?.toLowerCase() || '';
+    const isConfirmed = s === 'confirmed' || s === 'confirmado' || s === 'sim' || s === 'yes';
+    return isSeated && !isCheckedIn && isConfirmed;
   });
 
   if (!currentEvent) {

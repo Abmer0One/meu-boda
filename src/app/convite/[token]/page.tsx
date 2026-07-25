@@ -117,7 +117,12 @@ export default function PublicRSVPPage({ params }: RSVPPageProps) {
       }
 
       setGuest(fetchedGuest);
-      setRsvpStatus(fetchedGuest.status);
+      setRsvpStatus((() => {
+        const s = fetchedGuest.status?.toLowerCase() || '';
+        if (s === 'confirmed' || s === 'confirmado' || s === 'sim' || s === 'yes') return 'Confirmed';
+        if (s === 'declined' || s === 'recusado' || s === 'recusada' || s === 'não' || s === 'no') return 'Declined';
+        return 'Pending';
+      })());
       setCompanions(fetchedGuest.companions);
       setNotes(fetchedGuest.notes || '');
 

@@ -20,16 +20,29 @@ export const DashboardService = {
       daysRemaining = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
     }
 
+    // Helper to check statuses case-insensitively and language-agnostically
+    const checkStatus = (status: string, target: 'confirmed' | 'pending' | 'declined') => {
+      if (!status) return false;
+      const s = status.toLowerCase();
+      if (target === 'confirmed') {
+        return s === 'confirmed' || s === 'confirmado' || s === 'sim' || s === 'yes';
+      }
+      if (target === 'declined') {
+        return s === 'declined' || s === 'recusado' || s === 'recusada' || s === 'não' || s === 'no';
+      }
+      return s === 'pending' || s === 'pendente' || (!s.startsWith('confir') && !s.startsWith('recus') && s !== 'sim' && s !== 'yes' && s !== 'não' && s !== 'no');
+    };
+
     // 2. Guest stats
     const totalGuests = guests.reduce((sum, g) => sum + 1 + (g.companions || 0), 0);
     const confirmedGuests = guests
-      .filter((g) => g.status === 'Confirmed')
+      .filter((g) => checkStatus(g.status, 'confirmed'))
       .reduce((sum, g) => sum + 1 + (g.companions || 0), 0);
     const pendingGuests = guests
-      .filter((g) => g.status === 'Pending')
+      .filter((g) => checkStatus(g.status, 'pending'))
       .reduce((sum, g) => sum + 1 + (g.companions || 0), 0);
     const declinedGuests = guests
-      .filter((g) => g.status === 'Declined')
+      .filter((g) => checkStatus(g.status, 'declined'))
       .reduce((sum, g) => sum + 1 + (g.companions || 0), 0);
 
     // 3. Invitations
