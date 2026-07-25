@@ -19,6 +19,7 @@ export interface AdminEvent {
   created_at: string;
   status: string;
   guests_count: number;
+  confirmed_guests_count: number;
   checkins_count: number;
   total_tasks: number;
   completed_tasks: number;

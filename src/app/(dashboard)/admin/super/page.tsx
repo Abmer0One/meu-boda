@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
 import { SuperAdminRepository, AdminUser, AdminEvent, AdminTask, AdminCheckin } from '@/repositories/superadmin.repository';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -78,6 +79,38 @@ export default function SuperAdminPage() {
 
   useEffect(() => {
     loadData();
+
+    if (!isAdmin) return;
+
+    // Listen to changes across all tables to update stats in real-time
+    const channel = supabase
+      .channel('super-admin-realtime-channel')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'events' },
+        () => { loadData(); }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'guests' },
+        () => { loadData(); }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'checkins' },
+        () => { loadData(); }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'tasks' },
+        () => { loadData(); }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   const handleOpenEdit = (targetUser: AdminUser) => {
@@ -396,15 +429,23 @@ export default function SuperAdminPage() {
                         <td className="py-3.5 px-4 font-semibold text-foreground">{e.title}</td>
                         <td className="py-3.5 px-4 text-foreground/60 text-xs">{e.owner_email}</td>
                         <td className="py-3.5 px-4">
-                          <div className="flex flex-col gap-0.5">
-                            <span className="font-semibold text-xs text-foreground/80">
-                              {e.checkins_count} <span className="text-foreground/40 font-normal">de {e.guests_count} confirmados</span>
+                          <div className="flex flex-col gap-1 text-[11px] sm:text-xs">
+                            <span className="font-semibold text-foreground/80 flex items-center gap-1.5">
+                              <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                              Portaria: <span className="text-emerald-500 font-bold">{e.checkins_count}</span> <span className="text-foreground/45 font-normal">entradas</span>
                             </span>
-                            {e.guests_count > 0 && (
-                              <div className="w-24 h-1.5 bg-secondary rounded-full overflow-hidden mt-0.5">
+                            <span className="font-semibold text-foreground/80 flex items-center gap-1.5">
+                              <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500" />
+                              Confirmados: <span className="text-amber-500 font-bold">{e.confirmed_guests_count}</span>
+                            </span>
+                            <span className="text-foreground/50 flex items-center gap-1.5 pl-3">
+                              Total de Convidados: <span className="font-medium text-foreground/70">{e.guests_count}</span>
+                            </span>
+                            {e.confirmed_guests_count > 0 && (
+                              <div className="w-24 h-1 bg-secondary rounded-full overflow-hidden mt-1 ml-3">
                                 <div 
-                                  className="h-full bg-success rounded-full" 
-                                  style={{ width: `${(e.checkins_count / e.guests_count) * 100}%` }}
+                                  className="h-full bg-emerald-500 rounded-full" 
+                                  style={{ width: `${Math.min(100, (e.checkins_count / e.confirmed_guests_count) * 100)}%` }}
                                 />
                               </div>
                             )}
