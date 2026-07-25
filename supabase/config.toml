@@ -334,6 +334,14 @@ skip_nonce_check = false
 # If enabled, it will allow the user to successfully authenticate when the provider does not return an email address.
 email_optional = false
 
+[auth.external.google]
+enabled = true
+client_id = "your-google-client-id.apps.googleusercontent.com"
+secret = "your-google-client-secret"
+skip_nonce_check = true
+redirect_uri = ""
+email_optional = false
+
 # Allow Solana wallet holders to sign in to your project via the Sign in with Solana (SIWS, EIP-4361) standard.
 # You can configure "web3" rate limit in the [auth.rate_limit] section and set up [auth.captcha] if self-hosting.
 [auth.web3.solana]
@@ -386,7 +394,7 @@ deno_version = 2
 # secret_key = "env(SECRET_VALUE)"
 
 [analytics]
-enabled = true
+enabled = false
 port = 64327
 # Configure one of the supported backends: `postgres`, `bigquery`.
 backend = "postgres"

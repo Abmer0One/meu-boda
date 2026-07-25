@@ -13,6 +13,8 @@ import { Dialog } from '@/components/ui/Dialog';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { vendorSchema } from '@/validations/schemas';
+import MarketplaceTab from '@/components/marketplace/MarketplaceTab';
+import ChatTab from '@/components/marketplace/ChatTab';
 import {
   Briefcase,
   Plus,
@@ -24,12 +26,17 @@ import {
   AlertCircle,
   Loader2,
   DollarSign,
+  Search,
+  MessageSquare,
+  Sparkles
 } from 'lucide-react';
 
 export default function FornecedoresPage() {
   const { currentEvent } = useEvent();
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'contratos' | 'explorar' | 'mensagens'>('contratos');
+  const [preselectedRoomId, setPreselectedRoomId] = useState<string | null>(null);
 
   // Modals state
   const [vendorModalOpen, setVendorModalOpen] = useState(false);
@@ -156,104 +163,163 @@ export default function FornecedoresPage() {
             <Briefcase className="h-6 w-6 text-primary" /> Fornecedores & Contratos
           </h1>
           <p className="text-sm text-foreground/60">
-            Registe contactos, links de sites e valores contratados com prestadores de serviços.
+            Contrate fornecedores oficiais, converse em tempo real e controle o seu orçamento.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <Card className="bg-card-bg px-4 py-2 flex items-center gap-3 border border-border-custom shadow-none">
-            <div className="rounded-lg bg-primary/10 p-1.5 text-primary">
-              <DollarSign className="h-4 w-4" />
-            </div>
-            <div>
-              <p className="text-[10px] font-semibold text-foreground/50 uppercase tracking-wider">Total Contratado</p>
-              <h4 className="text-sm font-bold">{totalContractedValue.toLocaleString('pt-AO')} Kz</h4>
-            </div>
-          </Card>
-
-          <Button leftIcon={<Plus className="h-4 w-4" />} onClick={handleNewVendorClick} size="sm">
-            Adicionar Fornecedor
-          </Button>
+        {/* Tab Selection */}
+        <div className="flex bg-secondary/15 p-1 rounded-xl border border-border-custom/50 self-start sm:self-center">
+          <button
+            onClick={() => setActiveTab('contratos')}
+            className={`px-4 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+              activeTab === 'contratos'
+                ? 'bg-card-bg text-primary shadow-sm font-bold border border-border-custom/50'
+                : 'text-foreground/60 hover:text-foreground'
+            }`}
+          >
+            Os Meus Contratos
+          </button>
+          <button
+            onClick={() => setActiveTab('explorar')}
+            className={`px-4 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+              activeTab === 'explorar'
+                ? 'bg-card-bg text-primary shadow-sm font-bold border border-border-custom/50'
+                : 'text-foreground/60 hover:text-foreground'
+            }`}
+          >
+            Explorar Marketplace
+          </button>
+          <button
+            onClick={() => setActiveTab('mensagens')}
+            className={`px-4 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+              activeTab === 'mensagens'
+                ? 'bg-card-bg text-primary shadow-sm font-bold border border-border-custom/50'
+                : 'text-foreground/60 hover:text-foreground'
+            }`}
+          >
+            Mensagens & Pedidos
+          </button>
         </div>
       </div>
 
-      {/* Grid of vendors */}
-      {loading ? (
-        <div className="flex h-32 items-center justify-center">
-          <Loader2 className="h-6 w-6 animate-spin text-primary" />
-        </div>
-      ) : vendors.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {vendors.map((vendor) => (
-            <Card key={vendor.id} className="bg-card-bg border border-border-custom flex flex-col justify-between" hoverEffect>
+      {/* Tab Render */}
+      {activeTab === 'contratos' && (
+        <div className="space-y-6">
+          {/* Summary Banner */}
+          <div className="flex justify-between items-center bg-card-bg border border-border-custom p-5 rounded-2xl">
+            <div className="flex items-center gap-3">
+              <div className="rounded-xl bg-primary/10 p-2.5 text-primary">
+                <DollarSign className="h-5 w-5" />
+              </div>
               <div>
-                <div className="flex items-start justify-between gap-2 border-b border-border-custom pb-3 mb-3">
+                <p className="text-[10px] font-bold text-foreground/50 uppercase tracking-wider">Total Adjudicado / Contratado</p>
+                <h3 className="text-xl font-extrabold text-foreground">{totalContractedValue.toLocaleString('pt-AO')} Kz</h3>
+              </div>
+            </div>
+
+            <Button leftIcon={<Plus className="h-4 w-4" />} onClick={handleNewVendorClick} size="sm">
+              Adicionar Fornecedor
+            </Button>
+          </div>
+
+          {/* Grid of vendors */}
+          {loading ? (
+            <div className="flex h-32 items-center justify-center">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            </div>
+          ) : vendors.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {vendors.map((vendor) => (
+                <Card key={vendor.id} className="bg-card-bg border border-border-custom flex flex-col justify-between" hoverEffect>
                   <div>
-                    <h3 className="font-bold text-base truncate max-w-[160px]">{vendor.name}</h3>
-                    <span className="text-xs font-semibold text-foreground/50 uppercase tracking-wider">{vendor.category}</span>
+                    <div className="flex items-start justify-between gap-2 border-b border-border-custom pb-3 mb-3">
+                      <div>
+                        <h3 className="font-bold text-base truncate max-w-[160px]">{vendor.name}</h3>
+                        <span className="text-xs font-semibold text-foreground/50 uppercase tracking-wider">{vendor.category}</span>
+                      </div>
+                      <Badge variant={vendor.status === 'Ativo' ? 'success' : vendor.status === 'Cancelado' ? 'error' : 'warning'}>
+                        {vendor.status}
+                      </Badge>
+                    </div>
+
+                    {/* Details */}
+                    <div className="space-y-2 text-xs text-foreground/75 py-2">
+                      {vendor.phone && (
+                        <div className="flex items-center gap-2">
+                          <Phone className="h-3.5 w-3.5 text-foreground/45 shrink-0" />
+                          <span>{vendor.phone}</span>
+                        </div>
+                      )}
+                      {vendor.email && (
+                        <div className="flex items-center gap-2">
+                          <Mail className="h-3.5 w-3.5 text-foreground/45 shrink-0" />
+                          <span className="truncate">{vendor.email}</span>
+                        </div>
+                      )}
+                      {vendor.website && (
+                        <div className="flex items-center gap-2">
+                          <Globe className="h-3.5 w-3.5 text-foreground/45 shrink-0" />
+                          <a
+                            href={vendor.website.startsWith('http') ? vendor.website : `https://${vendor.website}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-primary hover:underline truncate"
+                          >
+                            {vendor.website}
+                          </a>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <Badge variant={vendor.status === 'Ativo' ? 'success' : vendor.status === 'Cancelado' ? 'error' : 'warning'}>
-                    {vendor.status}
-                  </Badge>
-                </div>
 
-                {/* Details */}
-                <div className="space-y-2 text-xs text-foreground/75 py-2">
-                  {vendor.phone && (
-                    <div className="flex items-center gap-2">
-                      <Phone className="h-3.5 w-3.5 text-foreground/45 shrink-0" />
-                      <span>{vendor.phone}</span>
+                  {/* Card Footer */}
+                  <div className="border-t border-border-custom pt-3 mt-4 flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] text-foreground/50 uppercase tracking-wider font-semibold">Valor Contrato</p>
+                      <p className="text-sm font-bold text-foreground">{Number(vendor.contract_value).toLocaleString('pt-AO')} Kz</p>
                     </div>
-                  )}
-                  {vendor.email && (
-                    <div className="flex items-center gap-2">
-                      <Mail className="h-3.5 w-3.5 text-foreground/45 shrink-0" />
-                      <span className="truncate">{vendor.email}</span>
-                    </div>
-                  )}
-                  {vendor.website && (
-                    <div className="flex items-center gap-2">
-                      <Globe className="h-3.5 w-3.5 text-foreground/45 shrink-0" />
-                      <a
-                        href={vendor.website.startsWith('http') ? vendor.website : `https://${vendor.website}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-primary hover:underline truncate"
-                      >
-                        {vendor.website}
-                      </a>
-                    </div>
-                  )}
-                </div>
-              </div>
 
-              {/* Card Footer */}
-              <div className="border-t border-border-custom pt-3 mt-4 flex items-center justify-between">
-                <div>
-                  <p className="text-[10px] text-foreground/50 uppercase tracking-wider font-semibold">Valor Contrato</p>
-                  <p className="text-sm font-bold text-foreground">{Number(vendor.contract_value).toLocaleString('pt-AO')} Kz</p>
-                </div>
-
-                <div className="flex gap-1">
-                  <Button variant="ghost" size="sm" onClick={() => handleEditVendorClick(vendor)} className="p-1 rounded-lg">
-                    Editar
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={() => handleDeleteClick(vendor)} className="p-1 text-error hover:bg-error/10 rounded-lg">
-                    Remover
-                  </Button>
-                </div>
-              </div>
-            </Card>
-          ))}
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="sm" onClick={() => handleEditVendorClick(vendor)} className="p-1 rounded-lg">
+                        Editar
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => handleDeleteClick(vendor)} className="p-1 text-error hover:bg-error/10 rounded-lg">
+                        Remover
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center text-center py-12 border border-dashed border-border-custom rounded-xl bg-card-bg">
+              <Briefcase className="h-10 w-10 text-foreground/25 mb-2" />
+              <p className="text-sm font-semibold text-foreground/75">Nenhum fornecedor registado</p>
+              <p className="text-xs text-foreground/50 mt-1">
+                Adicione os seus fornecedores para manter os seus contratos centralizados.
+              </p>
+            </div>
+          )}
         </div>
-      ) : (
-        <div className="flex flex-col items-center justify-center text-center py-12 border border-dashed border-border-custom rounded-xl bg-card-bg">
-          <Briefcase className="h-10 w-10 text-foreground/25 mb-2" />
-          <p className="text-sm font-semibold text-foreground/75">Nenhum fornecedor registado</p>
-          <p className="text-xs text-foreground/50 mt-1">
-            Adicione os seus fornecedores para manter os seus contratos centralizados.
-          </p>
-        </div>
+      )}
+
+      {activeTab === 'explorar' && (
+        <MarketplaceTab 
+          currentEvent={currentEvent} 
+          onStartChat={(roomId) => {
+            setPreselectedRoomId(roomId);
+            setActiveTab('mensagens');
+          }}
+        />
+      )}
+
+      {activeTab === 'mensagens' && (
+        <ChatTab 
+          userRole="client" 
+          eventId={currentEvent.id} 
+          preselectedRoomId={preselectedRoomId}
+          onRoomSelected={(roomId) => setPreselectedRoomId(roomId)}
+        />
       )}
 
       {/* ADD/EDIT VENDOR DIALOG */}

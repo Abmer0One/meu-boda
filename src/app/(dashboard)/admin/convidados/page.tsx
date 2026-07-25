@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useEvent } from '@/contexts/EventContext';
+import { supabase } from '@/lib/supabase';
 import { GuestRepository } from '@/repositories/guest.repository';
 import { TableRepository } from '@/repositories/table.repository';
 import { Guest, Table } from '@/types';
@@ -73,6 +74,27 @@ export default function ConvidadosPage() {
 
   useEffect(() => {
     loadData();
+
+    // Subscribe to realtime updates for guests of this event
+    const channel = supabase
+      .channel('convidados-guests-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'guests',
+          filter: `event_id=eq.${currentEvent?.id}`,
+        },
+        () => {
+          loadData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentEvent]);
 

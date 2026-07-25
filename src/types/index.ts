@@ -136,3 +136,66 @@ export interface EventInfoBlock {
   sort_order: number;
   created_at: string;
 }
+
+export interface VendorProfile {
+  id: string;
+  company_name: string;
+  nif: string | null;
+  iban: string | null;
+  logo_url: string | null;
+  category: string;
+  description: string | null;
+  daily_limit: number;
+  blocked_dates: string[];
+  status: 'Pendente' | 'Aprovado' | 'Suspenso';
+  created_at: string;
+}
+
+export interface VendorService {
+  id: string;
+  vendor_id: string;
+  title: string;
+  description: string | null;
+  price: number;
+  image_urls: string[];
+  created_at: string;
+}
+
+export interface ChatRoom {
+  id: string;
+  event_id: string;
+  vendor_id: string;
+  created_at: string;
+  vendor_profile?: VendorProfile;
+  event?: Event;
+  last_message?: ChatMessage;
+}
+
+export interface VendorContract {
+  id: string;
+  room_id: string;
+  vendor_id: string;
+  event_id: string;
+  service_title: string;
+  total_value: number;
+  payment_installments: Array<{
+    percentage: number;
+    amount: number;
+    due_date?: string;
+    status: 'Pending' | 'Paid';
+  }>;
+  pdf_url: string | null;
+  status: 'Pendente' | 'Ativo' | 'Recusado' | 'Concluido';
+  event_date: string;
+  created_at: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  room_id: string;
+  sender_id: string;
+  content: string;
+  proposal_id: string | null;
+  created_at: string;
+  proposal?: VendorContract;
+}

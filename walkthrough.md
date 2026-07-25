@@ -121,3 +121,6 @@ To inspect the PostgreSQL database or view buckets directly, access **Supabase S
 ### 3. Verify Mobile and QR Scanner Features
 - **Mobile Navigation:** Open the admin panel on your phone. Check that the bottom navigation bar is fixed at the foot of the screen and that dashboard card text wraps cleanly.
 - **Camera Scanner:** Navigate to `/admin/checkin` on your mobile phone browser (by clicking "Check-in" on the bottom navigation). Tap the **"Iniciar Leitor de Câmara"** card, authorize camera permissions, and point your phone to scan a guest's QR code.
+
+
+

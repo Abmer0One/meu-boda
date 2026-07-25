@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useEvent } from '@/contexts/EventContext';
+import { supabase } from '@/lib/supabase';
 import { DashboardService } from '@/services/dashboard.service';
 import { TaskRepository } from '@/repositories/task.repository';
 import { BudgetRepository } from '@/repositories/budget.repository';
@@ -82,6 +83,27 @@ export default function AdminDashboardPage() {
     };
 
     loadData();
+
+    // Subscribe to realtime updates for guests of this event
+    const channel = supabase
+      .channel('dashboard-guests-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'guests',
+          filter: `event_id=eq.${currentEvent.id}`,
+        },
+        () => {
+          loadData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [currentEvent]);
 
   if (loading) {

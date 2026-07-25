@@ -55,6 +55,13 @@ const menuItems: SidebarItem[] = [
   { name: 'Consola Admin', href: '/admin/super', icon: ShieldAlert },
 ];
 
+const vendorMenuItems: SidebarItem[] = [
+  { name: 'Meu Perfil', href: '/admin/fornecedores/perfil', icon: User },
+  { name: 'Portfólio', href: '/admin/fornecedores/portfolio', icon: Briefcase },
+  { name: 'Mensagens e Pedidos', href: '/admin/fornecedores/mensagens', icon: MailOpen },
+  { name: 'Meus Contratos', href: '/admin/fornecedores/contratos', icon: FileText },
+];
+
 const mobileTabItems = [
   { name: 'Painel', href: '/admin/dashboard', icon: LayoutDashboard },
   { name: 'Convidados', href: '/admin/convidados', icon: Users },
@@ -72,14 +79,25 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     || user?.email?.includes('admin')
     || user?.email === 'amota@example.com';
 
+  const isVendor = user?.app_metadata?.role === 'vendor' || user?.user_metadata?.role === 'vendor';
+
   const visibleMenuItems = isAdmin
     ? menuItems.filter(item => item.href === '/admin/super' || item.href === '/admin/perfil')
+    : isVendor
+    ? vendorMenuItems
     : menuItems.filter(item => item.href !== '/admin/super');
 
   const visibleMobileTabItems = isAdmin
     ? [
         { name: 'Consola', href: '/admin/super', icon: ShieldAlert },
         { name: 'Perfil', href: '/admin/perfil', icon: User },
+      ]
+    : isVendor
+    ? [
+        { name: 'Perfil', href: '/admin/fornecedores/perfil', icon: User },
+        { name: 'Portfólio', href: '/admin/fornecedores/portfolio', icon: Briefcase },
+        { name: 'Mensagens', href: '/admin/fornecedores/mensagens', icon: MailOpen },
+        { name: 'Contratos', href: '/admin/fornecedores/contratos', icon: FileText },
       ]
     : mobileTabItems;
 
@@ -98,9 +116,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         router.push('/login');
       } else if (isAdmin && (pathname === '/admin/dashboard' || pathname === '/admin')) {
         router.push('/admin/super');
+      } else if (isVendor && (pathname === '/admin/dashboard' || pathname === '/admin' || !pathname.startsWith('/admin/fornecedores'))) {
+        router.push('/admin/fornecedores/perfil');
       }
     }
-  }, [user, authLoading, router, isAdmin, pathname]);
+  }, [user, authLoading, router, isAdmin, isVendor, pathname]);
 
   // Sync slug on title change
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -235,7 +255,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div className="border-t border-border-custom p-4 flex items-center justify-between gap-3 bg-secondary/20">
           <div className="truncate flex-1">
             <p className="text-xs font-semibold truncate">{user.email}</p>
-            <p className="text-[10px] text-foreground/50">Organizador</p>
+            <p className="text-[10px] text-foreground/50">
+              {isAdmin ? 'Administrador' : isVendor ? 'Fornecedor' : 'Organizador'}
+            </p>
           </div>
           <button
             onClick={() => signOut().then(() => router.push('/login'))}
@@ -273,7 +295,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* MAIN PAGE BODY */}
         <main className="flex-1 overflow-y-auto p-4 pb-24 md:p-8 bg-background relative">
-          {events.length === 0 && !eventLoading && !isAdmin ? (
+          {events.length === 0 && !eventLoading && !isAdmin && !isVendor ? (
             <div className="flex h-[70vh] flex-col items-center justify-center text-center max-w-md mx-auto">
               <Heart className="h-16 w-16 text-accent animate-pulse mb-4" />
               <h2 className="text-xl font-bold mb-2">Bem-vindo ao Meu Boda!</h2>

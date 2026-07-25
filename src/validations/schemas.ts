@@ -6,9 +6,12 @@ export const loginSchema = z.object({
 });
 
 export const registerSchema = z.object({
+  name: z.string().min(2, 'Introduza o seu nome completo'),
+  phone: z.string().min(9, 'Introduza um número de telefone válido'),
   email: z.string().email('Introduza um e-mail válido'),
   password: z.string().min(6, 'A senha deve ter pelo menos 6 caracteres'),
   confirmPassword: z.string().min(6, 'A senha deve ter pelo menos 6 caracteres'),
+  role: z.enum(['client', 'vendor']).default('client'),
 }).refine((data) => data.password === data.confirmPassword, {
   message: 'As senhas não coincidem',
   path: ['confirmPassword'],
