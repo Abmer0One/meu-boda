@@ -33,6 +33,8 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
+import TornadoBackground from '@/components/ui/TornadoBackground';
+import HoverImageRevealList, { RevealItem } from '@/components/ui/HoverImageReveal';
 
 // Animation constants for clean, premium pacing
 const fadeInUp = {
@@ -446,6 +448,9 @@ export default function LandingPage() {
 
       {/* HERO SECTION - REFINED WITH EDITORIAL LUXURY TONE */}
       <section className="relative pt-36 pb-28 md:pt-48 md:pb-40 bg-gradient-to-b from-secondary/40 via-background to-background overflow-hidden">
+        {/* Swirling interactive tornado particle background */}
+        <TornadoBackground />
+
         {/* Living Cinematic background video loop */}
         <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
           <video 
@@ -549,8 +554,13 @@ export default function LandingPage() {
             {/* Main Video Frame Mockup */}
             <motion.div 
               animate={{ y: [0, -10, 0] }}
-              transition={{ repeat: Infinity, duration: 6, ease: 'easeInOut' }}
-              className="relative w-full max-w-md p-4 rounded-[32px] border border-border-custom/80 bg-card-bg/50 backdrop-blur shadow-2xl hover:shadow-primary/5 transition-all"
+              whileHover={{ scale: 1.03, rotate: 0.5 }}
+              transition={{ 
+                y: { repeat: Infinity, duration: 6, ease: 'easeInOut' },
+                scale: { duration: 0.3, ease: 'easeOut' },
+                rotate: { duration: 0.3, ease: 'easeOut' }
+              }}
+              className="relative w-full max-w-md p-4 rounded-[32px] border border-border-custom/80 bg-card-bg/50 backdrop-blur shadow-2xl hover:shadow-primary/10 hover:border-primary/20 transition-all cursor-pointer group"
             >
               <div className="rounded-2xl overflow-hidden border border-border-custom bg-background/95 relative aspect-[4/3] flex items-center justify-center">
                 <video 
@@ -645,9 +655,29 @@ export default function LandingPage() {
 
               {/* Simulated portaria validator visual */}
               <div className="rounded-2xl border border-border-custom bg-background/95 p-4 max-w-[220px] w-full shrink-0 shadow-lg relative z-10 transition-transform group-hover:scale-105">
-                <div className="h-32 rounded-lg bg-secondary/20 flex items-center justify-center relative overflow-hidden">
-                  <div className="absolute top-1/2 inset-x-0 h-0.5 bg-success shadow-[0_0_8px_var(--success)] animate-pulse" />
-                  <QrCode className="h-14 w-14 text-foreground/35" />
+                <div className="h-32 rounded-lg bg-secondary/20 flex items-center justify-center relative overflow-hidden group/validator">
+                  <motion.div 
+                    animate={{ 
+                      scale: [1, 1.08, 1],
+                      opacity: [0.5, 0.9, 0.5] 
+                    }}
+                    transition={{ repeat: Infinity, duration: 2.5, ease: "easeInOut" }}
+                    className="absolute inset-0 bg-gradient-to-tr from-success/5 via-transparent to-success/5 pointer-events-none"
+                  />
+                  {/* Scanner laser bar */}
+                  <motion.div 
+                    animate={{ 
+                      top: ["10%", "90%", "10%"] 
+                    }}
+                    transition={{ repeat: Infinity, duration: 3.5, ease: "easeInOut" }}
+                    className="absolute inset-x-0 h-0.5 bg-success shadow-[0_0_10px_#22C55E,0_0_20px_#22C55E]"
+                  />
+                  <motion.div
+                    whileHover={{ scale: 1.15, rotate: [0, -5, 5, 0] }}
+                    transition={{ duration: 0.5 }}
+                  >
+                    <QrCode className="h-14 w-14 text-foreground/35 group-hover/validator:text-success/70 transition-colors duration-300" />
+                  </motion.div>
                 </div>
                 <div className="mt-3 flex items-center justify-between text-[9px] font-black text-foreground/60">
                   <span>Validação</span>
@@ -750,6 +780,54 @@ export default function LandingPage() {
             </div>
 
           </div>
+        </div>
+      </section>
+
+      {/* DETAILED FEATURES LIST - HOVER IMAGE REVEAL PATTERN */}
+      <section className="py-24 bg-background relative border-t border-border-custom/20">
+        <div className="mx-auto max-w-7xl px-6">
+          <div className="text-center max-w-2xl mx-auto mb-16">
+            <span className="text-xs font-extrabold text-primary uppercase tracking-widest block">Por Dentro da Plataforma</span>
+            <h2 className="text-3xl lg:text-4xl font-serif font-extrabold text-foreground mt-2">
+              Explore a nossa interface interativa
+            </h2>
+            <p className="mt-4 text-xs md:text-sm text-foreground/60 leading-relaxed font-semibold">
+              Passe o cursor sobre cada recurso para ver uma antevisão real de como funciona a plataforma.
+            </p>
+          </div>
+
+          <HoverImageRevealList 
+            items={[
+              {
+                id: 'dashboard',
+                title: 'Painel Central do Casamento',
+                subtitle: 'Gerencie tarefas, orçamentos e cronogramas a partir de um centro de controlo centralizado, mantendo tudo nos trilhos.',
+                imageUrl: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?q=80&w=600&auto=format&fit=crop',
+                badge: 'Gestão Central'
+              },
+              {
+                id: 'seating',
+                title: 'Seating Chart Interativo',
+                subtitle: 'Distribua os convidados por mesas de banquete com arrastamento dinâmico e limite de capacidade automática.',
+                imageUrl: 'https://images.unsplash.com/photo-1507504038482-76210f5c2f5d?q=80&w=600&auto=format&fit=crop',
+                badge: 'Mesas'
+              },
+              {
+                id: 'portaria',
+                title: 'Portaria Digital em Tempo Real',
+                subtitle: 'Validadores inteligentes de código QR para o staff de recepção, bloqueando penetras e contando entradas ao vivo.',
+                imageUrl: 'https://images.unsplash.com/photo-1551836022-d5d88e9218df?q=80&w=600&auto=format&fit=crop',
+                badge: 'Segurança'
+              },
+              {
+                id: 'fornecedores',
+                title: 'Marketplace de Fornecedores',
+                subtitle: 'Encontre, negoceie e assine contratos diretamente com fotógrafos, espaços de festa, serviços de catering e músicos.',
+                imageUrl: 'https://images.unsplash.com/photo-1519741497674-611481863552?q=80&w=600&auto=format&fit=crop',
+                badge: 'Mercado'
+              }
+            ]}
+          />
         </div>
       </section>
 
