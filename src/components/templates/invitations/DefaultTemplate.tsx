@@ -162,7 +162,12 @@ export default function DefaultTemplate({
     try {
       const d = new Date(event.date);
       const weekdayStr = d.toLocaleDateString('pt-PT', { weekday: 'long' });
+      const day = d.getDate().toString();
+      const monthRaw = d.toLocaleDateString('pt-PT', { month: 'long' });
+      const monthCapitalized = monthRaw.charAt(0).toUpperCase() + monthRaw.slice(1);
+      const year = d.getFullYear().toString();
       const dayMonthYear = d.toLocaleDateString('pt-PT', { day: 'numeric', month: 'long', year: 'numeric' });
+      
       // Capitalize weekday
       const weekdayCapitalized = weekdayStr.charAt(0).toUpperCase() + weekdayStr.slice(1);
       
@@ -170,12 +175,14 @@ export default function DefaultTemplate({
       return {
         weekday: weekdayCapitalized,
         date: dayMonthYear,
+        monthDayYear: `${monthCapitalized} | ${day} | ${year}`,
         time: timeStr,
       };
     } catch (e) {
       return {
         weekday: 'Sábado',
         date: '18 de Junho de 2026',
+        monthDayYear: 'Junho | 18 | 2026',
         time: '15:00',
       };
     }
@@ -188,17 +195,14 @@ export default function DefaultTemplate({
      ========================================================================= */
   if (isPrinting) {
     if (renderPage === 'cover') {
-      /* ---------------------------------------------------------------------
-         COVER PAGE: Foldable outer sheets (Left: Photo, Center: Brand, Right: Front Names)
-         --------------------------------------------------------------------- */
       return (
-        <div className="w-[1120px] h-[792px] bg-[#0c0c0e] text-[#f4f4f5] p-8 flex flex-col justify-between font-sans relative overflow-hidden select-none box-border border-[6px] border-[#d4af37]/35 rounded-[32px]">
-          {/* Google Fonts and CSS styles */}
+        <div className="w-[1120px] h-[792px] bg-[#0c0c0e] text-[#f4f4f5] p-0 flex flex-col justify-between font-sans relative overflow-hidden select-none box-border border-[6px] border-[#d4af37]/35 rounded-none">
           <style jsx global>{`
-            @import url('https://fonts.googleapis.com/css2?family=Alex+Brush&family=Cinzel:wght@400;600;700;900&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap');
+            @import url('https://fonts.googleapis.com/css2?family=Alex+Brush&family=Cinzel:wght@400;600;700;900&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Pinyon+Script&display=swap');
             .font-cinzel { font-family: 'Cinzel', serif; }
             .font-alex { font-family: 'Alex Brush', cursive; }
             .font-playfair { font-family: 'Playfair Display', serif; }
+            .font-pinyon { font-family: 'Pinyon Script', cursive; }
             .gold-foil-text {
               background: linear-gradient(to right, #b89742 0%, #f3e0aa 50%, #b89742 100%);
               -webkit-background-clip: text;
@@ -206,22 +210,18 @@ export default function DefaultTemplate({
             }
           `}</style>
           
-          <div className="absolute inset-3 border border-[#d4af37]/20 rounded-[22px] pointer-events-none" />
+          <div className="absolute inset-3 border border-[#d4af37]/20 rounded-none pointer-events-none" />
 
-          {/* Grid Layout: Left: 25%, Center: 50%, Right: 25% */}
-          <div className="grid grid-cols-[1fr_2fr_1fr] gap-10 h-full items-stretch relative z-10 box-border">
-            
-            {/* LEFT COLUMN: Couple Photo (25%) */}
-            <div className="bg-[#121215] border border-[#d4af37]/20 rounded-3xl p-4 flex flex-col items-center justify-center shadow-xl relative overflow-hidden h-full">
+          <div className="grid grid-cols-[1fr_2fr_1fr] gap-0 h-full items-stretch relative z-10 box-border">
+            <div className="bg-[#121215] border-r border-[#d4af37]/20 rounded-none p-0 flex flex-col items-center justify-center shadow-xl relative overflow-hidden h-full">
               {event.cover_image ? (
-                // eslint-disable-next-line @next/next/no-img-element
                 <img 
                   src={event.cover_image} 
                   alt="Couple" 
-                  className="w-full h-full object-cover rounded-2xl border border-[#d4af37]/30"
+                  className="w-full h-full object-cover rounded-none border-0"
                 />
               ) : (
-                <div className="w-full h-full rounded-2xl border border-dashed border-[#d4af37]/25 flex flex-col items-center justify-center bg-white/5 text-center p-6 my-auto">
+                <div className="w-full h-full border-0 flex flex-col items-center justify-center bg-white/5 text-center p-6 my-auto">
                   <span className="text-5xl">📸</span>
                   <span className="text-xs font-bold text-[#d4af37] uppercase tracking-wider mt-4">Sua Foto Aqui</span>
                   <span className="text-[9px] text-white/55 mt-2">Carregue no painel do evento</span>
@@ -229,24 +229,20 @@ export default function DefaultTemplate({
               )}
             </div>
 
-            {/* CENTER COLUMN: Back Cover / App Reference (50%) */}
-            <div className="bg-[#121215] border border-[#d4af37]/45 rounded-3xl p-10 flex flex-col justify-between items-center text-center shadow-2xl relative overflow-hidden">
-              <div className="absolute inset-4 border border-dashed border-[#d4af37]/25 rounded-[22px] pointer-events-none" />
-              <div className="absolute inset-5 bg-gradient-to-b from-[#b89742]/5 to-[#d4af37]/0 rounded-[20px] pointer-events-none" />
+            <div className="bg-[#121215] border-r border-[#d4af37]/20 rounded-none p-10 flex flex-col justify-between items-center text-center shadow-2xl relative overflow-hidden h-full">
+              <div className="absolute inset-4 border border-dashed border-[#d4af37]/25 rounded-none pointer-events-none" />
+              <div className="absolute inset-5 bg-gradient-to-b from-[#b89742]/5 to-[#d4af37]/0 rounded-none pointer-events-none" />
 
-              <div className="my-auto space-y-8 py-8">
-                <div className="w-32 h-32 rounded-full border-2 border-[#d4af37]/35 flex items-center justify-center mx-auto bg-[#0d0d0f]/80 shadow-2xl">
-                  <span className="text-4xl font-cinzel font-black tracking-widest text-[#f3e0aa]">
-                    {hosts.initials}
-                  </span>
-                </div>
-                <div className="h-[1px] w-32 bg-gradient-to-r from-transparent via-[#d4af37]/50 to-transparent mx-auto" />
-                <span className="text-xs font-black uppercase tracking-[8px] text-white/50 block">
+              <div className="my-auto py-8 flex flex-col items-center justify-center">
+                <span className="font-pinyon text-[120px] leading-none gold-foil-text font-normal block select-none">
+                  {hosts.initials}
+                </span>
+                <div className="h-[1px] w-32 bg-gradient-to-r from-transparent via-[#d4af37]/50 to-transparent mx-auto mt-4" />
+                <span className="text-xs font-black uppercase tracking-[8px] text-white/50 block mt-4">
                   CONVITE DIGITAL EXCLUSIVO
                 </span>
               </div>
 
-              {/* Small application reference text */}
               <div className="text-center pb-4 z-10">
                 <p className="text-xs font-mono tracking-widest text-white/45 uppercase">
                   Desenvolvido com carinho através da aplicação www.meuboda.com
@@ -254,9 +250,8 @@ export default function DefaultTemplate({
               </div>
             </div>
 
-            {/* RIGHT COLUMN: Front Cover Names (25%) */}
-            <div className="bg-[#121215] border border-[#d4af37]/25 rounded-3xl p-8 flex flex-col justify-between shadow-xl relative">
-              <div className="absolute inset-3 border border-[#d4af37]/10 rounded-[20px] pointer-events-none" />
+            <div className="bg-[#121215] rounded-none p-6 flex flex-col justify-between shadow-xl relative h-full">
+              <div className="absolute inset-3 border border-[#d4af37]/10 rounded-none pointer-events-none" />
               
               <div className="flex-1 flex flex-col justify-around items-center text-center py-10">
                 <div className="space-y-2">
@@ -264,11 +259,11 @@ export default function DefaultTemplate({
                   <div className="h-[1px] w-12 bg-[#d4af37]/40 mx-auto mt-2.5" />
                 </div>
 
-                <div className="space-y-6 my-auto">
-                  <h1 className="text-5xl font-alex leading-tight gold-foil-text font-black py-2">
+                <div className="my-auto w-full px-2">
+                  <h1 className="text-4xl sm:text-5xl font-alex leading-snug gold-foil-text font-black whitespace-normal break-words py-4 max-w-full">
                     {hosts.names}
                   </h1>
-                  <span className="text-xs font-black tracking-[3px] text-white/60 uppercase block">
+                  <span className="text-xs font-black tracking-[3px] text-white/60 uppercase block mt-2">
                     {event.type === 'casamento' ? 'CASAMENTO' : event.type === 'aniversario' ? 'ANIVERSÁRIO' : 'PEDIDO'}
                   </span>
                 </div>
@@ -280,22 +275,18 @@ export default function DefaultTemplate({
                 </div>
               </div>
             </div>
-
           </div>
         </div>
       );
     } else {
-      /* ---------------------------------------------------------------------
-         INFORMATION PAGE: Trifold inside sheets (Left: Manual + Locations QR, Center: Invitation, Right: Access QR + Agenda)
-         --------------------------------------------------------------------- */
       return (
-        <div className="w-[1120px] h-[792px] bg-[#0c0c0e] text-[#f4f4f5] p-8 flex flex-col justify-between font-sans relative overflow-hidden select-none box-border border-[6px] border-[#d4af37]/35 rounded-[32px]">
-          {/* Google Fonts and CSS styles */}
+        <div className="w-[1120px] h-[792px] bg-[#0c0c0e] text-[#f4f4f5] p-0 flex flex-col justify-between font-sans relative overflow-hidden select-none box-border border-[6px] border-[#d4af37]/35 rounded-none">
           <style jsx global>{`
-            @import url('https://fonts.googleapis.com/css2?family=Alex+Brush&family=Cinzel:wght@400;600;700;900&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap');
+            @import url('https://fonts.googleapis.com/css2?family=Alex+Brush&family=Cinzel:wght@400;600;700;900&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Pinyon+Script&display=swap');
             .font-cinzel { font-family: 'Cinzel', serif; }
             .font-alex { font-family: 'Alex Brush', cursive; }
             .font-playfair { font-family: 'Playfair Display', serif; }
+            .font-pinyon { font-family: 'Pinyon Script', cursive; }
             .gold-foil-text {
               background: linear-gradient(to right, #b89742 0%, #f3e0aa 50%, #b89742 100%);
               -webkit-background-clip: text;
@@ -303,14 +294,11 @@ export default function DefaultTemplate({
             }
           `}</style>
           
-          <div className="absolute inset-3 border border-[#d4af37]/20 rounded-[22px] pointer-events-none" />
+          <div className="absolute inset-3 border border-[#d4af37]/20 rounded-none pointer-events-none" />
 
-          {/* Grid Layout: Left: 25%, Center: 50%, Right: 25% */}
-          <div className="grid grid-cols-[1fr_2fr_1fr] gap-10 h-full items-stretch relative z-10 box-border">
-            
-            {/* LEFT COLUMN: Guest Manual, Extra Info, Locations QR Code */}
-            <div className="bg-[#121215] border border-[#d4af37]/20 rounded-3xl p-6 flex flex-col justify-between shadow-xl relative">
-              <div className="absolute inset-3 border border-[#d4af37]/5 rounded-[20px] pointer-events-none" />
+          <div className="grid grid-cols-[1fr_2fr_1fr] gap-0 h-full items-stretch relative z-10 box-border">
+            <div className="bg-[#121215] border-r border-[#d4af37]/20 rounded-none p-6 flex flex-col justify-between shadow-xl relative h-full">
+              <div className="absolute inset-3 border border-[#d4af37]/5 rounded-none pointer-events-none" />
               
               <div className="space-y-6 relative z-10 flex-1 flex flex-col justify-between h-full">
                 <div className="text-center border-b border-[#d4af37]/15 pb-2.5">
@@ -319,7 +307,6 @@ export default function DefaultTemplate({
                   </h3>
                 </div>
 
-                {/* Important guidelines / Gift suggestions */}
                 <div className="space-y-4 text-xs leading-relaxed flex-1 py-4 flex flex-col justify-center">
                   {(event.dress_code_style || event.dress_code_colors) && (
                     <div className="space-y-0.5">
@@ -344,42 +331,33 @@ export default function DefaultTemplate({
                       <p className="text-white font-semibold">{event.kids_restriction_note}</p>
                     </div>
                   )}
-
-
                 </div>
 
-                {/* Locations multi-redirect QR Code */}
                 {locationsQrCodeUrl ? (
-                  <div className="bg-white/5 border border-[#d4af37]/15 rounded-2xl p-4 flex flex-col items-center gap-2.5 relative overflow-hidden">
+                  <div className="bg-white/5 border border-[#d4af37]/15 rounded-none p-4 flex flex-col items-center gap-2 relative overflow-hidden">
                     <span className="text-[9px] font-black tracking-[2px] text-[#d4af37] uppercase">MAPAS E LOCALIZAÇÕES</span>
                     
-                    <div className="bg-white p-2 rounded-xl border border-[#d4af37]/35 shadow-md">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={locationsQrCodeUrl} alt="Locais QR" className="w-28 h-28 object-contain" />
+                    <div className="bg-white p-2 rounded-none border border-[#d4af37]/35 shadow-md">
+                      <img src={locationsQrCodeUrl} alt="Locais QR" className="w-36 h-36 object-contain" />
                     </div>
-                    <span className="text-[8.5px] text-white/70 font-bold uppercase text-center leading-tight">SCAN PARA VER NO MAPA</span>
+                    <span className="text-[8.5px] text-white/70 font-bold uppercase text-center leading-tight mt-1">SCAN PARA VER NO MAPA</span>
                   </div>
                 ) : (
-                  <div className="h-28" />
+                  <div className="h-36" />
                 )}
               </div>
             </div>
 
-            {/* CENTER COLUMN: The Invitation Core card */}
-            <div className="bg-[#121215] border border-[#d4af37]/45 rounded-3xl p-10 flex flex-col justify-around items-center text-center shadow-2xl relative overflow-hidden">
-              <div className="absolute inset-4 border border-dashed border-[#d4af37]/25 rounded-[22px] pointer-events-none" />
-              <div className="absolute inset-5 bg-gradient-to-b from-[#b89742]/5 to-[#d4af37]/0 rounded-[20px] pointer-events-none" />
+            <div className="bg-[#121215] border-r border-[#d4af37]/20 rounded-none p-10 flex flex-col justify-around items-center text-center shadow-2xl relative overflow-hidden h-full">
+              <div className="absolute inset-4 border border-dashed border-[#d4af37]/25 rounded-none pointer-events-none" />
+              <div className="absolute inset-5 bg-gradient-to-b from-[#b89742]/5 to-[#d4af37]/0 rounded-none pointer-events-none" />
 
-              {/* Initials */}
-              <div className="space-y-1 relative z-10 pt-4">
-                <div className="w-20 h-20 rounded-full border-2 border-[#d4af37]/45 flex items-center justify-center mx-auto bg-[#0d0d0f]/80 shadow-lg">
-                  <span className="text-2xl font-cinzel font-black tracking-widest text-[#f3e0aa]">
-                    {hosts.initials}
-                  </span>
-                </div>
+              <div className="space-y-1 relative z-10 pt-4 flex flex-col items-center justify-center">
+                <span className="font-pinyon text-[90px] leading-none gold-foil-text font-normal block select-none">
+                  {hosts.initials}
+                </span>
               </div>
 
-              {/* Names and Phrase */}
               <div className="space-y-6 relative z-10 py-4 my-auto w-full">
                 <h1 className="text-5xl md:text-6xl font-alex tracking-wide text-white leading-tight gold-foil-text font-black px-2 py-1">
                   {hosts.names}
@@ -389,13 +367,12 @@ export default function DefaultTemplate({
                   {phrases.intro}
                 </p>
                 
-                {/* Date copo d'agua & Weekday */}
-                <div className="border-y-2 border-[#d4af37]/20 py-4 my-6 text-center space-y-1 bg-white/5 rounded-2xl px-8 w-full max-w-md mx-auto">
+                <div className="border-y-2 border-[#d4af37]/20 py-4 my-6 text-center space-y-1 bg-white/5 rounded-none px-8 w-full max-w-md mx-auto">
                   <span className="text-xs font-cinzel tracking-[4px] text-[#d4af37] font-black uppercase block">
                     {dateDetails.weekday}
                   </span>
-                  <span className="text-xl font-playfair text-white font-black block mt-1">
-                    {dateDetails.date}
+                  <span className="text-2xl font-playfair text-white font-black block mt-1.5 tracking-wider">
+                    {dateDetails.monthDayYear}
                   </span>
                   <span className="text-xs font-cinzel text-white/70 block mt-1">
                     Salão / Recepção às {dateDetails.time}
@@ -410,9 +387,8 @@ export default function DefaultTemplate({
               <div className="h-4" />
             </div>
 
-            {/* RIGHT COLUMN: Check-in / Gatekeeper QR Code & Agenda */}
-            <div className="bg-[#121215] border border-[#d4af37]/25 rounded-3xl p-6 flex flex-col justify-between shadow-xl relative">
-              <div className="absolute inset-3 border border-[#d4af37]/5 rounded-[20px] pointer-events-none" />
+            <div className="bg-[#121215] rounded-none p-6 flex flex-col justify-between shadow-xl relative h-full">
+              <div className="absolute inset-3 border border-[#d4af37]/5 rounded-none pointer-events-none" />
               
               <div className="space-y-6 relative z-10 flex-1 flex flex-col justify-between h-full">
                 <div className="text-center border-b border-[#d4af37]/15 pb-2.5">
@@ -421,7 +397,6 @@ export default function DefaultTemplate({
                   </h3>
                 </div>
 
-                {/* Vertical compact agenda */}
                 <div className="space-y-4 max-h-[220px] overflow-hidden flex-1 py-4 flex flex-col justify-center">
                   {schedules.length > 0 ? (
                     schedules.slice(0, 5).map((sched) => (
@@ -438,26 +413,23 @@ export default function DefaultTemplate({
                   )}
                 </div>
 
-                {/* Access check-in QR Code */}
                 {qrCodeUrl ? (
-                  <div className="bg-white/5 border border-[#d4af37]/15 rounded-2xl p-4 flex flex-col items-center gap-2.5 relative overflow-hidden">
+                  <div className="bg-white/5 border border-[#d4af37]/15 rounded-none p-4 flex flex-col items-center gap-2 relative overflow-hidden">
                     <span className="text-[9px] font-black tracking-[2px] text-[#d4af37] uppercase">CHECK-IN / PORTARIA</span>
                     
-                    <div className="bg-white p-2 rounded-xl border border-[#d4af37]/35 shadow-md">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={qrCodeUrl} alt="Acesso QR" className="w-28 h-28 object-contain" />
+                    <div className="bg-white p-2 rounded-none border border-[#d4af37]/35 shadow-md">
+                      <img src={qrCodeUrl} alt="Acesso QR" className="w-36 h-36 object-contain" />
                     </div>
-                    <span className="text-[10px] text-white font-bold uppercase truncate max-w-full leading-none">{guest.name}</span>
-                    <span className="text-[9px] text-[#d4af37] font-bold uppercase tracking-wider mt-1">
+                    <span className="text-[10px] text-white font-bold uppercase truncate max-w-full leading-none mt-1">{guest.name}</span>
+                    <span className="text-[9px] text-[#d4af37] font-black uppercase tracking-wider mt-1">
                       {guest.companions > 0 ? `Com Acompanhante (${guest.companions})` : 'Individual'}
                     </span>
                   </div>
                 ) : (
-                  <div className="h-28" />
+                  <div className="h-36" />
                 )}
               </div>
             </div>
-
           </div>
         </div>
       );
