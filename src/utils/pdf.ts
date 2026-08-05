@@ -4,8 +4,6 @@ import { createRoot } from 'react-dom/client';
 import { toPng } from 'html-to-image';
 import { Guest, Event, EventSchedule, EventInfoBlock } from '@/types';
 import DefaultTemplate from '@/components/templates/invitations/DefaultTemplate';
-import RoyalParisienneTemplate from '@/components/templates/invitations/RoyalParisienneTemplate';
-import ModernTicketTemplate from '@/components/templates/invitations/ModernTicketTemplate';
 
 export async function generateGuestPDF(
   guest: Guest,
@@ -66,15 +64,7 @@ export async function generateGuestPDF(
   const root = createRoot(container);
   
   await new Promise<void>((resolve) => {
-    let element: React.ReactElement;
-    if (templateId === 'royal-parisienne') {
-      element = React.createElement(RoyalParisienneTemplate, templateProps);
-    } else if (templateId === 'modern-ticket') {
-      element = React.createElement(ModernTicketTemplate, templateProps);
-    } else {
-      element = React.createElement(DefaultTemplate, templateProps);
-    }
-    
+    const element = React.createElement(DefaultTemplate, templateProps);
     root.render(element);
     
     // Give react time to mount and render

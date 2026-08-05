@@ -16,8 +16,6 @@ import { generateQRCode } from '@/utils/qr';
 import { generateGuestPDF } from '@/utils/pdf';
 import { supabase } from '@/lib/supabase';
 import DefaultTemplate from '@/components/templates/invitations/DefaultTemplate';
-import RoyalParisienneTemplate from '@/components/templates/invitations/RoyalParisienneTemplate';
-import ModernTicketTemplate from '@/components/templates/invitations/ModernTicketTemplate';
 import {
   MailOpen,
   Upload,
@@ -420,55 +418,15 @@ export default function ConvitesPage() {
 
           <Card className="bg-card-bg mt-4">
             <CardHeader>
-              <CardTitle>Design do Convite Digital</CardTitle>
+              <CardTitle>Convite Digital Interativo</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-xs text-foreground/60 leading-relaxed">
-                Escolha o design interativo que os seus convidados verão ao abrir o link do convite.
+                O seu evento utiliza o nosso modelo premium de **Convite Desdobrável de Luxo** (em tons pretos e dourados, com envelope interativo e selo de cera).
               </p>
-              
-              <div className="space-y-3">
-                {[
-                  {
-                    id: 'default',
-                    name: 'Padrão Meu Boda',
-                    desc: 'Design clássico em tons de rosa blush e champagne, ideal para qualquer tipo de evento.',
-                  },
-                  {
-                    id: 'royal-parisienne',
-                    name: 'Obsidian Gold Luxury',
-                    desc: 'Envelope desdobrável luxuoso com selo de cera em dourado e fontes serifadas elegantes.',
-                  },
-                  {
-                    id: 'modern-ticket',
-                    name: 'VIP Access Ticket',
-                    desc: 'Layout de ingresso moderno de alta tecnologia com visual dark e destaque para o QR code.',
-                  },
-                ].map((tpl) => {
-                  const isSelected = (currentEvent.template_id || 'default') === tpl.id;
-                  return (
-                    <button
-                      key={tpl.id}
-                      type="button"
-                      onClick={() => handleSelectTemplate(tpl.id)}
-                      disabled={updatingTemplate}
-                      className={`w-full text-left p-3.5 border rounded-2xl cursor-pointer transition-all flex flex-col gap-1 relative ${
-                        isSelected
-                          ? 'border-primary bg-primary/5 text-foreground ring-1 ring-primary'
-                          : 'border-border-custom hover:bg-secondary/40 text-foreground/80'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold">{tpl.name}</span>
-                        {isSelected && (
-                          <Badge variant="default" className="text-[9px] px-1.5 py-0">Ativo</Badge>
-                        )}
-                      </div>
-                      <span className="text-[10.5px] text-foreground/50 leading-relaxed">{tpl.desc}</span>
-                    </button>
-                  );
-                })}
-              </div>
+              <p className="text-xs text-foreground/60 leading-relaxed">
+                Toda a informação (agenda, manual, QR code) é sincronizada de forma dinâmica com o modelo.
+              </p>
 
               <Button
                 variant="outline"
@@ -785,80 +743,30 @@ export default function ConvitesPage() {
               style={previewMode === 'mobile' ? { scrollbarWidth: 'none', msOverflowStyle: 'none' } : {}}
             >
               {currentEvent && (
-                currentEvent.template_id === 'royal-parisienne' ? (
-                  <RoyalParisienneTemplate
-                    guest={{ name: 'Afonso Amado', id: '', event_id: '', phone: '', email: '', family_group: '', companions: 2, status: 'Confirmed', notes: '', invitation_sent: false, created_at: '', qr_token: '', table_id: '' }}
-                    event={currentEvent}
-                    table={{ name: 'Mesa Imperial', id: '', event_id: '', capacity: 10, created_at: '' }}
-                    qrCodeUrl="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=MockCheckin"
-                    schedules={schedules}
-                    infoBlocks={infoBlocks}
-                    rsvpStatus="Confirmed"
-                    saving={false}
-                    downloading={false}
-                    eventLabels={{
-                      title: 'Casamento',
-                      invitation: 'Convite Especial',
-                      details: 'Detalhes do Evento',
-                      theme: 'Tema',
-                      rsvpQuestion: 'Confirma a sua presença?',
-                    }}
-                    notes=""
-                    setNotes={() => {}}
-                    handleRSVPSubmit={() => {}}
-                    handleDownloadInvite={() => {}}
-                    getGoogleMapsLink={(loc, map) => map || ''}
-                    forceOpen={false} // start closed so they can test seal opening animation!
-                  />
-                ) : currentEvent.template_id === 'modern-ticket' ? (
-                  <ModernTicketTemplate
-                    guest={{ name: 'Afonso Amado', id: '', event_id: '', phone: '', email: '', family_group: '', companions: 2, status: 'Confirmed', notes: '', invitation_sent: false, created_at: '', qr_token: '', table_id: '' }}
-                    event={currentEvent}
-                    table={{ name: 'Mesa Imperial', id: '', event_id: '', capacity: 10, created_at: '' }}
-                    qrCodeUrl="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=MockCheckin"
-                    schedules={schedules}
-                    infoBlocks={infoBlocks}
-                    rsvpStatus="Confirmed"
-                    saving={false}
-                    downloading={false}
-                    eventLabels={{
-                      title: 'Casamento',
-                      invitation: 'Convite Especial',
-                      details: 'Detalhes do Evento',
-                      theme: 'Tema',
-                      rsvpQuestion: 'Confirma a sua presença?',
-                    }}
-                    notes=""
-                    setNotes={() => {}}
-                    handleRSVPSubmit={() => {}}
-                    handleDownloadInvite={() => {}}
-                    getGoogleMapsLink={(loc, map) => map || ''}
-                  />
-                ) : (
-                  <DefaultTemplate
-                    guest={{ name: 'Afonso Amado', id: '', event_id: '', phone: '', email: '', family_group: '', companions: 2, status: 'Confirmed', notes: '', invitation_sent: false, created_at: '', qr_token: '', table_id: '' }}
-                    event={currentEvent}
-                    table={{ name: 'Mesa Imperial', id: '', event_id: '', capacity: 10, created_at: '' }}
-                    qrCodeUrl="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=MockCheckin"
-                    schedules={schedules}
-                    infoBlocks={infoBlocks}
-                    rsvpStatus="Confirmed"
-                    saving={false}
-                    downloading={false}
-                    eventLabels={{
-                      title: 'Casamento',
-                      invitation: 'Convite Especial',
-                      details: 'Detalhes do Evento',
-                      theme: 'Tema',
-                      rsvpQuestion: 'Confirma a sua presença?',
-                    }}
-                    notes=""
-                    setNotes={() => {}}
-                    handleRSVPSubmit={() => {}}
-                    handleDownloadInvite={() => {}}
-                    getGoogleMapsLink={(loc, map) => map || ''}
-                  />
-                )
+                <DefaultTemplate
+                  guest={{ name: 'Afonso Amado', id: '', event_id: '', phone: '', email: '', family_group: '', companions: 2, status: 'Confirmed', notes: '', invitation_sent: false, created_at: '', qr_token: '', table_id: '' }}
+                  event={currentEvent}
+                  table={{ name: 'Mesa Imperial', id: '', event_id: '', capacity: 10, created_at: '' }}
+                  qrCodeUrl="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=MockCheckin"
+                  schedules={schedules}
+                  infoBlocks={infoBlocks}
+                  rsvpStatus="Confirmed"
+                  saving={false}
+                  downloading={false}
+                  eventLabels={{
+                    title: 'Casamento',
+                    invitation: 'Convite Especial',
+                    details: 'Detalhes do Evento',
+                    theme: 'Tema',
+                    rsvpQuestion: 'Confirma a sua presença?',
+                  }}
+                  notes=""
+                  setNotes={() => {}}
+                  handleRSVPSubmit={() => {}}
+                  handleDownloadInvite={() => {}}
+                  getGoogleMapsLink={(loc, map) => map || ''}
+                  forceOpen={false} // começa fechado para testar animação do selo!
+                />
               )}
             </div>
           </div>

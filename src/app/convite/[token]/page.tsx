@@ -32,8 +32,6 @@ import {
 } from 'lucide-react';
 
 import DefaultTemplate from '@/components/templates/invitations/DefaultTemplate';
-import RoyalParisienneTemplate from '@/components/templates/invitations/RoyalParisienneTemplate';
-import ModernTicketTemplate from '@/components/templates/invitations/ModernTicketTemplate';
 
 interface RSVPPageProps {
   params: Promise<{ token: string }>;
@@ -422,14 +420,7 @@ export default function PublicRSVPPage({ params }: RSVPPageProps) {
       </Card>
     );
 
-    switch (templateId) {
-      case 'royal-parisienne':
-        return <RoyalParisienneTemplate {...templateProps}>{galleryChildren}</RoyalParisienneTemplate>;
-      case 'modern-ticket':
-        return <ModernTicketTemplate {...templateProps}>{galleryChildren}</ModernTicketTemplate>;
-      default:
-        return <DefaultTemplate {...templateProps}>{galleryChildren}</DefaultTemplate>;
-    }
+    return <DefaultTemplate {...templateProps}>{galleryChildren}</DefaultTemplate>;
   };
 
   return renderTemplate();
