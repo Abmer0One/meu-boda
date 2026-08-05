@@ -32,17 +32,30 @@ export const EventProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setLoading(true);
     try {
       const fetchedEvents = await EventRepository.getByUserId(user.id);
-      setEvents(fetchedEvents);
+      
+      // Merge local template selections from localStorage
+      const mergedEvents = fetchedEvents.map((e) => {
+        if (typeof window !== 'undefined') {
+          const localTemplate = localStorage.getItem(`template_${e.id}`);
+          if (localTemplate) {
+            return { ...e, template_id: localTemplate };
+          }
+        }
+        return e;
+      });
+      setEvents(mergedEvents);
 
       // Restore last selected event or default to the first one
-      const storedEventId = localStorage.getItem('meuboda_selected_event_id');
-      const matchedEvent = fetchedEvents.find((e) => e.id === storedEventId);
+      const storedEventId = typeof window !== 'undefined' ? localStorage.getItem('meuboda_selected_event_id') : null;
+      const matchedEvent = mergedEvents.find((e) => e.id === storedEventId);
 
       if (matchedEvent) {
         setCurrentEventState(matchedEvent);
-      } else if (fetchedEvents.length > 0) {
-        setCurrentEventState(fetchedEvents[0]);
-        localStorage.setItem('meuboda_selected_event_id', fetchedEvents[0].id);
+      } else if (mergedEvents.length > 0) {
+        setCurrentEventState(mergedEvents[0]);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('meuboda_selected_event_id', mergedEvents[0].id);
+        }
       } else {
         setCurrentEventState(null);
       }
@@ -58,11 +71,20 @@ export const EventProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [refreshEvents]);
 
   const setCurrentEvent = (event: Event | null) => {
-    setCurrentEventState(event);
     if (event) {
-      localStorage.setItem('meuboda_selected_event_id', event.id);
+      if (typeof window !== 'undefined') {
+        const localTemplate = localStorage.getItem(`template_${event.id}`);
+        const merged = localTemplate ? { ...event, template_id: localTemplate } : event;
+        setCurrentEventState(merged);
+        localStorage.setItem('meuboda_selected_event_id', event.id);
+      } else {
+        setCurrentEventState(event);
+      }
     } else {
-      localStorage.removeItem('meuboda_selected_event_id');
+      setCurrentEventState(null);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('meuboda_selected_event_id');
+      }
     }
   };
 

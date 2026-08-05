@@ -1,4 +1,4 @@
-﻿-- 1. Create Events Table
+-- 1. Create Events Table
 create table if not exists public.events (
     id uuid primary key default gen_random_uuid(),
     user_id uuid references auth.users not null,
@@ -207,8 +207,14 @@ create policy "Allow auth users full access to documents bucket" on storage.obje
     for all using (bucket_id = 'documents' and auth.role() = 'authenticated');
 -- Alter events table to add type column
 alter table public.events 
-add column if not exists type text not null default 'casamento' 
-check (type in ('casamento', 'aniversario', 'pedido', 'outro'));
+add column if not exists type text not null default 'casamento';
+
+alter table public.events drop constraint if exists events_type_check;
+alter table public.events add constraint events_type_check check (type in ('casamento', 'aniversario', 'pedido', 'cha_panela', 'alambamento', 'palestra', 'festa_rua', 'outro'));
+
+alter table public.events 
+add column if not exists template_id text not null default 'default',
+add column if not exists template_config jsonb not null default '{}'::jsonb;
 -- Drop old all-in-one policies
 drop policy if exists "Users can CRUD own events" on public.events;
 drop policy if exists "Users can CRUD tables of own events" on public.tables;

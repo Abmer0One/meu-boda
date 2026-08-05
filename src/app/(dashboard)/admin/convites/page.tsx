@@ -15,6 +15,9 @@ import { Dialog } from '@/components/ui/Dialog';
 import { generateQRCode } from '@/utils/qr';
 import { generateGuestPDF } from '@/utils/pdf';
 import { supabase } from '@/lib/supabase';
+import DefaultTemplate from '@/components/templates/invitations/DefaultTemplate';
+import RoyalParisienneTemplate from '@/components/templates/invitations/RoyalParisienneTemplate';
+import ModernTicketTemplate from '@/components/templates/invitations/ModernTicketTemplate';
 import {
   MailOpen,
   Upload,
@@ -51,6 +54,36 @@ export default function ConvitesPage() {
   const [bulkIndex, setBulkIndex] = useState(0);
   const [bulkChannel, setBulkChannel] = useState<'whatsapp' | 'sms' | 'email'>('whatsapp');
   const [bulkMessageText, setBulkMessageText] = useState('');
+
+  // Preview and template selection state
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [updatingTemplate, setUpdatingTemplate] = useState(false);
+  const [previewMode, setPreviewMode] = useState<'mobile' | 'desktop'>('mobile');
+
+  const handleSelectTemplate = async (templateId: string) => {
+    if (!currentEvent) return;
+    setUpdatingTemplate(true);
+    try {
+      const updated = await EventRepository.update(currentEvent.id, { template_id: templateId });
+      if (updated) {
+        setCurrentEvent(updated);
+        alert('Template do convite atualizado com sucesso!');
+      } else {
+        // Fallback to localStorage
+        localStorage.setItem(`template_${currentEvent.id}`, templateId);
+        setCurrentEvent({ ...currentEvent, template_id: templateId });
+        alert('Template atualizado com sucesso! (Salvo localmente)');
+      }
+    } catch (err) {
+      console.error(err);
+      // Fallback to localStorage
+      localStorage.setItem(`template_${currentEvent.id}`, templateId);
+      setCurrentEvent({ ...currentEvent, template_id: templateId });
+      alert('Template atualizado com sucesso! (Salvo localmente)');
+    } finally {
+      setUpdatingTemplate(false);
+    }
+  };
 
   const getInvitationMessage = (guest: Guest) => {
     if (!currentEvent) return '';
@@ -384,6 +417,68 @@ export default function ConvitesPage() {
               </div>
             </CardContent>
           </Card>
+
+          <Card className="bg-card-bg mt-4">
+            <CardHeader>
+              <CardTitle>Design do Convite Digital</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-xs text-foreground/60 leading-relaxed">
+                Escolha o design interativo que os seus convidados verão ao abrir o link do convite.
+              </p>
+              
+              <div className="space-y-3">
+                {[
+                  {
+                    id: 'default',
+                    name: 'Padrão Meu Boda',
+                    desc: 'Design clássico em tons de rosa blush e champagne, ideal para qualquer tipo de evento.',
+                  },
+                  {
+                    id: 'royal-parisienne',
+                    name: 'Obsidian Gold Luxury',
+                    desc: 'Envelope desdobrável luxuoso com selo de cera em dourado e fontes serifadas elegantes.',
+                  },
+                  {
+                    id: 'modern-ticket',
+                    name: 'VIP Access Ticket',
+                    desc: 'Layout de ingresso moderno de alta tecnologia com visual dark e destaque para o QR code.',
+                  },
+                ].map((tpl) => {
+                  const isSelected = (currentEvent.template_id || 'default') === tpl.id;
+                  return (
+                    <button
+                      key={tpl.id}
+                      type="button"
+                      onClick={() => handleSelectTemplate(tpl.id)}
+                      disabled={updatingTemplate}
+                      className={`w-full text-left p-3.5 border rounded-2xl cursor-pointer transition-all flex flex-col gap-1 relative ${
+                        isSelected
+                          ? 'border-primary bg-primary/5 text-foreground ring-1 ring-primary'
+                          : 'border-border-custom hover:bg-secondary/40 text-foreground/80'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold">{tpl.name}</span>
+                        {isSelected && (
+                          <Badge variant="default" className="text-[9px] px-1.5 py-0">Ativo</Badge>
+                        )}
+                      </div>
+                      <span className="text-[10.5px] text-foreground/50 leading-relaxed">{tpl.desc}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <Button
+                variant="outline"
+                className="w-full justify-center mt-2 border-primary/30 text-primary hover:bg-primary/5"
+                onClick={() => setPreviewOpen(true)}
+              >
+                Visualizar Preview Interativo
+              </Button>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Right Side: Guest invite status & download */}
@@ -645,6 +740,133 @@ export default function ConvitesPage() {
               </Button>
             </div>
           )}
+        </div>
+      </Dialog>
+
+      {/* PREVIEW DIALOG */}
+      <Dialog
+        isOpen={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        title="Visualização do Convite Digital"
+        size="xl"
+      >
+        <div className="flex flex-col gap-4 text-center">
+          {/* View Mode Toggle Bar */}
+          <div className="flex items-center justify-center gap-2 border-b border-border-custom pb-4">
+            <button
+              onClick={() => setPreviewMode('mobile')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                previewMode === 'mobile'
+                  ? 'bg-primary text-white shadow-md shadow-primary/20'
+                  : 'bg-secondary hover:bg-secondary/70 text-foreground/70'
+              }`}
+            >
+              📱 Visualização Telemóvel
+            </button>
+            <button
+              onClick={() => setPreviewMode('desktop')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                previewMode === 'desktop'
+                  ? 'bg-primary text-white shadow-md shadow-primary/20'
+                  : 'bg-secondary hover:bg-secondary/70 text-foreground/70'
+              }`}
+            >
+              💻 Visualização Computador
+            </button>
+          </div>
+
+          <div className="max-h-[66vh] overflow-y-auto p-1 bg-background relative text-left rounded-xl">
+            <div
+              className={`transition-all duration-300 mx-auto ${
+                previewMode === 'mobile'
+                  ? 'w-[360px] h-[600px] border-[12px] border-[#27272a] rounded-[48px] shadow-2xl overflow-y-auto relative bg-[#09090b]'
+                  : 'w-full h-[600px] overflow-y-auto relative border border-border-custom rounded-2xl shadow-xl'
+              }`}
+              style={previewMode === 'mobile' ? { scrollbarWidth: 'none', msOverflowStyle: 'none' } : {}}
+            >
+              {currentEvent && (
+                currentEvent.template_id === 'royal-parisienne' ? (
+                  <RoyalParisienneTemplate
+                    guest={{ name: 'Afonso Amado', id: '', event_id: '', phone: '', email: '', family_group: '', companions: 2, status: 'Confirmed', notes: '', invitation_sent: false, created_at: '', qr_token: '', table_id: '' }}
+                    event={currentEvent}
+                    table={{ name: 'Mesa Imperial', id: '', event_id: '', capacity: 10, created_at: '' }}
+                    qrCodeUrl="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=MockCheckin"
+                    schedules={schedules}
+                    infoBlocks={infoBlocks}
+                    rsvpStatus="Confirmed"
+                    saving={false}
+                    downloading={false}
+                    eventLabels={{
+                      title: 'Casamento',
+                      invitation: 'Convite Especial',
+                      details: 'Detalhes do Evento',
+                      theme: 'Tema',
+                      rsvpQuestion: 'Confirma a sua presença?',
+                    }}
+                    notes=""
+                    setNotes={() => {}}
+                    handleRSVPSubmit={() => {}}
+                    handleDownloadInvite={() => {}}
+                    getGoogleMapsLink={(loc, map) => map || ''}
+                    forceOpen={false} // start closed so they can test seal opening animation!
+                  />
+                ) : currentEvent.template_id === 'modern-ticket' ? (
+                  <ModernTicketTemplate
+                    guest={{ name: 'Afonso Amado', id: '', event_id: '', phone: '', email: '', family_group: '', companions: 2, status: 'Confirmed', notes: '', invitation_sent: false, created_at: '', qr_token: '', table_id: '' }}
+                    event={currentEvent}
+                    table={{ name: 'Mesa Imperial', id: '', event_id: '', capacity: 10, created_at: '' }}
+                    qrCodeUrl="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=MockCheckin"
+                    schedules={schedules}
+                    infoBlocks={infoBlocks}
+                    rsvpStatus="Confirmed"
+                    saving={false}
+                    downloading={false}
+                    eventLabels={{
+                      title: 'Casamento',
+                      invitation: 'Convite Especial',
+                      details: 'Detalhes do Evento',
+                      theme: 'Tema',
+                      rsvpQuestion: 'Confirma a sua presença?',
+                    }}
+                    notes=""
+                    setNotes={() => {}}
+                    handleRSVPSubmit={() => {}}
+                    handleDownloadInvite={() => {}}
+                    getGoogleMapsLink={(loc, map) => map || ''}
+                  />
+                ) : (
+                  <DefaultTemplate
+                    guest={{ name: 'Afonso Amado', id: '', event_id: '', phone: '', email: '', family_group: '', companions: 2, status: 'Confirmed', notes: '', invitation_sent: false, created_at: '', qr_token: '', table_id: '' }}
+                    event={currentEvent}
+                    table={{ name: 'Mesa Imperial', id: '', event_id: '', capacity: 10, created_at: '' }}
+                    qrCodeUrl="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=MockCheckin"
+                    schedules={schedules}
+                    infoBlocks={infoBlocks}
+                    rsvpStatus="Confirmed"
+                    saving={false}
+                    downloading={false}
+                    eventLabels={{
+                      title: 'Casamento',
+                      invitation: 'Convite Especial',
+                      details: 'Detalhes do Evento',
+                      theme: 'Tema',
+                      rsvpQuestion: 'Confirma a sua presença?',
+                    }}
+                    notes=""
+                    setNotes={() => {}}
+                    handleRSVPSubmit={() => {}}
+                    handleDownloadInvite={() => {}}
+                    getGoogleMapsLink={(loc, map) => map || ''}
+                  />
+                )
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="flex justify-end pt-4 border-t border-border-custom mt-4">
+          <Button variant="outline" onClick={() => setPreviewOpen(false)}>
+            Fechar Preview
+          </Button>
         </div>
       </Dialog>
     </div>

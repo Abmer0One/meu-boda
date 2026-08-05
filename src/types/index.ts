@@ -3,7 +3,9 @@ export interface Event {
   user_id: string;
   title: string;
   slug: string;
-  type: 'casamento' | 'aniversario' | 'pedido' | 'outro';
+  type: 'casamento' | 'aniversario' | 'pedido' | 'cha_panela' | 'alambamento' | 'palestra' | 'festa_rua' | 'outro';
+  template_id?: string | null;
+  template_config?: Record<string, any> | null;
   description: string | null;
   date: string;
   ceremony_location: string | null;
