@@ -171,7 +171,7 @@ export default function DefaultTemplate({
          COVER PAGE: Foldable outer sheets (Left: Photo, Center: Brand, Right: Front Names)
          --------------------------------------------------------------------- */
       return (
-        <div className="w-[1120px] h-[792px] bg-[#0c0c0e] text-[#f4f4f5] p-6 flex flex-col justify-between font-sans relative overflow-hidden select-none box-border border-4 border-[#d4af37]/30 rounded-[28px]">
+        <div className="w-[1120px] h-[792px] bg-[#0c0c0e] text-[#f4f4f5] p-8 flex flex-col justify-between font-sans relative overflow-hidden select-none box-border border-[6px] border-[#d4af37]/35 rounded-[32px]">
           {/* Google Fonts and CSS styles */}
           <style jsx global>{`
             @import url('https://fonts.googleapis.com/css2?family=Alex+Brush&family=Cinzel:wght@400;600;700;900&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap');
@@ -185,75 +185,75 @@ export default function DefaultTemplate({
             }
           `}</style>
           
-          <div className="absolute inset-2 border border-[#d4af37]/15 rounded-[20px] pointer-events-none" />
+          <div className="absolute inset-3 border border-[#d4af37]/20 rounded-[22px] pointer-events-none" />
 
           {/* Grid Layout: Left: 25%, Center: 50%, Right: 25% */}
-          <div className="grid grid-cols-[1fr_2fr_1fr] gap-8 h-full items-stretch relative z-10 box-border">
+          <div className="grid grid-cols-[1fr_2fr_1fr] gap-10 h-full items-stretch relative z-10 box-border">
             
             {/* LEFT COLUMN: Couple Photo (25%) */}
-            <div className="bg-[#121215] border border-[#d4af37]/15 rounded-3xl p-3 flex flex-col items-center justify-center shadow-xl relative overflow-hidden h-full">
+            <div className="bg-[#121215] border border-[#d4af37]/20 rounded-3xl p-4 flex flex-col items-center justify-center shadow-xl relative overflow-hidden h-full">
               {event.cover_image ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img 
                   src={event.cover_image} 
                   alt="Couple" 
-                  className="w-full h-full object-cover rounded-2xl border border-[#d4af37]/20"
+                  className="w-full h-full object-cover rounded-2xl border border-[#d4af37]/30"
                 />
               ) : (
-                <div className="w-full h-full rounded-2xl border border-dashed border-[#d4af37]/25 flex flex-col items-center justify-center bg-white/5 text-center p-4">
-                  <span className="text-4xl">📸</span>
-                  <span className="text-[10px] font-bold text-[#d4af37] uppercase tracking-wider mt-3">Sua Foto Aqui</span>
-                  <span className="text-[8px] text-white/40 mt-1">Carregue no painel do evento</span>
+                <div className="w-full h-full rounded-2xl border border-dashed border-[#d4af37]/25 flex flex-col items-center justify-center bg-white/5 text-center p-6 my-auto">
+                  <span className="text-5xl">📸</span>
+                  <span className="text-xs font-bold text-[#d4af37] uppercase tracking-wider mt-4">Sua Foto Aqui</span>
+                  <span className="text-[9px] text-white/55 mt-2">Carregue no painel do evento</span>
                 </div>
               )}
             </div>
 
             {/* CENTER COLUMN: Back Cover / App Reference (50%) */}
-            <div className="bg-[#121215] border border-[#d4af37]/35 rounded-3xl p-8 flex flex-col justify-between items-center text-center shadow-2xl relative overflow-hidden">
-              <div className="absolute inset-3 border border-dashed border-[#d4af37]/20 rounded-[20px] pointer-events-none" />
-              <div className="absolute inset-4 bg-gradient-to-b from-[#b89742]/5 to-[#d4af37]/0 rounded-[18px] pointer-events-none" />
+            <div className="bg-[#121215] border border-[#d4af37]/45 rounded-3xl p-10 flex flex-col justify-between items-center text-center shadow-2xl relative overflow-hidden">
+              <div className="absolute inset-4 border border-dashed border-[#d4af37]/25 rounded-[22px] pointer-events-none" />
+              <div className="absolute inset-5 bg-gradient-to-b from-[#b89742]/5 to-[#d4af37]/0 rounded-[20px] pointer-events-none" />
 
-              <div className="my-auto space-y-6">
-                <div className="w-20 h-20 rounded-full border border-[#d4af37]/30 flex items-center justify-center mx-auto bg-[#0d0d0f]/60">
-                  <span className="text-xl font-cinzel font-black tracking-widest text-[#d4af37]">
+              <div className="my-auto space-y-8 py-8">
+                <div className="w-32 h-32 rounded-full border-2 border-[#d4af37]/35 flex items-center justify-center mx-auto bg-[#0d0d0f]/80 shadow-2xl">
+                  <span className="text-4xl font-cinzel font-black tracking-widest text-[#f3e0aa]">
                     {hosts.initials}
                   </span>
                 </div>
-                <div className="h-[1px] w-20 bg-gradient-to-r from-transparent via-[#d4af37]/40 to-transparent mx-auto" />
-                <span className="text-[10px] font-bold uppercase tracking-[6px] text-white/30 block">
+                <div className="h-[1px] w-32 bg-gradient-to-r from-transparent via-[#d4af37]/50 to-transparent mx-auto" />
+                <span className="text-xs font-black uppercase tracking-[8px] text-white/50 block">
                   CONVITE DIGITAL EXCLUSIVO
                 </span>
               </div>
 
               {/* Small application reference text */}
-              <div className="text-center pb-2 z-10">
-                <p className="text-[8.5px] font-mono tracking-widest text-white/35 uppercase">
+              <div className="text-center pb-4 z-10">
+                <p className="text-xs font-mono tracking-widest text-white/45 uppercase">
                   Desenvolvido com carinho através da aplicação www.meuboda.com
                 </p>
               </div>
             </div>
 
             {/* RIGHT COLUMN: Front Cover Names (25%) */}
-            <div className="bg-[#121215] border border-[#d4af37]/15 rounded-3xl p-6 flex flex-col justify-between shadow-xl relative">
-              <div className="absolute inset-3 border border-[#d4af37]/5 rounded-[20px] pointer-events-none" />
+            <div className="bg-[#121215] border border-[#d4af37]/25 rounded-3xl p-8 flex flex-col justify-between shadow-xl relative">
+              <div className="absolute inset-3 border border-[#d4af37]/10 rounded-[20px] pointer-events-none" />
               
-              <div className="flex-1 flex flex-col justify-between items-center text-center py-8">
-                <div className="space-y-1">
-                  <span className="text-[9px] font-black uppercase tracking-[4px] text-[#d4af37]">CONVITE</span>
-                  <div className="h-[1px] w-8 bg-[#d4af37]/30 mx-auto mt-2" />
+              <div className="flex-1 flex flex-col justify-around items-center text-center py-10">
+                <div className="space-y-2">
+                  <span className="text-xs font-black uppercase tracking-[6px] text-[#d4af37]">CONVITE</span>
+                  <div className="h-[1px] w-12 bg-[#d4af37]/40 mx-auto mt-2.5" />
                 </div>
 
-                <div className="space-y-4 my-auto">
-                  <h1 className="text-3xl font-alex leading-tight gold-foil-text font-black">
+                <div className="space-y-6 my-auto">
+                  <h1 className="text-5xl font-alex leading-tight gold-foil-text font-black py-2">
                     {hosts.names}
                   </h1>
-                  <span className="text-[8px] font-bold tracking-[2px] text-white/50 uppercase block">
+                  <span className="text-xs font-black tracking-[3px] text-white/60 uppercase block">
                     {event.type === 'casamento' ? 'CASAMENTO' : event.type === 'aniversario' ? 'ANIVERSÁRIO' : 'PEDIDO'}
                   </span>
                 </div>
 
-                <div className="space-y-1 w-full">
-                  <span className="text-[9px] font-cinzel tracking-[2px] text-[#f3e0aa] font-bold block">
+                <div className="space-y-2 w-full">
+                  <span className="text-xs font-cinzel tracking-[3px] text-[#f3e0aa] font-black block">
                     {new Date(event.date).toLocaleDateString('pt-PT', { year: 'numeric' })}
                   </span>
                 </div>
@@ -268,7 +268,7 @@ export default function DefaultTemplate({
          INFORMATION PAGE: Trifold inside sheets (Left: Manual + Locations QR, Center: Invitation, Right: Access QR + Agenda)
          --------------------------------------------------------------------- */
       return (
-        <div className="w-[1120px] h-[792px] bg-[#0c0c0e] text-[#f4f4f5] p-6 flex flex-col justify-between font-sans relative overflow-hidden select-none box-border border-4 border-[#d4af37]/30 rounded-[28px]">
+        <div className="w-[1120px] h-[792px] bg-[#0c0c0e] text-[#f4f4f5] p-8 flex flex-col justify-between font-sans relative overflow-hidden select-none box-border border-[6px] border-[#d4af37]/35 rounded-[32px]">
           {/* Google Fonts and CSS styles */}
           <style jsx global>{`
             @import url('https://fonts.googleapis.com/css2?family=Alex+Brush&family=Cinzel:wght@400;600;700;900&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap');
@@ -282,141 +282,141 @@ export default function DefaultTemplate({
             }
           `}</style>
           
-          <div className="absolute inset-2 border border-[#d4af37]/15 rounded-[20px] pointer-events-none" />
+          <div className="absolute inset-3 border border-[#d4af37]/20 rounded-[22px] pointer-events-none" />
 
           {/* Grid Layout: Left: 25%, Center: 50%, Right: 25% */}
-          <div className="grid grid-cols-[1fr_2fr_1fr] gap-8 h-full items-stretch relative z-10 box-border">
+          <div className="grid grid-cols-[1fr_2fr_1fr] gap-10 h-full items-stretch relative z-10 box-border">
             
             {/* LEFT COLUMN: Guest Manual, Extra Info, Locations QR Code */}
             <div className="bg-[#121215] border border-[#d4af37]/20 rounded-3xl p-6 flex flex-col justify-between shadow-xl relative">
               <div className="absolute inset-3 border border-[#d4af37]/5 rounded-[20px] pointer-events-none" />
               
-              <div className="space-y-4 relative z-10 flex-1 flex flex-col justify-between h-full">
-                <div className="text-center border-b border-[#d4af37]/15 pb-2">
-                  <h3 className="font-cinzel font-black text-[10px] tracking-[3px] text-[#f3e0aa]">
+              <div className="space-y-6 relative z-10 flex-1 flex flex-col justify-between h-full">
+                <div className="text-center border-b border-[#d4af37]/15 pb-2.5">
+                  <h3 className="font-cinzel font-black text-xs tracking-[3px] text-[#f3e0aa]">
                     MANUAL DO CONVIDADO
                   </h3>
                 </div>
 
                 {/* Important guidelines / Gift suggestions */}
-                <div className="space-y-3 text-[10.5px] leading-relaxed flex-1 py-2 flex flex-col justify-center">
+                <div className="space-y-4 text-xs leading-relaxed flex-1 py-4 flex flex-col justify-center">
                   {(event.dress_code_style || event.dress_code_colors) && (
-                    <div>
-                      <h4 className="font-bold text-[9px] uppercase tracking-wider text-[#d4af37]">👗 Dress Code</h4>
-                      <p className="text-white mt-0.5">{event.dress_code_style || 'Esporte Fino / Social'}</p>
+                    <div className="space-y-0.5">
+                      <h4 className="font-bold text-[10px] uppercase tracking-wider text-[#d4af37]">👗 Dress Code</h4>
+                      <p className="text-white font-semibold">{event.dress_code_style || 'Esporte Fino / Social'}</p>
                       {event.dress_code_colors && (
-                        <p className="text-[9px] text-white/50">Paleta sugerida: {event.dress_code_colors}</p>
+                        <p className="text-[10px] text-white/60">Paleta sugerida: {event.dress_code_colors}</p>
                       )}
                     </div>
                   )}
 
                   {event.gift_suggestions && (
-                    <div>
-                      <h4 className="font-bold text-[9px] uppercase tracking-wider text-[#d4af37]">🎁 Sugestão de Presentes</h4>
-                      <p className="text-white mt-0.5 line-clamp-3">{event.gift_suggestions}</p>
+                    <div className="space-y-0.5">
+                      <h4 className="font-bold text-[10px] uppercase tracking-wider text-[#d4af37]">🎁 Sugestão de Presentes</h4>
+                      <p className="text-white font-semibold line-clamp-3">{event.gift_suggestions}</p>
                     </div>
                   )}
 
                   {event.kids_restriction_note && (
-                    <div>
-                      <h4 className="font-bold text-[9px] uppercase tracking-wider text-[#d4af37]">👶 Restrição de Crianças</h4>
-                      <p className="text-white mt-0.5">{event.kids_restriction_note}</p>
+                    <div className="space-y-0.5">
+                      <h4 className="font-bold text-[10px] uppercase tracking-wider text-[#d4af37]">👶 Restrição de Crianças</h4>
+                      <p className="text-white font-semibold">{event.kids_restriction_note}</p>
                     </div>
                   )}
 
                   {event.rsvp_deadline && (
-                    <div>
-                      <h4 className="font-bold text-[9px] uppercase tracking-wider text-[#d4af37]">📅 Limite de Confirmação</h4>
-                      <p className="text-white mt-0.5">Até dia {new Date(event.rsvp_deadline).toLocaleDateString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
+                    <div className="space-y-0.5">
+                      <h4 className="font-bold text-[10px] uppercase tracking-wider text-[#d4af37]">📅 Limite de Confirmação</h4>
+                      <p className="text-white font-semibold">Até dia {new Date(event.rsvp_deadline).toLocaleDateString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
                     </div>
                   )}
                 </div>
 
                 {/* Locations multi-redirect QR Code */}
                 {locationsQrCodeUrl ? (
-                  <div className="bg-white/5 border border-[#d4af37]/15 rounded-2xl p-3 flex flex-col items-center gap-2 relative overflow-hidden">
-                    <span className="text-[8px] font-black tracking-[2px] text-[#d4af37] uppercase">SCAN PARA AS LOCALIZAÇÕES</span>
+                  <div className="bg-white/5 border border-[#d4af37]/15 rounded-2xl p-4 flex flex-col items-center gap-2.5 relative overflow-hidden">
+                    <span className="text-[9px] font-black tracking-[2px] text-[#d4af37] uppercase">MAPAS E LOCALIZAÇÕES</span>
                     
-                    <div className="bg-white p-1.5 rounded-lg border border-[#d4af37]/20 shadow-md">
+                    <div className="bg-white p-2 rounded-xl border border-[#d4af37]/35 shadow-md">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={locationsQrCodeUrl} alt="Locais QR" className="w-20 h-20 object-contain" />
+                      <img src={locationsQrCodeUrl} alt="Locais QR" className="w-28 h-28 object-contain" />
                     </div>
-                    <span className="text-[7.5px] text-white/50 font-bold uppercase text-center leading-tight">Cerimónia, Igreja & Salão</span>
+                    <span className="text-[8.5px] text-white/70 font-bold uppercase text-center leading-tight">SCAN PARA VER NO MAPA</span>
                   </div>
                 ) : (
-                  <div className="h-20" />
+                  <div className="h-28" />
                 )}
               </div>
             </div>
 
             {/* CENTER COLUMN: The Invitation Core card */}
-            <div className="bg-[#121215] border border-[#d4af37]/45 rounded-3xl p-8 flex flex-col justify-between items-center text-center shadow-2xl relative overflow-hidden">
-              <div className="absolute inset-3 border border-dashed border-[#d4af37]/25 rounded-[20px] pointer-events-none" />
-              <div className="absolute inset-4 bg-gradient-to-b from-[#b89742]/5 to-[#d4af37]/0 rounded-[18px] pointer-events-none" />
+            <div className="bg-[#121215] border border-[#d4af37]/45 rounded-3xl p-10 flex flex-col justify-around items-center text-center shadow-2xl relative overflow-hidden">
+              <div className="absolute inset-4 border border-dashed border-[#d4af37]/25 rounded-[22px] pointer-events-none" />
+              <div className="absolute inset-5 bg-gradient-to-b from-[#b89742]/5 to-[#d4af37]/0 rounded-[20px] pointer-events-none" />
 
               {/* Initials */}
               <div className="space-y-1 relative z-10 pt-4">
-                <div className="w-14 h-14 rounded-full border border-[#d4af37]/45 flex items-center justify-center mx-auto bg-[#0d0d0f]">
-                  <span className="text-sm font-cinzel font-black tracking-widest text-[#f3e0aa]">
+                <div className="w-20 h-20 rounded-full border-2 border-[#d4af37]/45 flex items-center justify-center mx-auto bg-[#0d0d0f]/80 shadow-lg">
+                  <span className="text-2xl font-cinzel font-black tracking-widest text-[#f3e0aa]">
                     {hosts.initials}
                   </span>
                 </div>
               </div>
 
               {/* Names and Phrase */}
-              <div className="space-y-5 relative z-10 py-2 my-auto">
-                <h1 className="text-4xl md:text-5xl font-alex tracking-wide text-white leading-tight gold-foil-text font-black">
+              <div className="space-y-6 relative z-10 py-4 my-auto w-full">
+                <h1 className="text-5xl md:text-6xl font-alex tracking-wide text-white leading-tight gold-foil-text font-black px-2 py-1">
                   {hosts.names}
                 </h1>
 
-                <p className="text-xs font-playfair italic max-w-sm mx-auto leading-relaxed text-white font-semibold">
+                <p className="text-sm font-playfair italic max-w-sm mx-auto leading-relaxed text-white font-semibold">
                   {phrases.intro}
                 </p>
                 
                 {/* Date copo d'agua & Weekday */}
-                <div className="border-y border-[#d4af37]/15 py-3.5 my-2 text-center space-y-1 bg-white/5 rounded-xl px-6">
-                  <span className="text-[10px] font-cinzel tracking-[3px] text-[#d4af37] font-black uppercase block">
+                <div className="border-y-2 border-[#d4af37]/20 py-4 my-6 text-center space-y-1 bg-white/5 rounded-2xl px-8 w-full max-w-md mx-auto">
+                  <span className="text-xs font-cinzel tracking-[4px] text-[#d4af37] font-black uppercase block">
                     {dateDetails.weekday}
                   </span>
-                  <span className="text-sm font-playfair text-white font-bold block">
+                  <span className="text-xl font-playfair text-white font-black block mt-1">
                     {dateDetails.date}
                   </span>
-                  <span className="text-[11px] font-cinzel text-white/70 block">
+                  <span className="text-xs font-cinzel text-white/70 block mt-1">
                     Salão / Recepção às {dateDetails.time}
                   </span>
                 </div>
 
-                <p className="text-[11px] font-playfair italic text-[#f3e0aa] font-bold">
+                <p className="text-xs font-playfair italic text-[#f3e0aa] font-bold">
                   &quot;{phrases.outro}&quot;
                 </p>
               </div>
 
-              <div className="h-6" />
+              <div className="h-4" />
             </div>
 
             {/* RIGHT COLUMN: Check-in / Gatekeeper QR Code & Agenda */}
-            <div className="bg-[#121215] border border-[#d4af37]/15 rounded-3xl p-6 flex flex-col justify-between shadow-xl relative">
+            <div className="bg-[#121215] border border-[#d4af37]/25 rounded-3xl p-6 flex flex-col justify-between shadow-xl relative">
               <div className="absolute inset-3 border border-[#d4af37]/5 rounded-[20px] pointer-events-none" />
               
-              <div className="space-y-4 relative z-10 flex-1 flex flex-col justify-between h-full">
-                <div className="text-center border-b border-[#d4af37]/15 pb-2">
-                  <h3 className="font-cinzel font-black text-[10px] tracking-[3px] text-[#f3e0aa]">
+              <div className="space-y-6 relative z-10 flex-1 flex flex-col justify-between h-full">
+                <div className="text-center border-b border-[#d4af37]/15 pb-2.5">
+                  <h3 className="font-cinzel font-black text-xs tracking-[3px] text-[#f3e0aa]">
                     AGENDA DO DIA
                   </h3>
                 </div>
 
                 {/* Vertical compact agenda */}
-                <div className="space-y-2.5 max-h-[190px] overflow-hidden flex-1 py-3 flex flex-col justify-center">
+                <div className="space-y-4 max-h-[220px] overflow-hidden flex-1 py-4 flex flex-col justify-center">
                   {schedules.length > 0 ? (
                     schedules.slice(0, 5).map((sched) => (
-                      <div key={sched.id} className="flex items-center gap-2 text-[10.5px]">
-                        <span className="text-[#d4af37] font-bold tracking-tighter shrink-0">{sched.time}</span>
+                      <div key={sched.id} className="flex items-center gap-2.5 text-xs font-semibold">
+                        <span className="text-[#d4af37] font-black tracking-tighter shrink-0">{sched.time}</span>
                         <span className="text-white/40 font-bold shrink-0">|</span>
-                        <span className="text-white truncate font-medium">{sched.title}</span>
+                        <span className="text-white truncate font-bold">{sched.title}</span>
                       </div>
                     ))
                   ) : (
-                    <div className="text-center py-6 text-[10px] text-white/50 italic">
+                    <div className="text-center py-6 text-xs text-white/50 italic font-medium">
                       Agenda será exibida no convite.
                     </div>
                   )}
@@ -424,17 +424,17 @@ export default function DefaultTemplate({
 
                 {/* Access check-in QR Code */}
                 {qrCodeUrl ? (
-                  <div className="bg-white/5 border border-[#d4af37]/15 rounded-2xl p-3 flex flex-col items-center gap-2 relative overflow-hidden">
-                    <span className="text-[8px] font-black tracking-[2px] text-[#d4af37] uppercase">QR CODE DE ACESSO A PORTARIA</span>
+                  <div className="bg-white/5 border border-[#d4af37]/15 rounded-2xl p-4 flex flex-col items-center gap-2.5 relative overflow-hidden">
+                    <span className="text-[9px] font-black tracking-[2px] text-[#d4af37] uppercase">CHECK-IN / PORTARIA</span>
                     
-                    <div className="bg-white p-1.5 rounded-lg border border-[#d4af37]/20 shadow-md">
+                    <div className="bg-white p-2 rounded-xl border border-[#d4af37]/35 shadow-md">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={qrCodeUrl} alt="Acesso QR" className="w-20 h-20 object-contain" />
+                      <img src={qrCodeUrl} alt="Acesso QR" className="w-28 h-28 object-contain" />
                     </div>
-                    <span className="text-[8px] text-white font-bold uppercase truncate max-w-full">{guest.name}</span>
+                    <span className="text-[10px] text-white font-bold uppercase truncate max-w-full leading-none">{guest.name}</span>
                   </div>
                 ) : (
-                  <div className="h-20" />
+                  <div className="h-28" />
                 )}
               </div>
             </div>
