@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -24,6 +24,7 @@ export interface TemplateProps {
   event: Event;
   table: Table | null;
   qrCodeUrl: string;
+  locationsQrCodeUrl?: string;
   schedules: EventSchedule[];
   infoBlocks: EventInfoBlock[];
   rsvpStatus: 'Pending' | 'Confirmed' | 'Declined';
@@ -44,6 +45,7 @@ export interface TemplateProps {
   children?: React.ReactNode;
   forceOpen?: boolean;
   isPrinting?: boolean;
+  renderPage?: 'cover' | 'info';
 }
 
 export default function DefaultTemplate({
@@ -51,6 +53,7 @@ export default function DefaultTemplate({
   event,
   table,
   qrCodeUrl,
+  locationsQrCodeUrl,
   schedules,
   infoBlocks,
   rsvpStatus,
@@ -65,253 +68,381 @@ export default function DefaultTemplate({
   children,
   forceOpen,
   isPrinting = false,
+  renderPage = 'info',
 }: TemplateProps) {
   const [isOpen, setIsOpen] = useState(forceOpen ?? false);
+  const [showMapsModal, setShowMapsModal] = useState(false);
+  
   const isConfirmed = rsvpStatus === 'Confirmed';
   const isDeclined = rsvpStatus === 'Declined';
 
-  // Dynamic Initials/Monogram
-  const getMonogram = () => {
-    if (event.type === 'aniversario') {
-      const match = event.title.match(/\d+/);
-      return match ? match[0] : '🎂';
+  // Modal map trigger for public invitation scan
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.hash === '#mapas') {
+      setShowMapsModal(true);
     }
-    const parts = event.title.split(/(?:e|&|and|\+|\by\b)/i).map(p => p.trim());
+  }, []);
+
+  // Dynamic host initials and names parsing
+  const getAnfitriões = () => {
+    // splits by e, &, +, and, /, \
+    const parts = event.title.split(/(?:e|&|and|\+|\by\b|\/|\\)/i).map(p => p.trim());
     if (parts.length >= 2) {
-      return `${parts[0].charAt(0).toUpperCase()}${parts[1].charAt(0).toUpperCase()}`;
+      return {
+        initials: `${parts[0].charAt(0).toUpperCase()} & ${parts[1].charAt(0).toUpperCase()}`,
+        names: `${parts[0]} & ${parts[1]}`,
+      };
     }
-    return event.title.substring(0, 2).toUpperCase();
+    return {
+      initials: event.title.substring(0, 2).toUpperCase(),
+      names: event.title,
+    };
   };
 
-  // Dynamic Intro Text based on Event Type
-  const getIntroText = () => {
+  const hosts = getAnfitriões();
+
+  // Dynamic Intro and Ending Phrases
+  const getPhrases = () => {
     switch (event.type) {
       case 'casamento':
-        return 'Juntamente com as suas famílias, têm o prazer de convidar para a celebração do seu casamento.';
+        return {
+          intro: 'Com a bênção de Deus e de nossas famílias, convidamo-vos para partilhar connosco este dia.',
+          outro: 'A vossa presença tornará o nosso dia ainda mais inesquecível e feliz.',
+        };
       case 'aniversario':
-        return 'Tenho o prazer de convidar para celebrar comigo o meu aniversário.';
+        return {
+          intro: 'A vida é uma dádiva e celebrá-la ao lado de pessoas queridas é a maior das alegrias.',
+          outro: 'Espero por si para partilhar abraços, sorrisos e brindes a este novo ciclo.',
+        };
       case 'alambamento':
-        return 'Com grande alegria e respeito tradicional, convidamos para o nosso Alambamento.';
+        return {
+          intro: 'Em união com as nossas tradições e as nossas famílias, convidamo-vos para o nosso Alambamento.',
+          outro: 'Vem testemunhar o início do nosso compromisso e celebrar o amor familiar.',
+        };
       case 'cha_panela':
-        return 'Estás convidada para o meu Chá de Panela! Vem celebrar comigo este momento especial.';
+        return {
+          intro: 'O meu casamento está a chegar! Vem divertir-te comigo e celebrar no meu Chá de Panela.',
+          outro: 'A tua presença e energia positiva são os meus maiores presentes.',
+        };
       case 'palestra':
-        return 'Convidamos a participar nesta enriquecedora palestra.';
-      case 'festa_rua':
-        return 'Vem celebrar connosco na nossa festa de rua! Contamos com a tua presença.';
+      case 'outro':
       default:
-        return 'Temos a honra e o prazer de convidar para o nosso evento especial.';
+        return {
+          intro: 'Temos o enorme prazer de convidar-vos para participar no nosso evento especial.',
+          outro: 'A vossa presença é fundamental para o sucesso e enriquecimento do nosso encontro.',
+        };
     }
   };
 
+  const phrases = getPhrases();
+
+  // Formatted date string with full weekday in Portuguese
+  const getFormattedDate = () => {
+    try {
+      const d = new Date(event.date);
+      const weekdayStr = d.toLocaleDateString('pt-PT', { weekday: 'long' });
+      const dayMonthYear = d.toLocaleDateString('pt-PT', { day: 'numeric', month: 'long', year: 'numeric' });
+      // Capitalize weekday
+      const weekdayCapitalized = weekdayStr.charAt(0).toUpperCase() + weekdayStr.slice(1);
+      
+      const timeStr = event.party_time || d.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
+      return {
+        weekday: weekdayCapitalized,
+        date: dayMonthYear,
+        time: timeStr,
+      };
+    } catch (e) {
+      return {
+        weekday: 'Sábado',
+        date: '18 de Junho de 2026',
+        time: '15:00',
+      };
+    }
+  };
+
+  const dateDetails = getFormattedDate();
+
   /* =========================================================================
-     PDF PRINT MODE LAYOUT: Single Landscape Page (1120x792)
+     PDF PRINT MODE LAYOUTS (Landscape A4: 1120x792)
      ========================================================================= */
   if (isPrinting) {
-    return (
-      <div className="w-[1120px] h-[792px] bg-[#0c0c0e] text-[#f4f4f5] p-6 flex flex-col justify-between font-sans relative overflow-hidden select-none box-border border-4 border-[#d4af37]/30 rounded-[28px]">
-        {/* Google Fonts and CSS styles */}
-        <style jsx global>{`
-          @import url('https://fonts.googleapis.com/css2?family=Alex+Brush&family=Cinzel:wght@400;600;700;900&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap');
+    if (renderPage === 'cover') {
+      /* ---------------------------------------------------------------------
+         COVER PAGE: Foldable outer sheets (Left: Photo, Center: Brand, Right: Front Names)
+         --------------------------------------------------------------------- */
+      return (
+        <div className="w-[1120px] h-[792px] bg-[#0c0c0e] text-[#f4f4f5] p-6 flex flex-col justify-between font-sans relative overflow-hidden select-none box-border border-4 border-[#d4af37]/30 rounded-[28px]">
+          {/* Google Fonts and CSS styles */}
+          <style jsx global>{`
+            @import url('https://fonts.googleapis.com/css2?family=Alex+Brush&family=Cinzel:wght@400;600;700;900&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap');
+            .font-cinzel { font-family: 'Cinzel', serif; }
+            .font-alex { font-family: 'Alex Brush', cursive; }
+            .font-playfair { font-family: 'Playfair Display', serif; }
+            .gold-foil-text {
+              background: linear-gradient(to right, #b89742 0%, #f3e0aa 50%, #b89742 100%);
+              -webkit-background-clip: text;
+              -webkit-text-fill-color: transparent;
+            }
+          `}</style>
           
-          .font-cinzel {
-            font-family: 'Cinzel', serif;
-          }
-          .font-alex {
-            font-family: 'Alex Brush', cursive;
-          }
-          .font-playfair {
-            font-family: 'Playfair Display', serif;
-          }
-          .gold-foil-text {
-            background: linear-gradient(to right, #b89742 0%, #f3e0aa 50%, #b89742 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-          }
-          .gold-foil-border {
-            border-image: linear-gradient(to right, #b89742, #f3e0aa, #b89742) 1;
-          }
-        `}</style>
+          <div className="absolute inset-2 border border-[#d4af37]/15 rounded-[20px] pointer-events-none" />
 
-        {/* Decorative Golden Ambient Blur Lights */}
-        <div className="absolute top-10 left-1/4 w-[350px] h-[350px] bg-[#d4af37]/5 rounded-full blur-[140px] pointer-events-none" />
-        <div className="absolute bottom-10 right-1/4 w-[350px] h-[350px] bg-[#b89742]/5 rounded-full blur-[140px] pointer-events-none" />
-
-        {/* Outer thin border */}
-        <div className="absolute inset-2 border border-[#d4af37]/15 rounded-[20px] pointer-events-none" />
-
-        {/* Grid Container filling 100% of height */}
-        <div className="grid grid-cols-3 gap-6 h-full items-stretch relative z-10 box-border">
-          
-          {/* PANEL 1: Event Details & Dress Code */}
-          <div className="bg-[#121215] border border-[#d4af37]/20 rounded-3xl p-6 flex flex-col justify-between shadow-xl relative">
-            <div className="absolute inset-3 border border-[#d4af37]/5 rounded-[20px] pointer-events-none" />
+          {/* Grid Layout: Left: 25%, Center: 50%, Right: 25% */}
+          <div className="grid grid-cols-[1fr_2fr_1fr] gap-8 h-full items-stretch relative z-10 box-border">
             
-            <div className="space-y-5 relative z-10 flex-1 flex flex-col justify-between">
-              <div className="text-center space-y-1 border-b border-[#d4af37]/15 pb-3">
-                <h3 className="font-cinzel font-black text-xs tracking-[3px] text-[#f3e0aa]">
-                  INFORMAÇÕES
-                </h3>
-              </div>
-
-              <div className="space-y-4 text-xs leading-relaxed flex-1 py-4 flex flex-col justify-center">
-                <div className="flex items-start gap-3 p-3 bg-white/5 rounded-xl border border-white/5">
-                  <Calendar className="h-5 w-5 text-[#d4af37] shrink-0" />
-                  <div>
-                    <h4 className="font-bold text-[9px] uppercase tracking-wider text-[#d4af37]">Data e Hora</h4>
-                    <p className="font-bold text-white mt-0.5 text-xs">
-                      {new Date(event.date).toLocaleDateString('pt-PT', {
-                        weekday: 'long',
-                        day: '2-digit',
-                        month: 'long',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </p>
-                  </div>
-                </div>
-
-                {event.ceremony_location && (
-                  <div className="flex items-start gap-3 p-3 bg-white/5 rounded-xl border border-white/5">
-                    <MapPin className="h-5 w-5 text-[#d4af37] shrink-0" />
-                    <div>
-                      <h4 className="font-bold text-[9px] uppercase tracking-wider text-[#d4af37]">
-                        {event.type === 'casamento' ? 'Cerimónia' : 'Local'}
-                      </h4>
-                      <p className="font-bold text-white mt-0.5 text-xs">{event.ceremony_location}</p>
-                      {event.ceremony_time && (
-                        <p className="text-[10px] text-white/60">Hora: {event.ceremony_time}</p>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {event.party_location && (
-                  <div className="flex items-start gap-3 p-3 bg-white/5 rounded-xl border border-white/5">
-                    <MapPin className="h-5 w-5 text-[#d4af37] shrink-0" />
-                    <div>
-                      <h4 className="font-bold text-[9px] uppercase tracking-wider text-[#d4af37]">
-                        {event.type === 'casamento' ? 'Copo d\'Água' : 'Recepção'}
-                      </h4>
-                      <p className="font-bold text-white mt-0.5 text-xs">{event.party_location}</p>
-                      {event.party_time && (
-                        <p className="text-[10px] text-white/60">Hora: {event.party_time}</p>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Dress Code in Left Panel */}
-              {(event.dress_code_style || event.dress_code_colors) && (
-                <div className="p-3 border border-[#d4af37]/15 bg-white/5 rounded-xl text-xs space-y-1 relative">
-                  <h4 className="font-bold text-[10px] uppercase tracking-wider text-[#d4af37]">👗 Dress Code</h4>
-                  {event.dress_code_style && <p className="text-white font-medium">{event.dress_code_style}</p>}
-                  {event.dress_code_colors && (
-                    <p className="text-[10px] text-white/70">Sugestão: {event.dress_code_colors}</p>
-                  )}
+            {/* LEFT COLUMN: Couple Photo (25%) */}
+            <div className="bg-[#121215] border border-[#d4af37]/15 rounded-3xl p-3 flex flex-col items-center justify-center shadow-xl relative overflow-hidden h-full">
+              {event.cover_image ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img 
+                  src={event.cover_image} 
+                  alt="Couple" 
+                  className="w-full h-full object-cover rounded-2xl border border-[#d4af37]/20"
+                />
+              ) : (
+                <div className="w-full h-full rounded-2xl border border-dashed border-[#d4af37]/25 flex flex-col items-center justify-center bg-white/5 text-center p-4">
+                  <span className="text-4xl">📸</span>
+                  <span className="text-[10px] font-bold text-[#d4af37] uppercase tracking-wider mt-3">Sua Foto Aqui</span>
+                  <span className="text-[8px] text-white/40 mt-1">Carregue no painel do evento</span>
                 </div>
               )}
             </div>
-          </div>
 
-          {/* PANEL 2: The Gold Acrylic Invitation Card */}
-          <div className="bg-[#121215] border border-[#d4af37]/45 rounded-3xl p-8 flex flex-col justify-between items-center text-center shadow-2xl relative overflow-hidden">
-            <div className="absolute inset-3 border border-dashed border-[#d4af37]/25 rounded-[20px] pointer-events-none" />
-            <div className="absolute inset-4 bg-gradient-to-b from-[#b89742]/5 to-[#d4af37]/0 rounded-[18px] pointer-events-none" />
+            {/* CENTER COLUMN: Back Cover / App Reference (50%) */}
+            <div className="bg-[#121215] border border-[#d4af37]/35 rounded-3xl p-8 flex flex-col justify-between items-center text-center shadow-2xl relative overflow-hidden">
+              <div className="absolute inset-3 border border-dashed border-[#d4af37]/20 rounded-[20px] pointer-events-none" />
+              <div className="absolute inset-4 bg-gradient-to-b from-[#b89742]/5 to-[#d4af37]/0 rounded-[18px] pointer-events-none" />
 
-            <div className="space-y-2 relative z-10 pt-4">
-              <div className="w-14 h-14 rounded-full border border-[#d4af37]/45 flex items-center justify-center mx-auto bg-[#0d0d0f]">
-                <span className="text-sm font-cinzel font-black tracking-widest text-[#f3e0aa]">
-                  {getMonogram()}
+              <div className="my-auto space-y-6">
+                <div className="w-20 h-20 rounded-full border border-[#d4af37]/30 flex items-center justify-center mx-auto bg-[#0d0d0f]/60">
+                  <span className="text-xl font-cinzel font-black tracking-widest text-[#d4af37]">
+                    {hosts.initials}
+                  </span>
+                </div>
+                <div className="h-[1px] w-20 bg-gradient-to-r from-transparent via-[#d4af37]/40 to-transparent mx-auto" />
+                <span className="text-[10px] font-bold uppercase tracking-[6px] text-white/30 block">
+                  CONVITE DIGITAL EXCLUSIVO
                 </span>
               </div>
-              <span className="text-[9px] font-black uppercase tracking-[4px] text-white/40 block mt-2">
-                {eventLabels.invitation}
-              </span>
-            </div>
 
-            <div className="space-y-6 relative z-10 py-4 my-auto">
-              <h1 className="text-4xl md:text-5xl font-alex tracking-wide text-white leading-tight gold-foil-text font-black">
-                {event.title}
-              </h1>
-
-              <p className="text-xs font-playfair italic max-w-sm mx-auto leading-relaxed text-white font-semibold">
-                {getIntroText()}
-              </p>
-              
-              {event.description && (
-                <p className="text-[11px] font-playfair italic text-[#f3e0aa] font-bold">
-                  &quot;{event.description}&quot;
+              {/* Small application reference text */}
+              <div className="text-center pb-2 z-10">
+                <p className="text-[8.5px] font-mono tracking-widest text-white/35 uppercase">
+                  Desenvolvido com carinho através da aplicação www.meuboda.com
                 </p>
-              )}
+              </div>
             </div>
 
-            <div className="space-y-1 relative z-10 w-full pb-4 border-t border-[#d4af37]/15 pt-3">
-              <p className="text-[10px] font-cinzel tracking-[3px] text-[#f3e0aa] uppercase font-black">
-                {new Date(event.date).toLocaleDateString('pt-PT', { month: 'long', year: 'numeric' })}
-              </p>
+            {/* RIGHT COLUMN: Front Cover Names (25%) */}
+            <div className="bg-[#121215] border border-[#d4af37]/15 rounded-3xl p-6 flex flex-col justify-between shadow-xl relative">
+              <div className="absolute inset-3 border border-[#d4af37]/5 rounded-[20px] pointer-events-none" />
+              
+              <div className="flex-1 flex flex-col justify-between items-center text-center py-8">
+                <div className="space-y-1">
+                  <span className="text-[9px] font-black uppercase tracking-[4px] text-[#d4af37]">CONVITE</span>
+                  <div className="h-[1px] w-8 bg-[#d4af37]/30 mx-auto mt-2" />
+                </div>
+
+                <div className="space-y-4 my-auto">
+                  <h1 className="text-3xl font-alex leading-tight gold-foil-text font-black">
+                    {hosts.names}
+                  </h1>
+                  <span className="text-[8px] font-bold tracking-[2px] text-white/50 uppercase block">
+                    {event.type === 'casamento' ? 'CASAMENTO' : event.type === 'aniversario' ? 'ANIVERSÁRIO' : 'PEDIDO'}
+                  </span>
+                </div>
+
+                <div className="space-y-1 w-full">
+                  <span className="text-[9px] font-cinzel tracking-[2px] text-[#f3e0aa] font-bold block">
+                    {new Date(event.date).toLocaleDateString('pt-PT', { year: 'numeric' })}
+                  </span>
+                </div>
+              </div>
             </div>
+
           </div>
+        </div>
+      );
+    } else {
+      /* ---------------------------------------------------------------------
+         INFORMATION PAGE: Trifold inside sheets (Left: Manual + Locations QR, Center: Invitation, Right: Access QR + Agenda)
+         --------------------------------------------------------------------- */
+      return (
+        <div className="w-[1120px] h-[792px] bg-[#0c0c0e] text-[#f4f4f5] p-6 flex flex-col justify-between font-sans relative overflow-hidden select-none box-border border-4 border-[#d4af37]/30 rounded-[28px]">
+          {/* Google Fonts and CSS styles */}
+          <style jsx global>{`
+            @import url('https://fonts.googleapis.com/css2?family=Alex+Brush&family=Cinzel:wght@400;600;700;900&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap');
+            .font-cinzel { font-family: 'Cinzel', serif; }
+            .font-alex { font-family: 'Alex Brush', cursive; }
+            .font-playfair { font-family: 'Playfair Display', serif; }
+            .gold-foil-text {
+              background: linear-gradient(to right, #b89742 0%, #f3e0aa 50%, #b89742 100%);
+              -webkit-background-clip: text;
+              -webkit-text-fill-color: transparent;
+            }
+          `}</style>
+          
+          <div className="absolute inset-2 border border-[#d4af37]/15 rounded-[20px] pointer-events-none" />
 
-          {/* PANEL 3: Access Ticket QR & Compact Timeline */}
-          <div className="bg-[#121215] border border-[#d4af37]/20 rounded-3xl p-6 flex flex-col justify-between shadow-xl relative">
-            <div className="absolute inset-3 border border-[#d4af37]/5 rounded-[20px] pointer-events-none" />
+          {/* Grid Layout: Left: 25%, Center: 50%, Right: 25% */}
+          <div className="grid grid-cols-[1fr_2fr_1fr] gap-8 h-full items-stretch relative z-10 box-border">
             
-            <div className="space-y-5 relative z-10 flex-1 flex flex-col justify-between">
-              <div className="text-center space-y-1 border-b border-[#d4af37]/15 pb-3">
-                <h3 className="font-cinzel font-black text-xs tracking-[3px] text-[#f3e0aa]">
-                  PASSE DE ACESSO
-                </h3>
+            {/* LEFT COLUMN: Guest Manual, Extra Info, Locations QR Code */}
+            <div className="bg-[#121215] border border-[#d4af37]/20 rounded-3xl p-6 flex flex-col justify-between shadow-xl relative">
+              <div className="absolute inset-3 border border-[#d4af37]/5 rounded-[20px] pointer-events-none" />
+              
+              <div className="space-y-4 relative z-10 flex-1 flex flex-col justify-between h-full">
+                <div className="text-center border-b border-[#d4af37]/15 pb-2">
+                  <h3 className="font-cinzel font-black text-[10px] tracking-[3px] text-[#f3e0aa]">
+                    MANUAL DO CONVIDADO
+                  </h3>
+                </div>
+
+                {/* Important guidelines / Gift suggestions */}
+                <div className="space-y-3 text-[10.5px] leading-relaxed flex-1 py-2 flex flex-col justify-center">
+                  {(event.dress_code_style || event.dress_code_colors) && (
+                    <div>
+                      <h4 className="font-bold text-[9px] uppercase tracking-wider text-[#d4af37]">👗 Dress Code</h4>
+                      <p className="text-white mt-0.5">{event.dress_code_style || 'Esporte Fino / Social'}</p>
+                      {event.dress_code_colors && (
+                        <p className="text-[9px] text-white/50">Paleta sugerida: {event.dress_code_colors}</p>
+                      )}
+                    </div>
+                  )}
+
+                  {event.gift_suggestions && (
+                    <div>
+                      <h4 className="font-bold text-[9px] uppercase tracking-wider text-[#d4af37]">🎁 Sugestão de Presentes</h4>
+                      <p className="text-white mt-0.5 line-clamp-3">{event.gift_suggestions}</p>
+                    </div>
+                  )}
+
+                  {event.kids_restriction_note && (
+                    <div>
+                      <h4 className="font-bold text-[9px] uppercase tracking-wider text-[#d4af37]">👶 Restrição de Crianças</h4>
+                      <p className="text-white mt-0.5">{event.kids_restriction_note}</p>
+                    </div>
+                  )}
+
+                  {event.rsvp_deadline && (
+                    <div>
+                      <h4 className="font-bold text-[9px] uppercase tracking-wider text-[#d4af37]">📅 Limite de Confirmação</h4>
+                      <p className="text-white mt-0.5">Até dia {new Date(event.rsvp_deadline).toLocaleDateString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Locations multi-redirect QR Code */}
+                {locationsQrCodeUrl ? (
+                  <div className="bg-white/5 border border-[#d4af37]/15 rounded-2xl p-3 flex flex-col items-center gap-2 relative overflow-hidden">
+                    <span className="text-[8px] font-black tracking-[2px] text-[#d4af37] uppercase">SCAN PARA AS LOCALIZAÇÕES</span>
+                    
+                    <div className="bg-white p-1.5 rounded-lg border border-[#d4af37]/20 shadow-md">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={locationsQrCodeUrl} alt="Locais QR" className="w-20 h-20 object-contain" />
+                    </div>
+                    <span className="text-[7.5px] text-white/50 font-bold uppercase text-center leading-tight">Cerimónia, Igreja & Salão</span>
+                  </div>
+                ) : (
+                  <div className="h-20" />
+                )}
+              </div>
+            </div>
+
+            {/* CENTER COLUMN: The Invitation Core card */}
+            <div className="bg-[#121215] border border-[#d4af37]/45 rounded-3xl p-8 flex flex-col justify-between items-center text-center shadow-2xl relative overflow-hidden">
+              <div className="absolute inset-3 border border-dashed border-[#d4af37]/25 rounded-[20px] pointer-events-none" />
+              <div className="absolute inset-4 bg-gradient-to-b from-[#b89742]/5 to-[#d4af37]/0 rounded-[18px] pointer-events-none" />
+
+              {/* Initials */}
+              <div className="space-y-1 relative z-10 pt-4">
+                <div className="w-14 h-14 rounded-full border border-[#d4af37]/45 flex items-center justify-center mx-auto bg-[#0d0d0f]">
+                  <span className="text-sm font-cinzel font-black tracking-widest text-[#f3e0aa]">
+                    {hosts.initials}
+                  </span>
+                </div>
               </div>
 
-              {/* QR Code Ticket */}
-              {qrCodeUrl ? (
-                <div className="bg-white/5 border border-[#d4af37]/15 rounded-2xl p-4 flex flex-col items-center gap-3 relative overflow-hidden">
-                  <span className="text-[8px] font-black tracking-[3px] text-[#d4af37] uppercase">PASSE DIGITAL INDIVIDUAL</span>
-                  
-                  <div className="bg-white p-2 rounded-xl border border-[#d4af37]/30 shadow-md">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={qrCodeUrl} alt="Acesso QR" className="w-28 h-28 object-contain" />
-                  </div>
+              {/* Names and Phrase */}
+              <div className="space-y-5 relative z-10 py-2 my-auto">
+                <h1 className="text-4xl md:text-5xl font-alex tracking-wide text-white leading-tight gold-foil-text font-black">
+                  {hosts.names}
+                </h1>
 
-                  <div className="text-center space-y-1 text-xs">
-                    <p className="font-bold text-white text-sm">{guest.name}</p>
-                    <p className="text-[10.5px] text-[#f3e0aa] font-semibold">
-                      {table ? `Mesa: ${table.name}` : 'Mesa: Confirmada'}
-                    </p>
-                  </div>
+                <p className="text-xs font-playfair italic max-w-sm mx-auto leading-relaxed text-white font-semibold">
+                  {phrases.intro}
+                </p>
+                
+                {/* Date copo d'agua & Weekday */}
+                <div className="border-y border-[#d4af37]/15 py-3.5 my-2 text-center space-y-1 bg-white/5 rounded-xl px-6">
+                  <span className="text-[10px] font-cinzel tracking-[3px] text-[#d4af37] font-black uppercase block">
+                    {dateDetails.weekday}
+                  </span>
+                  <span className="text-sm font-playfair text-white font-bold block">
+                    {dateDetails.date}
+                  </span>
+                  <span className="text-[11px] font-cinzel text-white/70 block">
+                    Salão / Recepção às {dateDetails.time}
+                  </span>
                 </div>
-              ) : (
-                <div className="h-36 flex items-center justify-center border border-dashed border-white/10 rounded-2xl bg-white/5">
-                  <p className="text-xs text-white/50">QR Code indisponível</p>
-                </div>
-              )}
 
-              {/* Compact Timeline / Agenda */}
-              {schedules.length > 0 ? (
-                <div className="space-y-2 text-left pt-2">
-                  <h4 className="font-bold text-[9px] uppercase tracking-wider text-[#d4af37] border-b border-[#d4af37]/10 pb-1.5 flex items-center gap-1.5">
-                    <Clock className="h-3 w-3" /> Agenda do Evento
-                  </h4>
-                  <div className="space-y-2 max-h-[140px] overflow-hidden">
-                    {schedules.slice(0, 4).map((sched) => (
-                      <div key={sched.id} className="flex items-center gap-2 text-[11px]">
+                <p className="text-[11px] font-playfair italic text-[#f3e0aa] font-bold">
+                  &quot;{phrases.outro}&quot;
+                </p>
+              </div>
+
+              <div className="h-6" />
+            </div>
+
+            {/* RIGHT COLUMN: Check-in / Gatekeeper QR Code & Agenda */}
+            <div className="bg-[#121215] border border-[#d4af37]/15 rounded-3xl p-6 flex flex-col justify-between shadow-xl relative">
+              <div className="absolute inset-3 border border-[#d4af37]/5 rounded-[20px] pointer-events-none" />
+              
+              <div className="space-y-4 relative z-10 flex-1 flex flex-col justify-between h-full">
+                <div className="text-center border-b border-[#d4af37]/15 pb-2">
+                  <h3 className="font-cinzel font-black text-[10px] tracking-[3px] text-[#f3e0aa]">
+                    AGENDA DO DIA
+                  </h3>
+                </div>
+
+                {/* Vertical compact agenda */}
+                <div className="space-y-2.5 max-h-[190px] overflow-hidden flex-1 py-3 flex flex-col justify-center">
+                  {schedules.length > 0 ? (
+                    schedules.slice(0, 5).map((sched) => (
+                      <div key={sched.id} className="flex items-center gap-2 text-[10.5px]">
                         <span className="text-[#d4af37] font-bold tracking-tighter shrink-0">{sched.time}</span>
                         <span className="text-white/40 font-bold shrink-0">|</span>
                         <span className="text-white truncate font-medium">{sched.title}</span>
                       </div>
-                    ))}
-                  </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-6 text-[10px] text-white/50 italic">
+                      Agenda será exibida no convite.
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div className="h-10" />
-              )}
-            </div>
-          </div>
 
+                {/* Access check-in QR Code */}
+                {qrCodeUrl ? (
+                  <div className="bg-white/5 border border-[#d4af37]/15 rounded-2xl p-3 flex flex-col items-center gap-2 relative overflow-hidden">
+                    <span className="text-[8px] font-black tracking-[2px] text-[#d4af37] uppercase">QR CODE DE ACESSO A PORTARIA</span>
+                    
+                    <div className="bg-white p-1.5 rounded-lg border border-[#d4af37]/20 shadow-md">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={qrCodeUrl} alt="Acesso QR" className="w-20 h-20 object-contain" />
+                    </div>
+                    <span className="text-[8px] text-white font-bold uppercase truncate max-w-full">{guest.name}</span>
+                  </div>
+                ) : (
+                  <div className="h-20" />
+                )}
+              </div>
+            </div>
+
+          </div>
         </div>
-      </div>
-    );
+      );
+    }
   }
 
   /* =========================================================================
@@ -346,6 +477,54 @@ export default function DefaultTemplate({
       {/* Decorative Golden Ambient Blur Lights */}
       <div className="absolute top-10 left-1/4 w-[350px] h-[350px] bg-[#d4af37]/5 rounded-full blur-[140px] pointer-events-none" />
       <div className="absolute bottom-10 right-1/4 w-[350px] h-[350px] bg-[#b89742]/5 rounded-full blur-[140px] pointer-events-none" />
+
+      {/* Dynamic Maps Selection Modal for Scanned Locations QR */}
+      <AnimatePresence>
+        {showMapsModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-[#121215] border border-[#d4af37]/30 rounded-3xl p-6 w-full max-w-sm text-center space-y-6 relative"
+            >
+              <button
+                onClick={() => setShowMapsModal(false)}
+                className="absolute top-4 right-4 text-white/50 hover:text-white text-sm"
+              >
+                ✕
+              </button>
+              <h3 className="font-cinzel font-bold text-sm text-[#f3e0aa] tracking-wider border-b border-[#d4af37]/20 pb-3">
+                📍 COMO CHEGAR AO EVENTO
+              </h3>
+              <p className="text-[11px] text-white/70">Escolha o local para o qual deseja obter direções:</p>
+              
+              <div className="space-y-3">
+                {event.ceremony_location && (
+                  <a
+                    href={getGoogleMapsLink(event.ceremony_location, event.ceremony_maps_url) || '#'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 w-full py-3 bg-[#b89742] hover:bg-[#d4af37] text-[#0d0d0f] font-bold rounded-xl text-xs uppercase transition-all shadow-md"
+                  >
+                    🚗 {event.type === 'casamento' ? 'Cerimónia Civil / Igreja' : 'Local Principal'}
+                  </a>
+                )}
+                {event.party_location && (
+                  <a
+                    href={getGoogleMapsLink(event.party_location, event.party_maps_url) || '#'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 w-full py-3 border border-[#d4af37]/40 hover:bg-[#d4af37]/10 text-white font-bold rounded-xl text-xs uppercase transition-all"
+                  >
+                    🎉 Copo d&apos;Água / Salão
+                  </a>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence mode="wait">
         {!isOpen ? (
@@ -385,7 +564,7 @@ export default function DefaultTemplate({
                 />
                 <div className="w-28 h-28 rounded-full bg-gradient-to-tr from-[#16161a] to-[#242429] border border-[#d4af37]/40 flex flex-col items-center justify-center shadow-2xl relative">
                   <span className="text-3xl font-cinzel font-black tracking-widest gold-foil-text">
-                    {getMonogram()}
+                    {hosts.initials}
                   </span>
                 </div>
               </div>
@@ -528,7 +707,7 @@ export default function DefaultTemplate({
                 <div className="space-y-2 relative z-10">
                   <div className="w-14 h-14 rounded-full border border-[#d4af37]/30 flex items-center justify-center mx-auto bg-[#0d0d0f]/60">
                     <span className="text-xs font-cinzel font-bold tracking-widest text-[#d4af37]">
-                      {getMonogram()}
+                      {hosts.initials}
                     </span>
                   </div>
                   <span className="text-[9px] font-black uppercase tracking-[4px] text-white/40 block mt-2">
@@ -543,7 +722,7 @@ export default function DefaultTemplate({
                   </h1>
 
                   <p className="text-xs font-playfair italic max-w-sm mx-auto leading-relaxed text-foreground/75 px-4">
-                    {getIntroText()}
+                    {phrases.intro}
                   </p>
                   
                   {event.description && (

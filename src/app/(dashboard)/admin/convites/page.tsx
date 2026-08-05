@@ -57,6 +57,7 @@ export default function ConvitesPage() {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [updatingTemplate, setUpdatingTemplate] = useState(false);
   const [previewMode, setPreviewMode] = useState<'mobile' | 'desktop'>('mobile');
+  const [previewType, setPreviewType] = useState<'interactive' | 'cover' | 'info'>('interactive');
 
   const handleSelectTemplate = async (templateId: string) => {
     if (!currentEvent) return;
@@ -710,65 +711,123 @@ export default function ConvitesPage() {
       >
         <div className="flex flex-col gap-4 text-center">
           {/* View Mode Toggle Bar */}
-          <div className="flex items-center justify-center gap-2 border-b border-border-custom pb-4">
+          <div className="flex flex-wrap items-center justify-center gap-3 border-b border-border-custom pb-4">
             <button
-              onClick={() => setPreviewMode('mobile')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                previewMode === 'mobile'
+              onClick={() => { setPreviewType('interactive'); setPreviewMode('mobile'); }}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                previewType === 'interactive' && previewMode === 'mobile'
                   ? 'bg-primary text-white shadow-md shadow-primary/20'
                   : 'bg-secondary hover:bg-secondary/70 text-foreground/70'
               }`}
             >
-              📱 Visualização Telemóvel
+              📱 Telemóvel (Interativo)
             </button>
             <button
-              onClick={() => setPreviewMode('desktop')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                previewMode === 'desktop'
+              onClick={() => { setPreviewType('interactive'); setPreviewMode('desktop'); }}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                previewType === 'interactive' && previewMode === 'desktop'
                   ? 'bg-primary text-white shadow-md shadow-primary/20'
                   : 'bg-secondary hover:bg-secondary/70 text-foreground/70'
               }`}
             >
-              💻 Visualização Computador
+              💻 Computador (Interativo)
+            </button>
+            <div className="h-6 w-[1px] bg-border-custom hidden sm:block" />
+            <button
+              onClick={() => { setPreviewType('cover'); }}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                previewType === 'cover'
+                  ? 'bg-[#b89742] text-[#0d0d0f] shadow-md shadow-[#b89742]/20'
+                  : 'bg-secondary hover:bg-secondary/70 text-foreground/70'
+              }`}
+            >
+              📄 Capa (Frente Impressão)
+            </button>
+            <button
+              onClick={() => { setPreviewType('info'); }}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                previewType === 'info'
+                  ? 'bg-[#b89742] text-[#0d0d0f] shadow-md shadow-[#b89742]/20'
+                  : 'bg-secondary hover:bg-secondary/70 text-foreground/70'
+              }`}
+            >
+              📝 Informações (Verso Impressão)
             </button>
           </div>
 
-          <div className="max-h-[66vh] overflow-y-auto p-1 bg-background relative text-left rounded-xl">
-            <div
-              className={`transition-all duration-300 mx-auto ${
-                previewMode === 'mobile'
-                  ? 'w-[360px] h-[600px] border-[12px] border-[#27272a] rounded-[48px] shadow-2xl overflow-y-auto relative bg-[#09090b]'
-                  : 'w-full h-[600px] overflow-y-auto relative border border-border-custom rounded-2xl shadow-xl'
-              }`}
-              style={previewMode === 'mobile' ? { scrollbarWidth: 'none', msOverflowStyle: 'none' } : {}}
-            >
-              {currentEvent && (
-                <DefaultTemplate
-                  guest={{ name: 'Afonso Amado', id: '', event_id: '', phone: '', email: '', family_group: '', companions: 2, status: 'Confirmed', notes: '', invitation_sent: false, created_at: '', qr_token: '', table_id: '' }}
-                  event={currentEvent}
-                  table={{ name: 'Mesa Imperial', id: '', event_id: '', capacity: 10, created_at: '' }}
-                  qrCodeUrl="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=MockCheckin"
-                  schedules={schedules}
-                  infoBlocks={infoBlocks}
-                  rsvpStatus="Confirmed"
-                  saving={false}
-                  downloading={false}
-                  eventLabels={{
-                    title: 'Casamento',
-                    invitation: 'Convite Especial',
-                    details: 'Detalhes do Evento',
-                    theme: 'Tema',
-                    rsvpQuestion: 'Confirma a sua presença?',
-                  }}
-                  notes=""
-                  setNotes={() => {}}
-                  handleRSVPSubmit={() => {}}
-                  handleDownloadInvite={() => {}}
-                  getGoogleMapsLink={(loc, map) => map || ''}
-                  forceOpen={false} // começa fechado para testar animação do selo!
-                />
-              )}
-            </div>
+          <div className="max-h-[68vh] overflow-y-auto p-1 bg-background relative text-left rounded-xl">
+            {previewType === 'interactive' ? (
+              <div
+                className={`transition-all duration-300 mx-auto ${
+                  previewMode === 'mobile'
+                    ? 'w-[360px] h-[600px] border-[12px] border-[#27272a] rounded-[48px] shadow-2xl overflow-y-auto relative bg-[#09090b]'
+                    : 'w-full h-[600px] overflow-y-auto relative border border-border-custom rounded-2xl shadow-xl'
+                }`}
+                style={previewMode === 'mobile' ? { scrollbarWidth: 'none', msOverflowStyle: 'none' } : {}}
+              >
+                {currentEvent && (
+                  <DefaultTemplate
+                    guest={{ name: 'Afonso Amado', id: '', event_id: '', phone: '', email: '', family_group: '', companions: 2, status: 'Confirmed', notes: '', invitation_sent: false, created_at: '', qr_token: '', table_id: '' }}
+                    event={currentEvent}
+                    table={{ name: 'Mesa Imperial', id: '', event_id: '', capacity: 10, created_at: '' }}
+                    qrCodeUrl="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=MockCheckin"
+                    schedules={schedules}
+                    infoBlocks={infoBlocks}
+                    rsvpStatus="Confirmed"
+                    saving={false}
+                    downloading={false}
+                    eventLabels={{
+                      title: 'Casamento',
+                      invitation: 'Convite Especial',
+                      details: 'Detalhes do Evento',
+                      theme: 'Tema',
+                      rsvpQuestion: 'Confirma a sua presença?',
+                    }}
+                    notes=""
+                    setNotes={() => {}}
+                    handleRSVPSubmit={() => {}}
+                    handleDownloadInvite={() => {}}
+                    getGoogleMapsLink={(loc, map) => map || ''}
+                    forceOpen={false}
+                  />
+                )}
+              </div>
+            ) : (
+              // Print preview scaled container to avoid layout breaking
+              <div className="w-full overflow-x-auto overflow-y-hidden py-6 flex items-center justify-center bg-black/40 rounded-2xl border border-border-custom">
+                <div className="origin-center scale-[0.5] sm:scale-[0.7] lg:scale-[0.8] my-[-150px] sm:my-[-80px] lg:my-[-40px] transition-all duration-300 shrink-0">
+                  {currentEvent && (
+                    <DefaultTemplate
+                      guest={{ name: 'Afonso Amado', id: '', event_id: '', phone: '', email: '', family_group: '', companions: 2, status: 'Confirmed', notes: '', invitation_sent: false, created_at: '', qr_token: '', table_id: '' }}
+                      event={currentEvent}
+                      table={{ name: 'Mesa Imperial', id: '', event_id: '', capacity: 10, created_at: '' }}
+                      qrCodeUrl="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=MockCheckin"
+                      locationsQrCodeUrl="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=MockLocations"
+                      schedules={schedules}
+                      infoBlocks={infoBlocks}
+                      rsvpStatus="Confirmed"
+                      saving={false}
+                      downloading={false}
+                      eventLabels={{
+                        title: 'Casamento',
+                        invitation: 'Convite Especial',
+                        details: 'Detalhes do Evento',
+                        theme: 'Tema',
+                        rsvpQuestion: 'Confirma a sua presença?',
+                      }}
+                      notes=""
+                      setNotes={() => {}}
+                      handleRSVPSubmit={() => {}}
+                      handleDownloadInvite={() => {}}
+                      getGoogleMapsLink={(loc, map) => map || ''}
+                      forceOpen={true}
+                      isPrinting={true}
+                      renderPage={previewType}
+                    />
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
         <div className="flex justify-end pt-4 border-t border-border-custom mt-4">
