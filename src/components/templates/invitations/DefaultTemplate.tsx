@@ -85,17 +85,38 @@ export default function DefaultTemplate({
 
   // Dynamic host initials and names parsing
   const getAnfitriões = () => {
-    // splits by e, &, +, and, /, \
-    const parts = event.title.split(/(?:e|&|and|\+|\by\b|\/|\\)/i).map(p => p.trim());
+    let cleanTitle = event.title;
+    const prefixes = [
+      /^(?:O\s+)?Casamento\s+(?:de|do|da|d')\s+/i,
+      /^(?:O\s+)?Aniversário\s+(?:de|do|da|d')\s+/i,
+      /^(?:O\s+)?Pedido\s+(?:de\s+casamento\s+de|de|do|da)\s+/i,
+      /^(?:O\s+)?Chá\s+de\s+panela\s+(?:de|do|da)\s+/i,
+      /^(?:O\s+)?Alambamento\s+(?:de|do|da)\s+/i,
+      /^(?:A\s+)?Festa\s+(?:de|do|da)\s+/i,
+      /^(?:O\s+)?Workshop\s+(?:de|do|da)\s+/i,
+      /^(?:A\s+)?Palestra\s+(?:de|do|da)\s+/i
+    ];
+    for (const prefix of prefixes) {
+      cleanTitle = cleanTitle.replace(prefix, '');
+    }
+
+    const parts = cleanTitle.split(/(?:e|&|and|\+|\by\b|\/|\\)/i).map(p => p.trim());
     if (parts.length >= 2) {
       return {
         initials: `${parts[0].charAt(0).toUpperCase()} & ${parts[1].charAt(0).toUpperCase()}`,
         names: `${parts[0]} & ${parts[1]}`,
       };
     }
+    const words = cleanTitle.split(/\s+/).filter(Boolean);
+    if (words.length >= 2) {
+      return {
+        initials: `${words[0].charAt(0).toUpperCase()} & ${words[1].charAt(0).toUpperCase()}`,
+        names: cleanTitle,
+      };
+    }
     return {
-      initials: event.title.substring(0, 2).toUpperCase(),
-      names: event.title,
+      initials: cleanTitle.charAt(0).toUpperCase(),
+      names: cleanTitle,
     };
   };
 
@@ -324,12 +345,7 @@ export default function DefaultTemplate({
                     </div>
                   )}
 
-                  {event.rsvp_deadline && (
-                    <div className="space-y-0.5">
-                      <h4 className="font-bold text-[10px] uppercase tracking-wider text-[#d4af37]">📅 Limite de Confirmação</h4>
-                      <p className="text-white font-semibold">Até dia {new Date(event.rsvp_deadline).toLocaleDateString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
-                    </div>
-                  )}
+
                 </div>
 
                 {/* Locations multi-redirect QR Code */}
@@ -432,6 +448,9 @@ export default function DefaultTemplate({
                       <img src={qrCodeUrl} alt="Acesso QR" className="w-28 h-28 object-contain" />
                     </div>
                     <span className="text-[10px] text-white font-bold uppercase truncate max-w-full leading-none">{guest.name}</span>
+                    <span className="text-[9px] text-[#d4af37] font-bold uppercase tracking-wider mt-1">
+                      {guest.companions > 0 ? `Com Acompanhante (${guest.companions})` : 'Individual'}
+                    </span>
                   </div>
                 ) : (
                   <div className="h-28" />
