@@ -43,6 +43,7 @@ export interface TemplateProps {
   getGoogleMapsLink: (locationName: string | null | undefined, mapsUrlOrCoords: string | null | undefined) => string | null;
   children?: React.ReactNode;
   forceOpen?: boolean;
+  isPrinting?: boolean;
 }
 
 export default function DefaultTemplate({
@@ -63,6 +64,7 @@ export default function DefaultTemplate({
   getGoogleMapsLink,
   children,
   forceOpen,
+  isPrinting = false,
 }: TemplateProps) {
   const [isOpen, setIsOpen] = useState(forceOpen ?? false);
   const isConfirmed = rsvpStatus === 'Confirmed';
@@ -101,6 +103,220 @@ export default function DefaultTemplate({
     }
   };
 
+  /* =========================================================================
+     PDF PRINT MODE LAYOUT: Single Landscape Page (1120x792)
+     ========================================================================= */
+  if (isPrinting) {
+    return (
+      <div className="w-[1120px] h-[792px] bg-[#0c0c0e] text-[#f4f4f5] p-6 flex flex-col justify-between font-sans relative overflow-hidden select-none box-border border-4 border-[#d4af37]/30 rounded-[28px]">
+        {/* Google Fonts and CSS styles */}
+        <style jsx global>{`
+          @import url('https://fonts.googleapis.com/css2?family=Alex+Brush&family=Cinzel:wght@400;600;700;900&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap');
+          
+          .font-cinzel {
+            font-family: 'Cinzel', serif;
+          }
+          .font-alex {
+            font-family: 'Alex Brush', cursive;
+          }
+          .font-playfair {
+            font-family: 'Playfair Display', serif;
+          }
+          .gold-foil-text {
+            background: linear-gradient(to right, #b89742 0%, #f3e0aa 50%, #b89742 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+          }
+          .gold-foil-border {
+            border-image: linear-gradient(to right, #b89742, #f3e0aa, #b89742) 1;
+          }
+        `}</style>
+
+        {/* Decorative Golden Ambient Blur Lights */}
+        <div className="absolute top-10 left-1/4 w-[350px] h-[350px] bg-[#d4af37]/5 rounded-full blur-[140px] pointer-events-none" />
+        <div className="absolute bottom-10 right-1/4 w-[350px] h-[350px] bg-[#b89742]/5 rounded-full blur-[140px] pointer-events-none" />
+
+        {/* Outer thin border */}
+        <div className="absolute inset-2 border border-[#d4af37]/15 rounded-[20px] pointer-events-none" />
+
+        {/* Grid Container filling 100% of height */}
+        <div className="grid grid-cols-3 gap-6 h-full items-stretch relative z-10 box-border">
+          
+          {/* PANEL 1: Event Details & Dress Code */}
+          <div className="bg-[#121215] border border-[#d4af37]/20 rounded-3xl p-6 flex flex-col justify-between shadow-xl relative">
+            <div className="absolute inset-3 border border-[#d4af37]/5 rounded-[20px] pointer-events-none" />
+            
+            <div className="space-y-5 relative z-10 flex-1 flex flex-col justify-between">
+              <div className="text-center space-y-1 border-b border-[#d4af37]/15 pb-3">
+                <h3 className="font-cinzel font-black text-xs tracking-[3px] text-[#f3e0aa]">
+                  INFORMAÇÕES
+                </h3>
+              </div>
+
+              <div className="space-y-4 text-xs leading-relaxed flex-1 py-4 flex flex-col justify-center">
+                <div className="flex items-start gap-3 p-3 bg-white/5 rounded-xl border border-white/5">
+                  <Calendar className="h-5 w-5 text-[#d4af37] shrink-0" />
+                  <div>
+                    <h4 className="font-bold text-[9px] uppercase tracking-wider text-[#d4af37]">Data e Hora</h4>
+                    <p className="font-bold text-white mt-0.5 text-xs">
+                      {new Date(event.date).toLocaleDateString('pt-PT', {
+                        weekday: 'long',
+                        day: '2-digit',
+                        month: 'long',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </p>
+                  </div>
+                </div>
+
+                {event.ceremony_location && (
+                  <div className="flex items-start gap-3 p-3 bg-white/5 rounded-xl border border-white/5">
+                    <MapPin className="h-5 w-5 text-[#d4af37] shrink-0" />
+                    <div>
+                      <h4 className="font-bold text-[9px] uppercase tracking-wider text-[#d4af37]">
+                        {event.type === 'casamento' ? 'Cerimónia' : 'Local'}
+                      </h4>
+                      <p className="font-bold text-white mt-0.5 text-xs">{event.ceremony_location}</p>
+                      {event.ceremony_time && (
+                        <p className="text-[10px] text-white/60">Hora: {event.ceremony_time}</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {event.party_location && (
+                  <div className="flex items-start gap-3 p-3 bg-white/5 rounded-xl border border-white/5">
+                    <MapPin className="h-5 w-5 text-[#d4af37] shrink-0" />
+                    <div>
+                      <h4 className="font-bold text-[9px] uppercase tracking-wider text-[#d4af37]">
+                        {event.type === 'casamento' ? 'Copo d\'Água' : 'Recepção'}
+                      </h4>
+                      <p className="font-bold text-white mt-0.5 text-xs">{event.party_location}</p>
+                      {event.party_time && (
+                        <p className="text-[10px] text-white/60">Hora: {event.party_time}</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Dress Code in Left Panel */}
+              {(event.dress_code_style || event.dress_code_colors) && (
+                <div className="p-3 border border-[#d4af37]/15 bg-white/5 rounded-xl text-xs space-y-1 relative">
+                  <h4 className="font-bold text-[10px] uppercase tracking-wider text-[#d4af37]">👗 Dress Code</h4>
+                  {event.dress_code_style && <p className="text-white font-medium">{event.dress_code_style}</p>}
+                  {event.dress_code_colors && (
+                    <p className="text-[10px] text-white/70">Sugestão: {event.dress_code_colors}</p>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* PANEL 2: The Gold Acrylic Invitation Card */}
+          <div className="bg-[#121215] border border-[#d4af37]/45 rounded-3xl p-8 flex flex-col justify-between items-center text-center shadow-2xl relative overflow-hidden">
+            <div className="absolute inset-3 border border-dashed border-[#d4af37]/25 rounded-[20px] pointer-events-none" />
+            <div className="absolute inset-4 bg-gradient-to-b from-[#b89742]/5 to-[#d4af37]/0 rounded-[18px] pointer-events-none" />
+
+            <div className="space-y-2 relative z-10 pt-4">
+              <div className="w-14 h-14 rounded-full border border-[#d4af37]/45 flex items-center justify-center mx-auto bg-[#0d0d0f]">
+                <span className="text-sm font-cinzel font-black tracking-widest text-[#f3e0aa]">
+                  {getMonogram()}
+                </span>
+              </div>
+              <span className="text-[9px] font-black uppercase tracking-[4px] text-white/40 block mt-2">
+                {eventLabels.invitation}
+              </span>
+            </div>
+
+            <div className="space-y-6 relative z-10 py-4 my-auto">
+              <h1 className="text-4xl md:text-5xl font-alex tracking-wide text-white leading-tight gold-foil-text font-black">
+                {event.title}
+              </h1>
+
+              <p className="text-xs font-playfair italic max-w-sm mx-auto leading-relaxed text-white font-semibold">
+                {getIntroText()}
+              </p>
+              
+              {event.description && (
+                <p className="text-[11px] font-playfair italic text-[#f3e0aa] font-bold">
+                  &quot;{event.description}&quot;
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-1 relative z-10 w-full pb-4 border-t border-[#d4af37]/15 pt-3">
+              <p className="text-[10px] font-cinzel tracking-[3px] text-[#f3e0aa] uppercase font-black">
+                {new Date(event.date).toLocaleDateString('pt-PT', { month: 'long', year: 'numeric' })}
+              </p>
+            </div>
+          </div>
+
+          {/* PANEL 3: Access Ticket QR & Compact Timeline */}
+          <div className="bg-[#121215] border border-[#d4af37]/20 rounded-3xl p-6 flex flex-col justify-between shadow-xl relative">
+            <div className="absolute inset-3 border border-[#d4af37]/5 rounded-[20px] pointer-events-none" />
+            
+            <div className="space-y-5 relative z-10 flex-1 flex flex-col justify-between">
+              <div className="text-center space-y-1 border-b border-[#d4af37]/15 pb-3">
+                <h3 className="font-cinzel font-black text-xs tracking-[3px] text-[#f3e0aa]">
+                  PASSE DE ACESSO
+                </h3>
+              </div>
+
+              {/* QR Code Ticket */}
+              {qrCodeUrl ? (
+                <div className="bg-white/5 border border-[#d4af37]/15 rounded-2xl p-4 flex flex-col items-center gap-3 relative overflow-hidden">
+                  <span className="text-[8px] font-black tracking-[3px] text-[#d4af37] uppercase">PASSE DIGITAL INDIVIDUAL</span>
+                  
+                  <div className="bg-white p-2 rounded-xl border border-[#d4af37]/30 shadow-md">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={qrCodeUrl} alt="Acesso QR" className="w-28 h-28 object-contain" />
+                  </div>
+
+                  <div className="text-center space-y-1 text-xs">
+                    <p className="font-bold text-white text-sm">{guest.name}</p>
+                    <p className="text-[10.5px] text-[#f3e0aa] font-semibold">
+                      {table ? `Mesa: ${table.name}` : 'Mesa: Confirmada'}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="h-36 flex items-center justify-center border border-dashed border-white/10 rounded-2xl bg-white/5">
+                  <p className="text-xs text-white/50">QR Code indisponível</p>
+                </div>
+              )}
+
+              {/* Compact Timeline / Agenda */}
+              {schedules.length > 0 ? (
+                <div className="space-y-2 text-left pt-2">
+                  <h4 className="font-bold text-[9px] uppercase tracking-wider text-[#d4af37] border-b border-[#d4af37]/10 pb-1.5 flex items-center gap-1.5">
+                    <Clock className="h-3 w-3" /> Agenda do Evento
+                  </h4>
+                  <div className="space-y-2 max-h-[140px] overflow-hidden">
+                    {schedules.slice(0, 4).map((sched) => (
+                      <div key={sched.id} className="flex items-center gap-2 text-[11px]">
+                        <span className="text-[#d4af37] font-bold tracking-tighter shrink-0">{sched.time}</span>
+                        <span className="text-white/40 font-bold shrink-0">|</span>
+                        <span className="text-white truncate font-medium">{sched.title}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="h-10" />
+              )}
+            </div>
+          </div>
+
+        </div>
+      </div>
+    );
+  }
+
+  /* =========================================================================
+     NORMAL INTERACTIVE TEMPLATE
+     ========================================================================= */
   return (
     <div className="min-h-screen bg-[#0d0d0f] text-[#f4f4f5] py-8 px-4 flex flex-col justify-between max-w-6xl mx-auto font-sans relative overflow-hidden select-none">
       
@@ -176,7 +392,7 @@ export default function DefaultTemplate({
 
               <div className="text-center space-y-6 z-10 pb-6 w-full">
                 <div className="space-y-1">
-                  <h2 className="text-[10px] uppercase font-bold tracking-[3px] text-foreground/40">
+                  <h2 className="text-[10px] uppercase font-bold tracking-[3px] text-[#8a8a93]">
                     Convidado(a):
                   </h2>
                   <p className="text-lg font-playfair font-bold gold-foil-text">
@@ -315,7 +531,7 @@ export default function DefaultTemplate({
                       {getMonogram()}
                     </span>
                   </div>
-                  <span className="text-[9px] font-black uppercase tracking-[4px] text-foreground/35 block mt-2">
+                  <span className="text-[9px] font-black uppercase tracking-[4px] text-white/40 block mt-2">
                     {eventLabels.invitation}
                   </span>
                 </div>
@@ -369,8 +585,8 @@ export default function DefaultTemplate({
 
                       <div className="text-center space-y-1 text-xs">
                         <p className="font-bold text-foreground">{guest.name}</p>
-                        <p className="text-[10.5px] text-foreground/50">
-                          {table ? `Mesa: ${table.name}` : 'Mesa: Pendente'}
+                        <p className="text-[10.5px] text-[#f3e0aa]">
+                          {table ? `Mesa: ${table.name}` : 'Mesa: Confirmada'}
                         </p>
                       </div>
 
@@ -423,7 +639,7 @@ export default function DefaultTemplate({
                       {/* Extra food restriction note input */}
                       {isConfirmed && (
                         <div className="flex flex-col gap-1 pt-1">
-                          <label className="text-[10px] font-bold text-foreground/50 uppercase tracking-wide">Observações / Restrições</label>
+                          <label className="text-[10px] font-bold text-white/40 uppercase tracking-wide">Observações / Restrições</label>
                           <textarea
                             rows={2}
                             placeholder="Vegetariano, alergias..."
@@ -442,7 +658,7 @@ export default function DefaultTemplate({
                     variant="outline"
                     size="sm"
                     onClick={() => setIsOpen(false)}
-                    className="text-[10px] text-foreground/40 hover:text-foreground border-white/5 hover:border-[#d4af37]/30 rounded-full"
+                    className="text-[10px] text-white/40 hover:text-foreground border-white/5 hover:border-[#d4af37]/30 rounded-full"
                   >
                     Voltar à Capa
                   </Button>

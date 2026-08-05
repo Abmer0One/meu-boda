@@ -19,13 +19,14 @@ export async function generateGuestPDF(
   container.style.position = 'absolute';
   container.style.left = '-9999px';
   container.style.top = '-9999px';
-  container.style.width = '800px'; // fixed capture width for clean desktop style ratio
-  container.style.background = '#09090b'; // dark theme placeholder
+  container.style.width = '1120px'; // A4 landscape ratio width
+  container.style.height = '792px'; // A4 landscape ratio height
+  container.style.background = '#0c0c0e';
+  container.style.boxSizing = 'border-box';
+  container.style.overflow = 'hidden';
   document.body.appendChild(container);
 
   // 2. Determine template properties
-  const templateId = event.template_id || 'default';
-  
   const eventLabels = {
     title: event.type === 'casamento' ? 'Casamento' : event.type === 'aniversario' ? 'Aniversário' : event.type === 'pedido' ? 'Pedido de Casamento' : 'Evento',
     invitation: 'Convite Especial',
@@ -57,7 +58,8 @@ export async function generateGuestPDF(
       if (!query) return null;
       return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
     },
-    forceOpen: true, // force trifold envelope open
+    forceOpen: true,
+    isPrinting: true, // triggers landscape print layout
   };
 
   // 3. Render template
@@ -100,36 +102,17 @@ export async function generateGuestPDF(
   document.body.removeChild(container);
 
   // 7. Calculate PDF dimensions
-  // An A4 page is 210mm x 297mm.
-  // We want to fit the template nicely on the page.
+  // An A4 page is 297mm x 210mm in landscape mode.
   const doc = new jsPDF({
-    orientation: 'portrait',
+    orientation: 'landscape',
     unit: 'mm',
     format: 'a4',
   });
 
-  const imgWidth = 210;
-  const img = new Image();
-  img.src = dataUrl;
-  await new Promise<void>((resolve) => {
-    img.onload = () => resolve();
-  });
-  
-  const imgHeight = (img.height * imgWidth) / img.width;
+  const imgWidth = 297;
+  const imgHeight = 210;
 
-  // Add pages dynamically if the height exceeds one page
-  let heightLeft = imgHeight;
-  let position = 0;
-
-  doc.addImage(dataUrl, 'PNG', 0, position, imgWidth, imgHeight);
-  heightLeft -= 297;
-
-  while (heightLeft >= 0) {
-    position = heightLeft - imgHeight;
-    doc.addPage();
-    doc.addImage(dataUrl, 'PNG', 0, position, imgWidth, imgHeight);
-    heightLeft -= 297;
-  }
+  doc.addImage(dataUrl, 'PNG', 0, 0, imgWidth, imgHeight);
 
   return doc;
 }
