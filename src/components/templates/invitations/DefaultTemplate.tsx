@@ -104,7 +104,7 @@ export default function DefaultTemplate({
     if (parts.length >= 2) {
       return {
         initials: `${parts[0].charAt(0).toUpperCase()} & ${parts[1].charAt(0).toUpperCase()}`,
-        names: `${parts[0]} & ${parts[1]}`,
+        names: cleanTitle,
       };
     }
     const words = cleanTitle.split(/\s+/).filter(Boolean);
@@ -260,7 +260,7 @@ export default function DefaultTemplate({
                 </div>
 
                 <div className="my-auto w-full px-2">
-                  <h1 className="text-4xl sm:text-5xl font-alex leading-snug gold-foil-text font-black whitespace-normal break-words py-4 max-w-full">
+                  <h1 className="text-3xl sm:text-4xl font-alex leading-relaxed gold-foil-text font-black whitespace-normal break-words py-4 max-w-full">
                     {hosts.names}
                   </h1>
                   <span className="text-xs font-black tracking-[3px] text-white/60 uppercase block mt-2">
@@ -349,8 +349,21 @@ export default function DefaultTemplate({
             </div>
 
             <div className="bg-[#121215] border-r border-[#d4af37]/20 rounded-none p-10 flex flex-col justify-around items-center text-center shadow-2xl relative overflow-hidden h-full">
-              <div className="absolute inset-4 border border-dashed border-[#d4af37]/25 rounded-none pointer-events-none" />
-              <div className="absolute inset-5 bg-gradient-to-b from-[#b89742]/5 to-[#d4af37]/0 rounded-none pointer-events-none" />
+              <div className="absolute inset-4 border border-dashed border-[#d4af37]/25 rounded-none pointer-events-none z-10" />
+              <div className="absolute inset-5 bg-gradient-to-b from-[#b89742]/5 to-[#d4af37]/0 rounded-none pointer-events-none z-10" />
+
+              {/* Dynamic Optional Background Photo with Dark Overlay for visibility */}
+              {event.background_image && (
+                <div className="absolute inset-0 z-0 select-none pointer-events-none">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img 
+                    src={event.background_image} 
+                    alt="Background" 
+                    className="w-full h-full object-cover opacity-20"
+                  />
+                  <div className="absolute inset-0 bg-[#121215]/85" />
+                </div>
+              )}
 
               <div className="space-y-1 relative z-10 pt-4 flex flex-col items-center justify-center">
                 <span className="font-pinyon text-[90px] leading-none gold-foil-text font-normal block select-none">
@@ -359,7 +372,7 @@ export default function DefaultTemplate({
               </div>
 
               <div className="space-y-6 relative z-10 py-4 my-auto w-full">
-                <h1 className="text-5xl md:text-6xl font-alex tracking-wide text-white leading-tight gold-foil-text font-black px-2 py-1">
+                <h1 className="text-4xl md:text-5xl font-alex tracking-wide text-white leading-relaxed gold-foil-text font-black px-2 py-1">
                   {hosts.names}
                 </h1>
 
