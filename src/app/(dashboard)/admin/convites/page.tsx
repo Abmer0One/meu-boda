@@ -58,6 +58,47 @@ export default function ConvitesPage() {
   const [updatingTemplate, setUpdatingTemplate] = useState(false);
   const [previewMode, setPreviewMode] = useState<'mobile' | 'desktop'>('mobile');
   const [previewType, setPreviewType] = useState<'interactive' | 'cover' | 'info'>('interactive');
+  const [printTheme, setPrintTheme] = useState<'dark' | 'light'>('dark');
+
+  useEffect(() => {
+    if (currentEvent) {
+      const config = currentEvent.template_config || {};
+      const savedTheme = config.print_theme || localStorage.getItem(`print_theme_${currentEvent.id}`) || 'dark';
+      setPrintTheme(savedTheme as 'dark' | 'light');
+    }
+  }, [currentEvent]);
+
+  const handleUpdatePrintTheme = async (theme: 'dark' | 'light') => {
+    if (!currentEvent) return;
+    setPrintTheme(theme);
+    localStorage.setItem(`print_theme_${currentEvent.id}`, theme);
+    try {
+      const updatedConfig = {
+        ...(currentEvent.template_config || {}),
+        print_theme: theme,
+      };
+      const updated = await EventRepository.update(currentEvent.id, {
+        template_config: updatedConfig,
+      });
+      if (updated) {
+        setCurrentEvent(updated);
+      } else {
+        setCurrentEvent({
+          ...currentEvent,
+          template_config: updatedConfig,
+        });
+      }
+    } catch (err) {
+      console.error(err);
+      setCurrentEvent({
+        ...currentEvent,
+        template_config: {
+          ...(currentEvent.template_config || {}),
+          print_theme: theme,
+        },
+      });
+    }
+  };
 
   const handleSelectTemplate = async (templateId: string) => {
     if (!currentEvent) return;
@@ -428,6 +469,33 @@ export default function ConvitesPage() {
               <p className="text-xs text-foreground/60 leading-relaxed">
                 Toda a informação (agenda, manual, QR code) é sincronizada de forma dinâmica com o modelo.
               </p>
+
+              {/* PRINT COLOR TOGGLE */}
+              <div className="pt-3 border-t border-border-custom space-y-2">
+                <span className="text-xs font-semibold text-foreground/80 block">Cor de Fundo das Folhas (Impressão):</span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleUpdatePrintTheme('dark')}
+                    className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all border cursor-pointer ${
+                      printTheme === 'dark'
+                        ? 'bg-black text-white border-primary shadow-sm shadow-primary/20 font-black'
+                        : 'bg-secondary/40 hover:bg-secondary/70 border-transparent text-foreground/70'
+                    }`}
+                  >
+                    ⚫ Fundo Preto
+                  </button>
+                  <button
+                    onClick={() => handleUpdatePrintTheme('light')}
+                    className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all border cursor-pointer ${
+                      printTheme === 'light'
+                        ? 'bg-white text-black border-[#d4af37] shadow-sm shadow-gold/20 font-black'
+                        : 'bg-secondary/40 hover:bg-secondary/70 border-transparent text-foreground/70'
+                    }`}
+                  >
+                    ⚪ Fundo Branco
+                  </button>
+                </div>
+              </div>
 
               <Button
                 variant="outline"

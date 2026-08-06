@@ -194,15 +194,31 @@ export default function DefaultTemplate({
      PDF PRINT MODE LAYOUTS (Landscape A4: 1120x792)
      ========================================================================= */
   if (isPrinting) {
+    const isLight = event.template_config?.print_theme === 'light';
+
+    // Core Theme Styling Classes
+    const containerBg = isLight ? 'bg-[#ffffff]' : 'bg-[#0c0c0e]';
+    const containerText = isLight ? 'text-[#1a1a1f]' : 'text-[#f4f4f5]';
+    const borderGold = isLight ? 'border-[#cda344]' : 'border-[#d4af37]/35';
+    const borderInner = isLight ? 'border-[#cda344]/30' : 'border-[#d4af37]/20';
+    const columnBg = isLight ? 'bg-[#ffffff]' : 'bg-[#121215]';
+    const columnBorder = isLight ? 'border-[#cda344]/25' : 'border-[#d4af37]/20';
+    const cardBgAlternative = isLight ? 'bg-[#f7f7f9] border border-[#cda344]/20' : 'bg-white/5 border border-[#d4af37]/15';
+    const textColorMuted = isLight ? 'text-zinc-500' : 'text-white/50';
+    const textColorMain = isLight ? 'text-zinc-800' : 'text-white';
+    const textColorWhite = isLight ? 'text-zinc-900' : 'text-white';
+    const textColorTime = isLight ? 'text-zinc-600' : 'text-white/70';
+    const overlayBg = isLight ? 'bg-white/50' : 'bg-[#121215]/65';
+
     if (renderPage === 'cover') {
       return (
-        <div className="w-[1120px] h-[792px] bg-[#0c0c0e] text-[#f4f4f5] p-0 flex flex-col justify-between font-sans relative overflow-hidden select-none box-border border-[6px] border-[#d4af37]/35 rounded-none">
+        <div className={`w-[1120px] h-[792px] ${containerBg} ${containerText} p-0 flex flex-col justify-between font-sans relative overflow-hidden select-none box-border border-[6px] ${borderGold} rounded-none`}>
           <style jsx global>{`
-            @import url('https://fonts.googleapis.com/css2?family=Alex+Brush&family=Cinzel:wght@400;600;700;900&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Pinyon+Script&display=swap');
+            @import url('https://fonts.googleapis.com/css2?family=Alex+Brush&family=Cinzel:wght@400;600;700;900&family=Cinzel+Decorative:wght@700;900&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap');
             .font-cinzel { font-family: 'Cinzel', serif; }
             .font-alex { font-family: 'Alex Brush', cursive; }
             .font-playfair { font-family: 'Playfair Display', serif; }
-            .font-pinyon { font-family: 'Pinyon Script', cursive; }
+            .font-cinzel-dec { font-family: 'Cinzel Decorative', serif; }
             .gold-foil-text {
               background: linear-gradient(to right, #b89742 0%, #f3e0aa 50%, #b89742 100%);
               -webkit-background-clip: text;
@@ -210,10 +226,10 @@ export default function DefaultTemplate({
             }
           `}</style>
           
-          <div className="absolute inset-3 border border-[#d4af37]/20 rounded-none pointer-events-none" />
+          <div className={`absolute inset-3 border ${borderInner} rounded-none pointer-events-none`} />
 
           <div className="grid grid-cols-[1fr_2fr_1fr] gap-0 h-full items-stretch relative z-10 box-border">
-            <div className="bg-[#121215] border-r border-[#d4af37]/20 rounded-none p-0 flex flex-col items-center justify-center shadow-xl relative overflow-hidden h-full">
+            <div className={`${columnBg} border-r ${columnBorder} rounded-none p-0 flex flex-col items-center justify-center shadow-xl relative overflow-hidden h-full`}>
               {event.cover_image ? (
                 <img 
                   src={event.cover_image} 
@@ -221,37 +237,37 @@ export default function DefaultTemplate({
                   className="w-full h-full object-cover rounded-none border-0"
                 />
               ) : (
-                <div className="w-full h-full border-0 flex flex-col items-center justify-center bg-white/5 text-center p-6 my-auto">
+                <div className={`w-full h-full border-0 flex flex-col items-center justify-center ${isLight ? 'bg-zinc-100/60' : 'bg-white/5'} text-center p-6 my-auto`}>
                   <span className="text-5xl">📸</span>
                   <span className="text-xs font-bold text-[#d4af37] uppercase tracking-wider mt-4">Sua Foto Aqui</span>
-                  <span className="text-[9px] text-white/55 mt-2">Carregue no painel do evento</span>
+                  <span className={`text-[9px] ${textColorMuted} mt-2`}>Carregue no painel do evento</span>
                 </div>
               )}
             </div>
 
-            <div className="bg-[#121215] border-r border-[#d4af37]/20 rounded-none p-10 flex flex-col justify-between items-center text-center shadow-2xl relative overflow-hidden h-full">
-              <div className="absolute inset-4 border border-dashed border-[#d4af37]/25 rounded-none pointer-events-none" />
-              <div className="absolute inset-5 bg-gradient-to-b from-[#b89742]/5 to-[#d4af37]/0 rounded-none pointer-events-none" />
+            <div className={`${columnBg} border-r ${columnBorder} rounded-none p-10 flex flex-col justify-between items-center text-center shadow-2xl relative overflow-hidden h-full`}>
+              <div className={`absolute inset-4 border border-dashed ${isLight ? 'border-[#cda344]/35' : 'border-[#d4af37]/25'} rounded-none pointer-events-none`} />
+              <div className={`absolute inset-5 ${isLight ? 'bg-gradient-to-b from-[#cda344]/5 to-[#cda344]/0' : 'bg-gradient-to-b from-[#b89742]/5 to-[#d4af37]/0'} rounded-none pointer-events-none`} />
 
-              <div className="my-auto py-8 flex flex-col items-center justify-center">
-                <span className="font-pinyon text-[90px] sm:text-[100px] leading-normal gold-foil-text font-normal block select-none whitespace-nowrap overflow-visible py-4">
+              <div className="my-auto py-8 flex flex-col items-center justify-center relative z-10">
+                <span className="font-cinzel-dec text-5xl sm:text-6xl tracking-wider gold-foil-text font-black block select-none whitespace-nowrap py-4">
                   {hosts.initials}
                 </span>
                 <div className="h-[1px] w-32 bg-gradient-to-r from-transparent via-[#d4af37]/50 to-transparent mx-auto mt-4" />
-                <span className="text-xs font-black uppercase tracking-[8px] text-white/50 block mt-4">
+                <span className={`text-xs font-black uppercase tracking-[8px] ${textColorMuted} block mt-4`}>
                   CONVITE DIGITAL EXCLUSIVO
                 </span>
               </div>
 
               <div className="text-center pb-4 z-10">
-                <p className="text-xs font-mono tracking-widest text-white/45 uppercase">
+                <p className={`text-xs font-mono tracking-widest ${textColorMuted} uppercase`}>
                   Desenvolvido com carinho através da aplicação www.meuboda.com
                 </p>
               </div>
             </div>
 
-            <div className="bg-[#121215] rounded-none p-6 flex flex-col justify-between shadow-xl relative h-full">
-              <div className="absolute inset-3 border border-[#d4af37]/10 rounded-none pointer-events-none" />
+            <div className={`${columnBg} rounded-none p-6 flex flex-col justify-between shadow-xl relative h-full`}>
+              <div className={`absolute inset-3 border ${isLight ? 'border-[#cda344]/15' : 'border-[#d4af37]/10'} rounded-none pointer-events-none`} />
               
               <div className="flex-1 flex flex-col justify-around items-center text-center py-10">
                 <div className="space-y-2">
@@ -263,7 +279,7 @@ export default function DefaultTemplate({
                   <h1 className="text-3xl sm:text-4xl font-alex leading-relaxed gold-foil-text font-black whitespace-normal break-words py-4 max-w-full">
                     {hosts.names}
                   </h1>
-                  <span className="text-xs font-black tracking-[3px] text-white/60 uppercase block mt-2">
+                  <span className={`text-xs font-black tracking-[3px] ${isLight ? 'text-zinc-600' : 'text-white/60'} uppercase block mt-2`}>
                     {event.type === 'casamento' ? 'CASAMENTO' : event.type === 'aniversario' ? 'ANIVERSÁRIO' : 'PEDIDO'}
                   </span>
                 </div>
@@ -280,13 +296,13 @@ export default function DefaultTemplate({
       );
     } else {
       return (
-        <div className="w-[1120px] h-[792px] bg-[#0c0c0e] text-[#f4f4f5] p-0 flex flex-col justify-between font-sans relative overflow-hidden select-none box-border border-[6px] border-[#d4af37]/35 rounded-none">
+        <div className={`w-[1120px] h-[792px] ${containerBg} ${containerText} p-0 flex flex-col justify-between font-sans relative overflow-hidden select-none box-border border-[6px] ${borderGold} rounded-none`}>
           <style jsx global>{`
-            @import url('https://fonts.googleapis.com/css2?family=Alex+Brush&family=Cinzel:wght@400;600;700;900&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Pinyon+Script&display=swap');
+            @import url('https://fonts.googleapis.com/css2?family=Alex+Brush&family=Cinzel:wght@400;600;700;900&family=Cinzel+Decorative:wght@700;900&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap');
             .font-cinzel { font-family: 'Cinzel', serif; }
             .font-alex { font-family: 'Alex Brush', cursive; }
             .font-playfair { font-family: 'Playfair Display', serif; }
-            .font-pinyon { font-family: 'Pinyon Script', cursive; }
+            .font-cinzel-dec { font-family: 'Cinzel Decorative', serif; }
             .gold-foil-text {
               background: linear-gradient(to right, #b89742 0%, #f3e0aa 50%, #b89742 100%);
               -webkit-background-clip: text;
@@ -294,11 +310,11 @@ export default function DefaultTemplate({
             }
           `}</style>
           
-          <div className="absolute inset-3 border border-[#d4af37]/20 rounded-none pointer-events-none" />
+          <div className={`absolute inset-3 border ${borderInner} rounded-none pointer-events-none`} />
 
           <div className="grid grid-cols-[1fr_2fr_1fr] gap-0 h-full items-stretch relative z-10 box-border">
-            <div className="bg-[#121215] border-r border-[#d4af37]/20 rounded-none p-6 flex flex-col justify-between shadow-xl relative h-full">
-              <div className="absolute inset-3 border border-[#d4af37]/5 rounded-none pointer-events-none" />
+            <div className={`${columnBg} border-r ${columnBorder} rounded-none p-6 flex flex-col justify-between shadow-xl relative h-full`}>
+              <div className={`absolute inset-3 border ${isLight ? 'border-[#cda344]/10' : 'border-[#d4af37]/5'} rounded-none pointer-events-none`} />
               
               <div className="space-y-6 relative z-10 flex-1 flex flex-col justify-between h-full">
                 <div className="text-center border-b border-[#d4af37]/15 pb-2.5">
@@ -311,9 +327,9 @@ export default function DefaultTemplate({
                   {(event.dress_code_style || event.dress_code_colors) && (
                     <div className="space-y-0.5">
                       <h4 className="font-bold text-[10px] uppercase tracking-wider text-[#d4af37]">👗 Dress Code</h4>
-                      <p className="text-white font-semibold">{event.dress_code_style || 'Esporte Fino / Social'}</p>
+                      <p className={`${textColorWhite} font-semibold`}>{event.dress_code_style || 'Esporte Fino / Social'}</p>
                       {event.dress_code_colors && (
-                        <p className="text-[10px] text-white/60">Paleta sugerida: {event.dress_code_colors}</p>
+                        <p className={`text-[10px] ${textColorMuted}`}>Paleta sugerida: {event.dress_code_colors}</p>
                       )}
                     </div>
                   )}
@@ -321,26 +337,26 @@ export default function DefaultTemplate({
                   {event.gift_suggestions && (
                     <div className="space-y-0.5">
                       <h4 className="font-bold text-[10px] uppercase tracking-wider text-[#d4af37]">🎁 Sugestão de Presentes</h4>
-                      <p className="text-white font-semibold line-clamp-3">{event.gift_suggestions}</p>
+                      <p className={`${textColorWhite} font-semibold line-clamp-3`}>{event.gift_suggestions}</p>
                     </div>
                   )}
 
                   {event.kids_restriction_note && (
                     <div className="space-y-0.5">
                       <h4 className="font-bold text-[10px] uppercase tracking-wider text-[#d4af37]">👶 Restrição de Crianças</h4>
-                      <p className="text-white font-semibold">{event.kids_restriction_note}</p>
+                      <p className={`${textColorWhite} font-semibold`}>{event.kids_restriction_note}</p>
                     </div>
                   )}
                 </div>
 
                 {locationsQrCodeUrl ? (
-                  <div className="bg-white/5 border border-[#d4af37]/15 rounded-none p-4 flex flex-col items-center gap-2 relative overflow-hidden">
+                  <div className={`${cardBgAlternative} rounded-none p-4 flex flex-col items-center gap-2 relative overflow-hidden`}>
                     <span className="text-[9px] font-black tracking-[2px] text-[#d4af37] uppercase">MAPAS E LOCALIZAÇÕES</span>
                     
                     <div className="bg-white p-2 rounded-none border border-[#d4af37]/35 shadow-md">
                       <img src={locationsQrCodeUrl} alt="Locais QR" className="w-36 h-36 object-contain" />
                     </div>
-                    <span className="text-[8.5px] text-white/70 font-bold uppercase text-center leading-tight mt-1">SCAN PARA VER NO MAPA</span>
+                    <span className={`text-[8.5px] ${textColorTime} font-bold uppercase text-center leading-tight mt-1`}>SCAN PARA VER NO MAPA</span>
                   </div>
                 ) : (
                   <div className="h-36" />
@@ -348,25 +364,25 @@ export default function DefaultTemplate({
               </div>
             </div>
 
-            <div className="bg-[#121215] border-r border-[#d4af37]/20 rounded-none p-10 flex flex-col justify-around items-center text-center shadow-2xl relative overflow-hidden h-full">
-              <div className="absolute inset-4 border border-dashed border-[#d4af37]/25 rounded-none pointer-events-none z-10" />
-              <div className="absolute inset-5 bg-gradient-to-b from-[#b89742]/5 to-[#d4af37]/0 rounded-none pointer-events-none z-10" />
+            <div className={`${columnBg} border-r ${columnBorder} rounded-none p-10 flex flex-col justify-around items-center text-center shadow-2xl relative overflow-hidden h-full`}>
+              <div className={`absolute inset-4 border border-dashed ${isLight ? 'border-[#cda344]/35' : 'border-[#d4af37]/25'} rounded-none pointer-events-none z-10`} />
+              <div className={`absolute inset-5 ${isLight ? 'bg-gradient-to-b from-[#cda344]/5 to-[#cda344]/0' : 'bg-gradient-to-b from-[#b89742]/5 to-[#d4af37]/0'} rounded-none pointer-events-none z-10`} />
 
-              {/* Dynamic Optional Background Photo with Dark Overlay for visibility */}
+              {/* Dynamic Optional Background Photo with Dark/Light Overlay for visibility */}
               {event.background_image && (
                 <div className="absolute inset-0 z-0 select-none pointer-events-none">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img 
                     src={event.background_image} 
                     alt="Background" 
-                    className="w-full h-full object-cover opacity-40"
+                    className="w-full h-full object-cover opacity-50"
                   />
-                  <div className="absolute inset-0 bg-[#121215]/65" />
+                  <div className={`absolute inset-0 ${overlayBg}`} />
                 </div>
               )}
 
               <div className="space-y-1 relative z-10 pt-4 flex flex-col items-center justify-center">
-                <span className="font-pinyon text-[70px] sm:text-[80px] leading-normal gold-foil-text font-normal block select-none whitespace-nowrap overflow-visible py-2">
+                <span className="font-cinzel-dec text-4xl sm:text-5xl tracking-wider gold-foil-text font-black block select-none whitespace-nowrap py-2">
                   {hosts.initials}
                 </span>
               </div>
@@ -376,18 +392,18 @@ export default function DefaultTemplate({
                   {hosts.names}
                 </h1>
 
-                <p className="text-sm font-playfair italic max-w-sm mx-auto leading-relaxed text-white font-semibold">
+                <p className={`text-sm font-playfair italic max-w-sm mx-auto leading-relaxed ${textColorWhite} font-semibold`}>
                   {phrases.intro}
                 </p>
                 
-                <div className="border-y-2 border-[#d4af37]/20 py-4 my-6 text-center space-y-1 bg-white/5 rounded-none px-8 w-full max-w-md mx-auto">
+                <div className={`border-y-2 ${isLight ? 'border-[#cda344]/30' : 'border-[#d4af37]/20'} py-4 my-6 text-center space-y-1 ${isLight ? 'bg-zinc-100/50' : 'bg-white/5'} rounded-none px-8 w-full max-w-md mx-auto`}>
                   <span className="text-xs font-cinzel tracking-[4px] text-[#d4af37] font-black uppercase block">
                     {dateDetails.weekday}
                   </span>
-                  <span className="text-2xl font-playfair text-white font-black block mt-1.5 tracking-wider">
+                  <span className={`text-2xl font-playfair ${textColorWhite} font-black block mt-1.5 tracking-wider`}>
                     {dateDetails.monthDayYear}
                   </span>
-                  <span className="text-xs font-cinzel text-white/70 block mt-1">
+                  <span className={`text-xs font-cinzel ${textColorTime} block mt-1`}>
                     Salão / Recepção às {dateDetails.time}
                   </span>
                 </div>
@@ -400,8 +416,8 @@ export default function DefaultTemplate({
               <div className="h-4" />
             </div>
 
-            <div className="bg-[#121215] rounded-none p-6 flex flex-col justify-between shadow-xl relative h-full">
-              <div className="absolute inset-3 border border-[#d4af37]/5 rounded-none pointer-events-none" />
+            <div className={`${columnBg} rounded-none p-6 flex flex-col justify-between shadow-xl relative h-full`}>
+              <div className={`absolute inset-3 border ${isLight ? 'border-[#cda344]/10' : 'border-[#d4af37]/5'} rounded-none pointer-events-none`} />
               
               <div className="space-y-6 relative z-10 flex-1 flex flex-col justify-between h-full">
                 <div className="text-center border-b border-[#d4af37]/15 pb-2.5">
@@ -415,8 +431,8 @@ export default function DefaultTemplate({
                     schedules.slice(0, 5).map((sched) => (
                       <div key={sched.id} className="flex items-center gap-2.5 text-xs font-semibold">
                         <span className="text-[#d4af37] font-black tracking-tighter shrink-0">{sched.time}</span>
-                        <span className="text-white/40 font-bold shrink-0">|</span>
-                        <span className="text-white truncate font-bold">{sched.title}</span>
+                        <span className={`${textColorMuted} font-bold shrink-0`}>|</span>
+                        <span className={`${textColorWhite} truncate font-bold`}>{sched.title}</span>
                       </div>
                     ))
                   ) : (
@@ -427,13 +443,13 @@ export default function DefaultTemplate({
                 </div>
 
                 {qrCodeUrl ? (
-                  <div className="bg-white/5 border border-[#d4af37]/15 rounded-none p-4 flex flex-col items-center gap-2 relative overflow-hidden">
+                  <div className={`${cardBgAlternative} rounded-none p-4 flex flex-col items-center gap-2 relative overflow-hidden`}>
                     <span className="text-[9px] font-black tracking-[2px] text-[#d4af37] uppercase">CHECK-IN / PORTARIA</span>
                     
                     <div className="bg-white p-2 rounded-none border border-[#d4af37]/35 shadow-md">
                       <img src={qrCodeUrl} alt="Acesso QR" className="w-36 h-36 object-contain" />
                     </div>
-                    <span className="text-[10px] text-white font-bold uppercase truncate max-w-full leading-none mt-1">{guest.name}</span>
+                    <span className={`text-[10px] ${textColorWhite} font-bold uppercase truncate max-w-full leading-none mt-1`}>{guest.name}</span>
                     <span className="text-[9px] text-[#d4af37] font-black uppercase tracking-wider mt-1">
                       {guest.companions > 0 ? `Com Acompanhante (${guest.companions})` : 'Individual'}
                     </span>
