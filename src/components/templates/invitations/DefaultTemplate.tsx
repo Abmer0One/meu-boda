@@ -234,7 +234,7 @@ export default function DefaultTemplate({
               <div className="absolute inset-5 bg-gradient-to-b from-[#b89742]/5 to-[#d4af37]/0 rounded-none pointer-events-none" />
 
               <div className="my-auto py-8 flex flex-col items-center justify-center">
-                <span className="font-pinyon text-[120px] leading-none gold-foil-text font-normal block select-none">
+                <span className="font-pinyon text-[90px] sm:text-[100px] leading-normal gold-foil-text font-normal block select-none whitespace-nowrap overflow-visible py-4">
                   {hosts.initials}
                 </span>
                 <div className="h-[1px] w-32 bg-gradient-to-r from-transparent via-[#d4af37]/50 to-transparent mx-auto mt-4" />
@@ -359,14 +359,14 @@ export default function DefaultTemplate({
                   <img 
                     src={event.background_image} 
                     alt="Background" 
-                    className="w-full h-full object-cover opacity-20"
+                    className="w-full h-full object-cover opacity-40"
                   />
-                  <div className="absolute inset-0 bg-[#121215]/85" />
+                  <div className="absolute inset-0 bg-[#121215]/65" />
                 </div>
               )}
 
               <div className="space-y-1 relative z-10 pt-4 flex flex-col items-center justify-center">
-                <span className="font-pinyon text-[90px] leading-none gold-foil-text font-normal block select-none">
+                <span className="font-pinyon text-[70px] sm:text-[80px] leading-normal gold-foil-text font-normal block select-none whitespace-nowrap overflow-visible py-2">
                   {hosts.initials}
                 </span>
               </div>
