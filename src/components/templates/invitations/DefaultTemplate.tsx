@@ -194,21 +194,24 @@ export default function DefaultTemplate({
      PDF PRINT MODE LAYOUTS (Landscape A4: 1120x792)
      ========================================================================= */
   if (isPrinting) {
-    const isLight = event.template_config?.print_theme === 'light';
+    const isLight = event.template_config?.print_theme !== 'dark'; // DEFAULT TO LIGHT (ivory) as requested!
 
-    // Core Theme Styling Classes
-    const containerBg = isLight ? 'bg-[#ffffff]' : 'bg-[#0c0c0e]';
-    const containerText = isLight ? 'text-[#1a1a1f]' : 'text-[#f4f4f5]';
+    // Core Theme Styling Classes (replicated from the analyzed user images)
+    const containerBg = isLight ? 'bg-[#FAF8F5]' : 'bg-[#0c0c0e]'; // Warm Luxury Ivory card stock
+    const containerText = isLight ? 'text-[#2C2B29]' : 'text-[#f4f4f5]'; // Warm Dark Charcoal text
     const borderGold = isLight ? 'border-[#cda344]' : 'border-[#d4af37]/35';
     const borderInner = isLight ? 'border-[#cda344]/30' : 'border-[#d4af37]/20';
-    const columnBg = isLight ? 'bg-[#ffffff]' : 'bg-[#121215]';
-    const columnBorder = isLight ? 'border-[#cda344]/25' : 'border-[#d4af37]/20';
-    const cardBgAlternative = isLight ? 'bg-[#f7f7f9] border border-[#cda344]/20' : 'bg-white/5 border border-[#d4af37]/15';
+    const columnBg = isLight ? 'bg-[#FAF8F5]' : 'bg-[#121215]';
+    const columnBorder = isLight ? 'border-[#cda344]/20' : 'border-[#d4af37]/20';
+    const cardBgAlternative = isLight ? 'bg-zinc-100/50 border border-[#cda344]/20' : 'bg-white/5 border border-[#d4af37]/15';
     const textColorMuted = isLight ? 'text-zinc-500' : 'text-white/50';
     const textColorMain = isLight ? 'text-zinc-800' : 'text-white';
     const textColorWhite = isLight ? 'text-zinc-900' : 'text-white';
     const textColorTime = isLight ? 'text-zinc-600' : 'text-white/70';
-    const overlayBg = isLight ? 'bg-white/50' : 'bg-[#121215]/65';
+    const overlayBg = isLight ? 'bg-white/55' : 'bg-[#121215]/75';
+
+    // Couple photo fallback logic to show them in the center panel of print
+    const bgPhoto = event.background_image || event.cover_image;
 
     if (renderPage === 'cover') {
       return (
@@ -368,18 +371,26 @@ export default function DefaultTemplate({
               <div className={`absolute inset-4 border border-dashed ${isLight ? 'border-[#cda344]/35' : 'border-[#d4af37]/25'} rounded-none pointer-events-none z-10`} />
               <div className={`absolute inset-5 ${isLight ? 'bg-gradient-to-b from-[#cda344]/5 to-[#cda344]/0' : 'bg-gradient-to-b from-[#b89742]/5 to-[#d4af37]/0'} rounded-none pointer-events-none z-10`} />
 
-              {/* Dynamic Optional Background Photo with Dark/Light Overlay for visibility */}
-              {event.background_image && (
-                <div className="absolute inset-0 z-0 select-none pointer-events-none">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img 
-                    src={event.background_image} 
-                    alt="Background" 
-                    className="w-full h-full object-cover opacity-50"
-                  />
-                  <div className={`absolute inset-0 ${overlayBg}`} />
+              {/* Dynamic Background Photo with simulated photo corners, overlaid with text */}
+              {bgPhoto ? (
+                <div className="absolute inset-0 z-0 select-none pointer-events-none p-4">
+                  <div className="w-full h-full relative overflow-hidden">
+                    {/* Simulated Photo Corners */}
+                    <div className="absolute top-1.5 left-1.5 w-4 h-[1px] bg-[#d4af37] rotate-45 z-20" />
+                    <div className="absolute top-1.5 right-1.5 w-4 h-[1px] bg-[#d4af37] -rotate-45 z-20" />
+                    <div className="absolute bottom-1.5 left-1.5 w-4 h-[1px] bg-[#d4af37] -rotate-45 z-20" />
+                    <div className="absolute bottom-1.5 right-1.5 w-4 h-[1px] bg-[#d4af37] rotate-45 z-20" />
+
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img 
+                      src={bgPhoto} 
+                      alt="Background" 
+                      className="w-full h-full object-cover opacity-50"
+                    />
+                    <div className={`absolute inset-0 ${overlayBg}`} />
+                  </div>
                 </div>
-              )}
+              ) : null}
 
               <div className="space-y-1 relative z-10 pt-4 flex flex-col items-center justify-center">
                 <span className="font-cinzel-dec text-4xl sm:text-5xl tracking-wider gold-foil-text font-black block select-none whitespace-nowrap py-2">
@@ -387,28 +398,38 @@ export default function DefaultTemplate({
                 </span>
               </div>
 
-              <div className="space-y-6 relative z-10 py-4 my-auto w-full">
+              <div className="space-y-5 relative z-10 py-4 my-auto w-full">
                 <h1 className="text-4xl md:text-5xl font-alex tracking-wide text-white leading-relaxed gold-foil-text font-black px-2 py-1">
                   {hosts.names}
                 </h1>
 
-                <p className={`text-sm font-playfair italic max-w-sm mx-auto leading-relaxed ${textColorWhite} font-semibold`}>
+                <p className={`text-[10px] font-cinzel tracking-[4px] text-[#d4af37] font-bold uppercase block mt-1`}>
                   {phrases.intro}
                 </p>
                 
-                <div className={`border-y-2 ${isLight ? 'border-[#cda344]/30' : 'border-[#d4af37]/20'} py-4 my-6 text-center space-y-1 ${isLight ? 'bg-zinc-100/50' : 'bg-white/5'} rounded-none px-8 w-full max-w-md mx-auto`}>
-                  <span className="text-xs font-cinzel tracking-[4px] text-[#d4af37] font-black uppercase block">
-                    {dateDetails.weekday}
-                  </span>
-                  <span className={`text-2xl font-playfair ${textColorWhite} font-black block mt-1.5 tracking-wider`}>
+                {/* Date line styled exactly like the user's images (clean vertical separators, no card borders) */}
+                <div className="py-2.5 my-4 text-center space-y-1 w-full max-w-md mx-auto">
+                  <span className={`text-[19px] font-playfair ${textColorWhite} font-black block tracking-widest`}>
                     {dateDetails.monthDayYear}
                   </span>
-                  <span className={`text-xs font-cinzel ${textColorTime} block mt-1`}>
-                    Salão / Recepção às {dateDetails.time}
+                  <span className="text-[10px] font-cinzel tracking-[4px] text-[#d4af37] font-bold uppercase block mt-1">
+                    {dateDetails.weekday} ÀS {dateDetails.time}
                   </span>
                 </div>
 
-                <p className="text-xs font-playfair italic text-[#f3e0aa] font-bold">
+                {/* Location text rendered dynamically beneath the date block */}
+                <div className="space-y-0.5 mt-2">
+                  <span className="text-[11px] font-cinzel font-black tracking-[3px] text-[#d4af37] uppercase block">
+                    {event.party_location || event.ceremony_location || 'SALÃO DE EVENTOS'}
+                  </span>
+                  {event.party_location && event.ceremony_location && (
+                    <span className={`text-[8.5px] font-cinzel tracking-[2px] ${textColorMuted} uppercase block`}>
+                      {event.ceremony_location}
+                    </span>
+                  )}
+                </div>
+
+                <p className="text-xs font-playfair italic text-[#f3e0aa] font-bold mt-4">
                   &quot;{phrases.outro}&quot;
                 </p>
               </div>
@@ -419,14 +440,41 @@ export default function DefaultTemplate({
             <div className={`${columnBg} rounded-none p-6 flex flex-col justify-between shadow-xl relative h-full`}>
               <div className={`absolute inset-3 border ${isLight ? 'border-[#cda344]/10' : 'border-[#d4af37]/5'} rounded-none pointer-events-none`} />
               
-              <div className="space-y-6 relative z-10 flex-1 flex flex-col justify-between h-full">
-                <div className="text-center border-b border-[#d4af37]/15 pb-2.5">
-                  <h3 className="font-cinzel font-black text-xs tracking-[3px] text-[#f3e0aa]">
+              <div className="space-y-4 relative z-10 flex-1 flex flex-col justify-between h-full">
+                {/* Botanical leaf branch at the top (replicated from the analysed images) */}
+                <div className="pt-2 text-center select-none pointer-events-none">
+                  <svg className="w-10 h-10 text-[#d4af37] mx-auto opacity-80" viewBox="0 0 100 100" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M50,90 C50,60 55,40 65,15" />
+                    <path d="M50,80 C40,75 38,68 45,65 C48,63 50,68 50,80 Z" fill="currentColor" opacity="0.2" />
+                    <path d="M50,80 C40,75 38,68 45,65 C48,63 50,68 50,80 Z" />
+                    
+                    <path d="M51,70 C60,65 62,58 55,55 C52,53 51,58 51,70 Z" fill="currentColor" opacity="0.2" />
+                    <path d="M51,70 C60,65 62,58 55,55 C52,53 51,58 51,70 Z" />
+
+                    <path d="M49,60 C39,55 37,48 44,45 C47,43 49,48 49,60 Z" fill="currentColor" opacity="0.2" />
+                    <path d="M49,60 C39,55 37,48 44,45 C47,43 49,48 49,60 Z" />
+
+                    <path d="M52,50 C61,45 63,38 56,35 C53,33 52,38 52,50 Z" fill="currentColor" opacity="0.2" />
+                    <path d="M52,50 C61,45 63,38 56,35 C53,33 52,38 52,50 Z" />
+
+                    <path d="M48,40 C38,35 36,28 43,25 C46,23 48,28 48,40 Z" fill="currentColor" opacity="0.2" />
+                    <path d="M48,40 C38,35 36,28 43,25 C46,23 48,28 48,40 Z" />
+
+                    <path d="M53,30 C62,25 64,18 57,15 C54,13 53,18 53,30 Z" fill="currentColor" opacity="0.2" />
+                    <path d="M53,30 C62,25 64,18 57,15 C54,13 53,18 53,30 Z" />
+
+                    <path d="M65,15 C60,10 52,8 55,3 C58,-2 68,5 65,15 Z" fill="currentColor" opacity="0.2" />
+                    <path d="M65,15 C60,10 52,8 55,3 C58,-2 68,5 65,15 Z" />
+                  </svg>
+                </div>
+
+                <div className="text-center border-b border-[#d4af37]/15 pb-1.5">
+                  <h3 className="font-cinzel font-black text-[10px] tracking-[3px] text-[#f3e0aa]">
                     AGENDA DO DIA
                   </h3>
                 </div>
 
-                <div className="space-y-4 max-h-[220px] overflow-hidden flex-1 py-4 flex flex-col justify-center">
+                <div className="space-y-3.5 max-h-[160px] overflow-hidden flex-1 py-1.5 flex flex-col justify-center">
                   {schedules.length > 0 ? (
                     schedules.slice(0, 5).map((sched) => (
                       <div key={sched.id} className="flex items-center gap-2.5 text-xs font-semibold">
@@ -436,26 +484,26 @@ export default function DefaultTemplate({
                       </div>
                     ))
                   ) : (
-                    <div className="text-center py-6 text-xs text-white/50 italic font-medium">
+                    <div className="text-center py-4 text-xs text-white/50 italic font-medium">
                       Agenda será exibida no convite.
                     </div>
                   )}
                 </div>
 
                 {qrCodeUrl ? (
-                  <div className={`${cardBgAlternative} rounded-none p-4 flex flex-col items-center gap-2 relative overflow-hidden`}>
+                  <div className={`${cardBgAlternative} rounded-none p-3.5 flex flex-col items-center gap-1.5 relative overflow-hidden`}>
                     <span className="text-[9px] font-black tracking-[2px] text-[#d4af37] uppercase">CHECK-IN / PORTARIA</span>
                     
-                    <div className="bg-white p-2 rounded-none border border-[#d4af37]/35 shadow-md">
-                      <img src={qrCodeUrl} alt="Acesso QR" className="w-36 h-36 object-contain" />
+                    <div className="bg-white p-1.5 rounded-none border border-[#d4af37]/35 shadow-md">
+                      <img src={qrCodeUrl} alt="Acesso QR" className="w-32 h-32 object-contain" />
                     </div>
                     <span className={`text-[10px] ${textColorWhite} font-bold uppercase truncate max-w-full leading-none mt-1`}>{guest.name}</span>
-                    <span className="text-[9px] text-[#d4af37] font-black uppercase tracking-wider mt-1">
+                    <span className="text-[8.5px] text-[#d4af37] font-black uppercase tracking-wider">
                       {guest.companions > 0 ? `Com Acompanhante (${guest.companions})` : 'Individual'}
                     </span>
                   </div>
                 ) : (
-                  <div className="h-36" />
+                  <div className="h-32" />
                 )}
               </div>
             </div>
