@@ -298,6 +298,20 @@ export default function DefaultTemplate({
         </div>
       );
     } else {
+      // RSVP deadline date formatter helper
+      const formatRSVPDeadline = () => {
+        if (!event.rsvp_deadline) return '15.06.2026';
+        try {
+          const d = new Date(event.rsvp_deadline);
+          const day = d.getDate().toString().padStart(2, '0');
+          const month = (d.getMonth() + 1).toString().padStart(2, '0');
+          const year = d.getFullYear();
+          return `${day}.${month}.${year}`;
+        } catch (e) {
+          return '15.06.2026';
+        }
+      };
+
       return (
         <div className={`w-[1120px] h-[792px] ${containerBg} ${containerText} p-0 flex flex-col justify-between font-sans relative overflow-hidden select-none box-border border-[6px] ${borderGold} rounded-none`}>
           <style jsx global>{`
@@ -316,38 +330,43 @@ export default function DefaultTemplate({
           <div className={`absolute inset-3 border ${borderInner} rounded-none pointer-events-none`} />
 
           <div className="grid grid-cols-[1fr_2fr_1fr] gap-0 h-full items-stretch relative z-10 box-border">
+            {/* ABA ESQUERDA: DETAILS / DETALHES */}
             <div className={`${columnBg} border-r ${columnBorder} rounded-none p-6 flex flex-col justify-between shadow-xl relative h-full`}>
               <div className={`absolute inset-3 border ${isLight ? 'border-[#cda344]/10' : 'border-[#d4af37]/5'} rounded-none pointer-events-none`} />
               
-              <div className="space-y-6 relative z-10 flex-1 flex flex-col justify-between h-full">
-                <div className="text-center border-b border-[#d4af37]/15 pb-2.5">
-                  <h3 className="font-cinzel font-black text-xs tracking-[3px] text-[#f3e0aa]">
-                    MANUAL DO CONVIDADO
+              <div className="space-y-4 relative z-10 flex-1 flex flex-col justify-between h-full">
+                <div className="text-center pt-2">
+                  <h3 className="font-cinzel font-black text-xs tracking-[4px] text-[#d4af37]">
+                    DETAILS
                   </h3>
+                  <h4 className="font-cinzel font-bold text-[9px] uppercase tracking-[2px] text-[#d4af37] mt-3">
+                    ACCOMMODATIONS
+                  </h4>
+                  <div className="h-[1px] w-full bg-[#d4af37]/35 mt-1.5 mb-2" />
                 </div>
 
-                <div className="space-y-4 text-xs leading-relaxed flex-1 py-4 flex flex-col justify-center">
+                <div className="space-y-4 text-xs leading-relaxed flex-1 py-4 flex flex-col justify-center text-left">
                   {(event.dress_code_style || event.dress_code_colors) && (
                     <div className="space-y-0.5">
-                      <h4 className="font-bold text-[10px] uppercase tracking-wider text-[#d4af37]">👗 Dress Code</h4>
-                      <p className={`${textColorWhite} font-semibold`}>{event.dress_code_style || 'Esporte Fino / Social'}</p>
+                      <h5 className="font-bold text-[9px] uppercase tracking-wider text-[#d4af37]">👗 DRESS CODE</h5>
+                      <p className={`${textColorWhite} font-semibold text-[10px]`}>{event.dress_code_style || 'Esporte Fino / Social'}</p>
                       {event.dress_code_colors && (
-                        <p className={`text-[10px] ${textColorMuted}`}>Paleta sugerida: {event.dress_code_colors}</p>
+                        <p className={`text-[9px] ${textColorMuted}`}>Paleta sugerida: {event.dress_code_colors}</p>
                       )}
                     </div>
                   )}
 
                   {event.gift_suggestions && (
                     <div className="space-y-0.5">
-                      <h4 className="font-bold text-[10px] uppercase tracking-wider text-[#d4af37]">🎁 Sugestão de Presentes</h4>
-                      <p className={`${textColorWhite} font-semibold line-clamp-3`}>{event.gift_suggestions}</p>
+                      <h5 className="font-bold text-[9px] uppercase tracking-wider text-[#d4af37]">🎁 GIFT REGISTRY</h5>
+                      <p className={`${textColorWhite} font-semibold text-[10px] line-clamp-3`}>{event.gift_suggestions}</p>
                     </div>
                   )}
 
                   {event.kids_restriction_note && (
                     <div className="space-y-0.5">
-                      <h4 className="font-bold text-[10px] uppercase tracking-wider text-[#d4af37]">👶 Restrição de Crianças</h4>
-                      <p className={`${textColorWhite} font-semibold`}>{event.kids_restriction_note}</p>
+                      <h5 className="font-bold text-[9px] uppercase tracking-wider text-[#d4af37]">👶 KIDS NOTE</h5>
+                      <p className={`${textColorWhite} font-semibold text-[10px]`}>{event.kids_restriction_note}</p>
                     </div>
                   )}
                 </div>
@@ -359,7 +378,7 @@ export default function DefaultTemplate({
                     <div className="bg-white p-2 rounded-none border border-[#d4af37]/35 shadow-md">
                       <img src={locationsQrCodeUrl} alt="Locais QR" className="w-36 h-36 object-contain" />
                     </div>
-                    <span className={`text-[8.5px] ${textColorTime} font-bold uppercase text-center leading-tight mt-1`}>SCAN PARA VER NO MAPA</span>
+                    <span className={`text-[8.5px] ${textColorTime} font-bold uppercase text-center leading-tight mt-1`}>SCAN PARA MAPAS E COORDENADAS</span>
                   </div>
                 ) : (
                   <div className="h-36" />
@@ -367,6 +386,7 @@ export default function DefaultTemplate({
               </div>
             </div>
 
+            {/* PAINEL CENTRAL: O CORAÇÃO DO CONVITE */}
             <div className={`${columnBg} border-r ${columnBorder} rounded-none p-10 flex flex-col justify-around items-center text-center shadow-2xl relative overflow-hidden h-full`}>
               <div className={`absolute inset-4 border border-dashed ${isLight ? 'border-[#cda344]/35' : 'border-[#d4af37]/25'} rounded-none pointer-events-none z-10`} />
               <div className={`absolute inset-5 ${isLight ? 'bg-gradient-to-b from-[#cda344]/5 to-[#cda344]/0' : 'bg-gradient-to-b from-[#b89742]/5 to-[#d4af37]/0'} rounded-none pointer-events-none z-10`} />
@@ -392,24 +412,18 @@ export default function DefaultTemplate({
                 </div>
               ) : null}
 
-              <div className="space-y-1 relative z-10 pt-4 flex flex-col items-center justify-center">
-                <span className="font-cinzel-dec text-4xl sm:text-5xl tracking-wider gold-foil-text font-black block select-none whitespace-nowrap py-2">
-                  {hosts.initials}
-                </span>
-              </div>
-
               <div className="space-y-5 relative z-10 py-4 my-auto w-full">
                 <h1 className="text-4xl md:text-5xl font-alex tracking-wide text-white leading-relaxed gold-foil-text font-black px-2 py-1">
                   {hosts.names}
                 </h1>
 
-                <p className={`text-[10px] font-cinzel tracking-[4px] text-[#d4af37] font-bold uppercase block mt-1`}>
+                <p className="text-[9.5px] font-cinzel tracking-[4px] text-[#d4af37] font-black uppercase block mt-1">
                   {phrases.intro}
                 </p>
                 
                 {/* Date line styled exactly like the user's images (clean vertical separators, no card borders) */}
                 <div className="py-2.5 my-4 text-center space-y-1 w-full max-w-md mx-auto">
-                  <span className={`text-[19px] font-playfair ${textColorWhite} font-black block tracking-widest`}>
+                  <span className={`text-[21px] font-playfair ${textColorWhite} font-black block tracking-widest`}>
                     {dateDetails.monthDayYear}
                   </span>
                   <span className="text-[10px] font-cinzel tracking-[4px] text-[#d4af37] font-bold uppercase block mt-1">
@@ -429,7 +443,7 @@ export default function DefaultTemplate({
                   )}
                 </div>
 
-                <p className="text-xs font-playfair italic text-[#f3e0aa] font-bold mt-4">
+                <p className="text-sm font-alex gold-foil-text font-semibold mt-4">
                   &quot;{phrases.outro}&quot;
                 </p>
               </div>
@@ -437,6 +451,7 @@ export default function DefaultTemplate({
               <div className="h-4" />
             </div>
 
+            {/* ABA DIREITA: RSVP / CONFIRMAÇÃO */}
             <div className={`${columnBg} rounded-none p-6 flex flex-col justify-between shadow-xl relative h-full`}>
               <div className={`absolute inset-3 border ${isLight ? 'border-[#cda344]/10' : 'border-[#d4af37]/5'} rounded-none pointer-events-none`} />
               
@@ -468,31 +483,15 @@ export default function DefaultTemplate({
                   </svg>
                 </div>
 
-                <div className="text-center border-b border-[#d4af37]/15 pb-1.5">
-                  <h3 className="font-cinzel font-black text-[10px] tracking-[3px] text-[#f3e0aa]">
-                    AGENDA DO DIA
+                <div className="text-center">
+                  <h3 className="font-cinzel font-black text-xs tracking-[3px] text-[#d4af37] uppercase">
+                    RSVP
                   </h3>
-                </div>
-
-                <div className="space-y-3.5 max-h-[160px] overflow-hidden flex-1 py-1.5 flex flex-col justify-center">
-                  {schedules.length > 0 ? (
-                    schedules.slice(0, 5).map((sched) => (
-                      <div key={sched.id} className="flex items-center gap-2.5 text-xs font-semibold">
-                        <span className="text-[#d4af37] font-black tracking-tighter shrink-0">{sched.time}</span>
-                        <span className={`${textColorMuted} font-bold shrink-0`}>|</span>
-                        <span className={`${textColorWhite} truncate font-bold`}>{sched.title}</span>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-center py-4 text-xs text-white/50 italic font-medium">
-                      Agenda será exibida no convite.
-                    </div>
-                  )}
                 </div>
 
                 {qrCodeUrl ? (
                   <div className={`${cardBgAlternative} rounded-none p-3.5 flex flex-col items-center gap-1.5 relative overflow-hidden`}>
-                    <span className="text-[9px] font-black tracking-[2px] text-[#d4af37] uppercase">CHECK-IN / PORTARIA</span>
+                    <span className="text-[9px] font-black tracking-[2px] text-[#d4af37] uppercase">CONFIRMAÇÃO DIGITAL</span>
                     
                     <div className="bg-white p-1.5 rounded-none border border-[#d4af37]/35 shadow-md">
                       <img src={qrCodeUrl} alt="Acesso QR" className="w-32 h-32 object-contain" />
@@ -505,6 +504,15 @@ export default function DefaultTemplate({
                 ) : (
                   <div className="h-32" />
                 )}
+
+                <div className="text-center space-y-1 pb-2">
+                  <span className="text-[9px] text-[#d4af37] font-black uppercase tracking-wider block">
+                    PLEASE RESPOND BY {formatRSVPDeadline()}
+                  </span>
+                  <span className={`text-[8px] ${textColorMuted} uppercase block break-all font-mono leading-tight`}>
+                    www.meuboda.com/convite/{guest.qr_token}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
