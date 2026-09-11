@@ -205,345 +205,72 @@ export default function DefaultTemplate({
      PDF PRINT MODE LAYOUTS (Landscape A4: 1120x792)
      ========================================================================= */
   if (isPrinting) {
-    const isLight = event.template_config?.print_theme !== 'dark'; // DEFAULT TO LIGHT (ivory) as requested!
+    const canvaCover = event.template_config?.canva_cover_url || '/templates/canva/page_1.png';
+    const canvaInfo = event.template_config?.canva_info_url || '/templates/canva/page_2_clean.png';
 
-    const containerBg = isLight ? 'bg-[#FAF8F1]' : 'bg-[#0c0c0e]';
-    const containerText = isLight ? 'text-[#2C2A25]' : 'text-[#f4f4f5]';
-    const bgPhoto = event.background_image || event.cover_image;
-
-    // PAGE 1: COVER (Aba da Capa - Horizontal A4)
+    // PAGE 1: COVER (Aba da Capa - Horizontal A4 Canva Oficial)
     if (renderPage === 'cover') {
       return (
-        <div className={`w-[1120px] h-[792px] ${containerBg} ${containerText} p-0 flex flex-col justify-between font-sans relative overflow-hidden select-none box-border`}>
-          <style jsx global>{`
-            @import url('https://fonts.googleapis.com/css2?family=Alex+Brush&family=Alice&family=Ballet:opsz@16..72&family=Cinzel:wght@400;600;700;900&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap');
-            .font-alice { font-family: 'Alice', serif; }
-            .font-ballet { font-family: 'Ballet', cursive; }
-            .font-cinzel { font-family: 'Cinzel', serif; }
-            .font-alex { font-family: 'Alex Brush', cursive; }
-            .font-playfair { font-family: 'Playfair Display', serif; }
-          `}</style>
-
-          {/* 3 Panels layout: Left (26%), Center (48%), Right (26%) */}
-          <div className="grid grid-cols-[26%_48%_26%] gap-0 h-full items-stretch relative z-10 box-border">
-            {/* Aba Esquerda: limpa para dobra */}
-            <div className="h-full" />
-
-            {/* Painel Central: Exatamente como na Página 1 e Seção 4 da análise técnica */}
-            <div className="h-full flex flex-col justify-between items-center text-center py-20 px-8 relative">
-              <div className="flex-1 flex flex-col items-center justify-center space-y-4">
-                {/* 4.2 Monograma A&M com a fonte Ballet */}
-                <div className="py-2 select-none overflow-visible leading-normal">
-                  <span className="font-ballet text-8xl md:text-9xl text-[#B99A4C] leading-none block font-normal tracking-wider px-6">
-                    {hosts.initials}
-                  </span>
-                </div>
-
-                {/* 4.3 Subtítulo CONVITE EXCLUSIVO */}
-                <span className="font-cinzel text-xs sm:text-sm font-bold tracking-[4px] text-[#B99A4C] uppercase block mt-3 mb-6">
-                  CONVITE EXCLUSIVO
-                </span>
-
-                {/* 4.4 Citação Bíblica em 3 linhas com a fonte Alice */}
-                <div className="max-w-md mx-auto space-y-1.5 my-5 text-center">
-                  <p className="font-alice text-xs sm:text-sm text-[#4A3827] leading-relaxed italic">
-                    “Assim, permanecem agora estes três: a fé, a esperança e o amor.<br />
-                    O maior deles, porém, é o amor.”
-                  </p>
-                  <p className="font-alice text-xs text-[#6E6B65] mt-1 font-medium">
-                    1 Coríntios 13, 13
-                  </p>
-                </div>
-              </div>
-
-              {/* 4.5 Parte inferior: Nosso Casamento */}
-              <div className="pb-6">
-                <p className="font-alex text-4xl sm:text-5xl text-[#B99A4C] font-normal tracking-wide">
-                  Nosso Casamento
-                </p>
-              </div>
-            </div>
-
-            {/* Aba Direita: limpa para dobra */}
-            <div className="h-full" />
-          </div>
+        <div className="w-[1120px] h-[792px] bg-[#FAF8F1] p-0 relative overflow-hidden select-none box-border flex items-center justify-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img 
+            src={canvaCover} 
+            alt="Capa do Convite Oficial Canva" 
+            className="w-full h-full object-cover select-none pointer-events-none"
+          />
         </div>
       );
     } else {
-      // PAGE 2: INFO (Folha de Informações - Horizontal A4)
-      const formatRSVPDeadline = () => {
-        if (!event.rsvp_deadline) return '25 de Outubro de 2026';
-        try {
-          const d = new Date(event.rsvp_deadline);
-          return d.toLocaleDateString('pt-PT', { day: 'numeric', month: 'long', year: 'numeric' });
-        } catch (e) {
-          return '25 de Outubro de 2026';
-        }
-      };
-
-      const defaultSchedules = [
-        { id: '1', title: 'Cerimónia Religiosa', time: '16:00', icon: 'church' },
-        { id: '2', title: 'Cortejo', time: '18:00', icon: 'procession' },
-        { id: '3', title: 'Recepção de Convidados', time: '20:30', icon: 'reception' },
-        { id: '4', title: 'Aperitivos', time: '21:30', icon: 'appetizers' },
-        { id: '5', title: 'Dança dos Noivos', time: '23:30', icon: 'dance' },
-      ];
-
-      const displaySchedules = schedules && schedules.length > 0 
-        ? schedules.slice(0, 5).map((s, idx) => ({
-            id: s.id,
-            title: s.title,
-            time: s.time,
-            icon: idx === 0 ? 'church' : idx === 1 ? 'procession' : idx === 2 ? 'reception' : idx === 3 ? 'appetizers' : 'dance'
-          }))
-        : defaultSchedules;
-
-      const getScheduleIcon = (type: string) => {
-        switch (type) {
-          case 'church':
-            return (
-              <svg className="w-7 h-7 text-[#B99A4C] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2v3m-2-1.5h4" />
-                <path d="M12 5l-4 3v13h8V8l-4-3z" />
-                <path d="M4 11l4-3v13H3v-7l1-3z" />
-                <path d="M20 11l-4-3v13h5v-7l-1-3z" />
-                <path d="M10 21v-4a2 2 0 0 1 4 0v4" />
-                <circle cx="12" cy="11" r="1.5" />
-              </svg>
-            );
-          case 'procession':
-            return (
-              <svg className="w-7 h-7 text-[#B99A4C] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="9" cy="5" r="2" />
-                <circle cx="15" cy="5" r="2" />
-                <path d="M7 21l2-8 2 8" />
-                <path d="M13 13l-2 8" />
-                <path d="M13 13l4 8" />
-                <path d="M15 7l-2 6h4l-2-6z" />
-              </svg>
-            );
-          case 'reception':
-            return (
-              <svg className="w-7 h-7 text-[#B99A4C] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M8 3l-3 7a3 3 0 0 0 3 3h0a3 3 0 0 0 3-3L8 3z" />
-                <path d="M8 13v7m-3 0h6" />
-                <path d="M16 3l-3 7a3 3 0 0 0 3 3h0a3 3 0 0 0 3-3l-3-7z" />
-                <path d="M16 13v7m-3 0h6" />
-                <path d="M11 6l2-1" />
-              </svg>
-            );
-          case 'appetizers':
-            return (
-              <svg className="w-7 h-7 text-[#B99A4C] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="8" />
-                <circle cx="12" cy="12" r="5" />
-                <path d="M2 7v5a2 2 0 0 0 2 2h0v8" />
-                <path d="M3 4v4m-2-4v4m4-4v4" />
-                <path d="M22 4c0 3-1 6-2 7v11" />
-              </svg>
-            );
-          case 'dance':
-          default:
-            return (
-              <svg className="w-7 h-7 text-[#B99A4C] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="9" cy="4" r="1.5" />
-                <circle cx="15" cy="4.5" r="1.5" />
-                <path d="M8 8l2 5-3 8" />
-                <path d="M10 13l2 8" />
-                <path d="M14 6l-3 3 3 3-2 9" />
-                <path d="M16 9l-2 4 4 8" />
-              </svg>
-            );
-        }
-      };
-
+      // PAGE 2: INFO (Folha de Informações - Horizontal A4 Canva Oficial com QRs Dinâmicos)
       return (
-        <div className={`w-[1120px] h-[792px] ${containerBg} ${containerText} p-0 flex flex-col justify-between font-sans relative overflow-hidden select-none box-border`}>
-          <style jsx global>{`
-            @import url('https://fonts.googleapis.com/css2?family=Alex+Brush&family=Alice&family=Ballet:opsz@16..72&family=Cinzel:wght@400;600;700;900&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap');
-            .font-alice { font-family: 'Alice', serif; }
-            .font-ballet { font-family: 'Ballet', cursive; }
-            .font-cinzel { font-family: 'Cinzel', serif; }
-            .font-alex { font-family: 'Alex Brush', cursive; }
-            .font-playfair { font-family: 'Playfair Display', serif; }
-          `}</style>
+        <div className="w-[1120px] h-[792px] bg-[#FAF8F1] p-0 relative overflow-hidden select-none box-border">
+          {/* Imagem de Fundo Oficial do Canva com todas as fontes, cores e ornamentos intactos */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img 
+            src={canvaInfo} 
+            alt="Verso do Convite Oficial Canva" 
+            className="w-full h-full object-cover select-none pointer-events-none absolute inset-0 z-0"
+          />
 
-          <div className="grid grid-cols-[26%_48%_26%] gap-0 h-full items-stretch relative z-10 box-border">
-            {/* 6. PAINEL ESQUERDO: PROGRAMA DO CASAMENTO */}
-            <div className="p-6 flex flex-col justify-between items-center text-center h-full relative">
-              {/* 6.2 Ornamento superior */}
-              <div className="w-full flex flex-col items-center">
-                <svg className="w-12 h-10 text-[#B99A4C] mx-auto opacity-90 mb-3" viewBox="0 0 100 80" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M50,40 C35,20 20,35 25,50 C30,65 45,55 50,40 Z" />
-                  <path d="M50,40 C65,20 80,35 75,50 C70,65 55,55 50,40 Z" />
-                  <circle cx="50" cy="40" r="3" fill="currentColor" />
-                  <path d="M50,15 C48,25 52,35 50,40" />
-                  <path d="M35,25 C40,28 45,35 50,40" />
-                  <path d="M65,25 C60,28 55,35 50,40" />
-                </svg>
-
-                {/* 6.3 e 6.4 Linha temporal de eventos */}
-                <div className="space-y-4 w-full px-2 mt-1">
-                  {displaySchedules.map((item) => (
-                    <div key={item.id} className="flex items-center gap-3 py-0.5 text-left">
-                      <div className="w-7 h-7 flex items-center justify-center shrink-0">
-                        {getScheduleIcon(item.icon)}
-                      </div>
-                      <div>
-                        <div className="text-[12px] font-alice text-[#B99A4C] font-semibold leading-snug">{item.title}</div>
-                        <div className="text-xs font-bold text-[#2C2A25] font-sans tracking-tight mt-0.5">{item.time}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* 6.5 QR code de localização */}
-              <div className="flex flex-col items-center pb-2 w-full">
-                {locationsQrCodeUrl ? (
-                  <div className="p-2 bg-white shadow-sm border border-[#B99A4C]/25 inline-block">
-                    <img src={locationsQrCodeUrl} alt="Código de Localizações" className="w-28 h-28 object-contain" />
-                  </div>
-                ) : (
-                  <div className="w-28 h-28" />
-                )}
-                <span className="font-alice text-xs font-bold text-[#B99A4C] tracking-wider uppercase block mt-2.5">
-                  Código de Localizações
-                </span>
-                <span className="font-alice text-[9.5px] text-[#4A3827] text-center leading-tight mt-1 max-w-[200px]">
-                  Scaneie o código QR para ver a localização pelo Google Maps.
-                </span>
-              </div>
+          {/* 1. Código QR Real de Localizações (Aba Esquerda - Coordenadas exatas do design Canva) */}
+          {locationsQrCodeUrl && (
+            <div 
+              className="absolute z-10 flex items-center justify-center bg-white"
+              style={{
+                left: '8.76%',
+                top: '69.56%',
+                width: '11.85%',
+                height: '16.76%',
+              }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img 
+                src={locationsQrCodeUrl} 
+                alt="Código de Localizações Real" 
+                className="w-full h-full object-contain p-0.5"
+              />
             </div>
+          )}
 
-            {/* 7. PAINEL CENTRAL: CONVITE PRINCIPAL */}
-            <div className="relative h-full flex flex-col justify-between items-center text-center overflow-hidden p-6">
-              {/* 7.1 Fundo fotográfico com película suave */}
-              {bgPhoto ? (
-                <div className="absolute inset-0 z-0 select-none pointer-events-none">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img 
-                    src={bgPhoto} 
-                    alt="Background" 
-                    className="w-full h-full object-cover opacity-55"
-                  />
-                  <div className="absolute inset-0 bg-[#FAF8F1]/85" />
-                </div>
-              ) : null}
-
-              <div className="relative z-10 w-full h-full flex flex-col justify-between items-center text-center py-2 px-4">
-                {/* 7.2 Texto superior sobre os pais */}
-                <div className="w-full space-y-2 pt-2">
-                  <p className="font-alice text-xs text-[#B99A4C] font-medium tracking-wide">
-                    Com a magnífica bênção de Deus e de seus Pais,
-                  </p>
-
-                  <div className="w-full max-w-sm mx-auto flex justify-between items-start text-xs font-alice text-[#B99A4C] px-4 pt-1 font-medium">
-                    <div className="text-left space-y-0.5">
-                      <p>Armando Quitamba</p>
-                      <p>Maria Quitamba</p>
-                    </div>
-                    <div className="text-right space-y-0.5">
-                      <p>António da Costa</p>
-                      <p>Beatriz da Costa</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 7.3 Nomes dos noivos empilhados */}
-                <div className="flex flex-col items-center justify-center my-1 select-none">
-                  <span className="font-alex text-5xl sm:text-6xl text-[#B99A4C] leading-tight font-normal">
-                    {hosts.firstName || 'Abiúd'}
-                  </span>
-                  <span className="font-alex text-3xl sm:text-4xl text-[#B99A4C] leading-none my-0.5">
-                    &
-                  </span>
-                  <span className="font-alex text-5xl sm:text-6xl text-[#B99A4C] leading-tight font-normal">
-                    {hosts.secondName || 'Marinela'}
-                  </span>
-                </div>
-
-                {/* 7.4 Frase de convite */}
-                <p className="font-alice text-xs text-[#4A3827] tracking-wide max-w-sm mx-auto">
-                  Temos a honra de convidar-te para o nosso casamento
-                </p>
-
-                {/* 7.5 e 7.6 Data principal, dia e hora */}
-                <div className="my-1">
-                  <div className="font-playfair text-3xl sm:text-4xl font-bold tracking-widest text-[#2C2A25]">
-                    <span>{dateDetails.monthDayYear.split('|')[0]?.trim() || 'NOV'}</span>
-                    <span className="text-[#B99A4C] font-normal mx-2.5">|</span>
-                    <span>{dateDetails.monthDayYear.split('|')[1]?.trim() || '06'}</span>
-                    <span className="text-[#B99A4C] font-normal mx-2.5">|</span>
-                    <span>{dateDetails.monthDayYear.split('|')[2]?.trim() || '2026'}</span>
-                  </div>
-                  <p className="font-alice text-xs sm:text-sm text-[#4A3827] mt-1 font-medium">
-                    {dateDetails.weekdayAtTime}
-                  </p>
-                </div>
-
-                {/* 7.7 Local da cerimónia e recepção */}
-                <div className="space-y-0.5 text-center my-1 max-w-md mx-auto">
-                  <p className="font-alice text-xs text-[#B99A4C] font-medium leading-relaxed">
-                    {event.ceremony_location ? `Cerimónia Religiosa no ${event.ceremony_location}` : 'Cerimónia Religiosa no Centro Nossa Senhora da Paz, Golf 2'}
-                  </p>
-                  <p className="font-alice text-xs text-[#B99A4C] font-medium leading-relaxed">
-                    {event.party_location ? `copo-d'água no ${event.party_location}` : 'copo-d\'água no Salão de Festas Jailinda, Camama.'}
-                  </p>
-                </div>
-
-                {/* 7.8 Frase inferior: Nosso Casamento */}
-                <div className="pb-1">
-                  <p className="font-alex text-3xl sm:text-4xl text-[#B99A4C] font-normal tracking-wide">
-                    Nosso Casamento
-                  </p>
-                </div>
-              </div>
+          {/* 2. Código QR Real de Acesso / Portaria (Aba Direita - Coordenadas exatas do design Canva) */}
+          {qrCodeUrl && (
+            <div 
+              className="absolute z-10 flex items-center justify-center bg-white"
+              style={{
+                left: '80.99%',
+                top: '54.14%',
+                width: '13.10%',
+                height: '18.52%',
+              }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img 
+                src={qrCodeUrl} 
+                alt="Código de Acesso Real" 
+                className="w-full h-full object-contain p-0.5"
+              />
             </div>
-
-            {/* 8. PAINEL DIREITO: RSVP E CONFIRMAÇÃO DE PRESENÇA */}
-            <div className="p-6 flex flex-col justify-between items-center text-center h-full relative">
-              <div className="w-full flex flex-col items-center">
-                {/* 8.1 Ilustração floral vertical */}
-                <svg className="w-20 h-28 mx-auto text-[#B99A4C]" viewBox="0 0 100 160" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M52,150 C54,120 50,85 53,50" />
-                  <path d="M51,105 C42,108 34,103 36,92 C38,82 48,89 52,98" />
-                  <path d="M52,80 C62,82 70,76 68,66 C66,58 56,64 53,72" />
-                  <path d="M53,50 C44,45 36,32 42,18 C48,4 62,10 58,26 C56,36 53,46 53,50 Z" />
-                  <path d="M53,50 C63,46 74,36 71,22 C68,8 54,16 53,28" />
-                  <path d="M42,20 C32,15 26,24 32,34 C38,44 48,46 53,50" />
-                </svg>
-
-                {/* 8.2 Título RSVP */}
-                <span className="font-cinzel text-base tracking-[4px] text-[#B99A4C] font-bold block my-3">
-                  RSVP
-                </span>
-
-                {/* 8.3 QR code de acesso */}
-                {qrCodeUrl ? (
-                  <div className="p-2 bg-white shadow-sm border border-[#B99A4C]/25 mt-1 inline-block">
-                    <img src={qrCodeUrl} alt="Código de Acesso" className="w-28 h-28 object-contain" />
-                  </div>
-                ) : (
-                  <div className="w-28 h-28" />
-                )}
-
-                <span className="font-alice text-xs font-bold text-[#B99A4C] tracking-wider uppercase block mt-2">
-                  Código de Acesso
-                </span>
-              </div>
-
-              {/* 8.4 Instrução de confirmação e 8.5 Observação sobre crianças */}
-              <div className="text-center space-y-1.5 pb-2 w-full">
-                <p className="font-alice text-[10.5px] text-[#4A3827] leading-tight">
-                  Por Favor, confirme a presença até o dia {formatRSVPDeadline()}
-                </p>
-                <p className="font-alice text-[10.5px] text-[#2C2A25] font-bold tracking-tight">
-                  {event.kids_restriction_note ? `OBS: ${event.kids_restriction_note}` : 'OBS: Por favor, não levar crianças'}
-                </p>
-              </div>
-            </div>
-          </div>
+          )}
         </div>
       );
     }
