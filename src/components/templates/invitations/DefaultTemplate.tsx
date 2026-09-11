@@ -207,8 +207,8 @@ export default function DefaultTemplate({
   if (isPrinting) {
     const isLight = event.template_config?.print_theme !== 'dark'; // DEFAULT TO LIGHT (ivory) as requested!
 
-    const containerBg = isLight ? 'bg-[#FAF8F5]' : 'bg-[#0c0c0e]';
-    const containerText = isLight ? 'text-[#2C2B29]' : 'text-[#f4f4f5]';
+    const containerBg = isLight ? 'bg-[#FAF8F1]' : 'bg-[#0c0c0e]';
+    const containerText = isLight ? 'text-[#2C2A25]' : 'text-[#f4f4f5]';
     const bgPhoto = event.background_image || event.cover_image;
 
     // PAGE 1: COVER (Aba da Capa - Horizontal A4)
@@ -216,54 +216,49 @@ export default function DefaultTemplate({
       return (
         <div className={`w-[1120px] h-[792px] ${containerBg} ${containerText} p-0 flex flex-col justify-between font-sans relative overflow-hidden select-none box-border`}>
           <style jsx global>{`
-            @import url('https://fonts.googleapis.com/css2?family=Alex+Brush&family=Ballet:opsz@16..72&family=Cinzel:wght@400;600;700;900&family=Cinzel+Decorative:wght@700;900&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap');
+            @import url('https://fonts.googleapis.com/css2?family=Alex+Brush&family=Alice&family=Ballet:opsz@16..72&family=Cinzel:wght@400;600;700;900&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap');
+            .font-alice { font-family: 'Alice', serif; }
             .font-ballet { font-family: 'Ballet', cursive; }
             .font-cinzel { font-family: 'Cinzel', serif; }
             .font-alex { font-family: 'Alex Brush', cursive; }
             .font-playfair { font-family: 'Playfair Display', serif; }
-            .font-cinzel-dec { font-family: 'Cinzel Decorative', serif; }
-            .gold-foil-text {
-              background: linear-gradient(to right, #b89742 0%, #f3e0aa 50%, #b89742 100%);
-              -webkit-background-clip: text;
-              -webkit-text-fill-color: transparent;
-            }
           `}</style>
 
-          {/* 3 Panels layout: Left (25%), Center (50%), Right (25%) */}
-          <div className="grid grid-cols-[1fr_2fr_1fr] gap-0 h-full items-stretch relative z-10 box-border">
+          {/* 3 Panels layout: Left (26%), Center (48%), Right (26%) */}
+          <div className="grid grid-cols-[26%_48%_26%] gap-0 h-full items-stretch relative z-10 box-border">
             {/* Aba Esquerda: limpa para dobra */}
             <div className="h-full" />
 
-            {/* Painel Central: Exatamente como na Página 1 do PDF fornecido */}
+            {/* Painel Central: Exatamente como na Página 1 e Seção 4 da análise técnica */}
             <div className="h-full flex flex-col justify-between items-center text-center py-20 px-8 relative">
               <div className="flex-1 flex flex-col items-center justify-center space-y-4">
-                {/* Monograma com a fonte Ballet solicitada */}
+                {/* 4.2 Monograma A&M com a fonte Ballet */}
                 <div className="py-2 select-none overflow-visible leading-normal">
-                  <span className="font-ballet text-8xl md:text-9xl text-[#cda344] leading-none block font-normal tracking-wider px-6">
+                  <span className="font-ballet text-8xl md:text-9xl text-[#B99A4C] leading-none block font-normal tracking-wider px-6">
                     {hosts.initials}
                   </span>
                 </div>
 
-                {/* CONVITE EXCLUSIVO */}
-                <span className="font-cinzel text-sm sm:text-base font-bold tracking-[4px] text-[#cda344] uppercase block mt-3 mb-6">
+                {/* 4.3 Subtítulo CONVITE EXCLUSIVO */}
+                <span className="font-cinzel text-xs sm:text-sm font-bold tracking-[4px] text-[#B99A4C] uppercase block mt-3 mb-6">
                   CONVITE EXCLUSIVO
                 </span>
 
-                {/* Versículo Bíblico */}
-                <div className="max-w-md mx-auto space-y-1.5 my-4 text-center">
-                  <p className="font-serif text-xs sm:text-sm text-[#4A4844] leading-relaxed italic">
+                {/* 4.4 Citação Bíblica em 3 linhas com a fonte Alice */}
+                <div className="max-w-md mx-auto space-y-1.5 my-5 text-center">
+                  <p className="font-alice text-xs sm:text-sm text-[#4A3827] leading-relaxed italic">
                     “Assim, permanecem agora estes três: a fé, a esperança e o amor.<br />
                     O maior deles, porém, é o amor.”
                   </p>
-                  <p className="font-serif text-xs text-[#6E6B65] mt-1 font-medium">
+                  <p className="font-alice text-xs text-[#6E6B65] mt-1 font-medium">
                     1 Coríntios 13, 13
                   </p>
                 </div>
               </div>
 
-              {/* Nosso Casamento */}
-              <div className="pb-4">
-                <p className="font-alex text-4xl sm:text-5xl text-[#cda344] font-normal tracking-wide">
+              {/* 4.5 Parte inferior: Nosso Casamento */}
+              <div className="pb-6">
+                <p className="font-alex text-4xl sm:text-5xl text-[#B99A4C] font-normal tracking-wide">
                   Nosso Casamento
                 </p>
               </div>
@@ -287,7 +282,7 @@ export default function DefaultTemplate({
       };
 
       const defaultSchedules = [
-        { id: '1', title: 'Cerimonia Religiosa', time: '16:00', icon: 'church' },
+        { id: '1', title: 'Cerimónia Religiosa', time: '16:00', icon: 'church' },
         { id: '2', title: 'Cortejo', time: '18:00', icon: 'procession' },
         { id: '3', title: 'Recepção de Convidados', time: '20:30', icon: 'reception' },
         { id: '4', title: 'Aperitivos', time: '21:30', icon: 'appetizers' },
@@ -307,7 +302,7 @@ export default function DefaultTemplate({
         switch (type) {
           case 'church':
             return (
-              <svg className="w-7 h-7 text-[#cda344] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+              <svg className="w-7 h-7 text-[#B99A4C] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 2v3m-2-1.5h4" />
                 <path d="M12 5l-4 3v13h8V8l-4-3z" />
                 <path d="M4 11l4-3v13H3v-7l1-3z" />
@@ -318,7 +313,7 @@ export default function DefaultTemplate({
             );
           case 'procession':
             return (
-              <svg className="w-7 h-7 text-[#cda344] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+              <svg className="w-7 h-7 text-[#B99A4C] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="9" cy="5" r="2" />
                 <circle cx="15" cy="5" r="2" />
                 <path d="M7 21l2-8 2 8" />
@@ -329,7 +324,7 @@ export default function DefaultTemplate({
             );
           case 'reception':
             return (
-              <svg className="w-7 h-7 text-[#cda344] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+              <svg className="w-7 h-7 text-[#B99A4C] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M8 3l-3 7a3 3 0 0 0 3 3h0a3 3 0 0 0 3-3L8 3z" />
                 <path d="M8 13v7m-3 0h6" />
                 <path d="M16 3l-3 7a3 3 0 0 0 3 3h0a3 3 0 0 0 3-3l-3-7z" />
@@ -339,7 +334,7 @@ export default function DefaultTemplate({
             );
           case 'appetizers':
             return (
-              <svg className="w-7 h-7 text-[#cda344] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+              <svg className="w-7 h-7 text-[#B99A4C] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="8" />
                 <circle cx="12" cy="12" r="5" />
                 <path d="M2 7v5a2 2 0 0 0 2 2h0v8" />
@@ -350,7 +345,7 @@ export default function DefaultTemplate({
           case 'dance':
           default:
             return (
-              <svg className="w-7 h-7 text-[#cda344] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+              <svg className="w-7 h-7 text-[#B99A4C] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="9" cy="4" r="1.5" />
                 <circle cx="15" cy="4.5" r="1.5" />
                 <path d="M8 8l2 5-3 8" />
@@ -365,25 +360,20 @@ export default function DefaultTemplate({
       return (
         <div className={`w-[1120px] h-[792px] ${containerBg} ${containerText} p-0 flex flex-col justify-between font-sans relative overflow-hidden select-none box-border`}>
           <style jsx global>{`
-            @import url('https://fonts.googleapis.com/css2?family=Alex+Brush&family=Ballet:opsz@16..72&family=Cinzel:wght@400;600;700;900&family=Cinzel+Decorative:wght@700;900&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap');
+            @import url('https://fonts.googleapis.com/css2?family=Alex+Brush&family=Alice&family=Ballet:opsz@16..72&family=Cinzel:wght@400;600;700;900&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap');
+            .font-alice { font-family: 'Alice', serif; }
             .font-ballet { font-family: 'Ballet', cursive; }
             .font-cinzel { font-family: 'Cinzel', serif; }
             .font-alex { font-family: 'Alex Brush', cursive; }
             .font-playfair { font-family: 'Playfair Display', serif; }
-            .font-cinzel-dec { font-family: 'Cinzel Decorative', serif; }
-            .gold-foil-text {
-              background: linear-gradient(to right, #b89742 0%, #f3e0aa 50%, #b89742 100%);
-              -webkit-background-clip: text;
-              -webkit-text-fill-color: transparent;
-            }
           `}</style>
 
-          <div className="grid grid-cols-[1fr_2fr_1fr] gap-0 h-full items-stretch relative z-10 box-border">
-            {/* ABA ESQUERDA: CRONOGRAMA & CÓDIGO DE LOCALIZAÇÕES */}
+          <div className="grid grid-cols-[26%_48%_26%] gap-0 h-full items-stretch relative z-10 box-border">
+            {/* 6. PAINEL ESQUERDO: PROGRAMA DO CASAMENTO */}
             <div className="p-6 flex flex-col justify-between items-center text-center h-full relative">
-              {/* Top floral ornament */}
+              {/* 6.2 Ornamento superior */}
               <div className="w-full flex flex-col items-center">
-                <svg className="w-12 h-10 text-[#cda344] mx-auto opacity-90 mb-2" viewBox="0 0 100 80" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <svg className="w-12 h-10 text-[#B99A4C] mx-auto opacity-90 mb-3" viewBox="0 0 100 80" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M50,40 C35,20 20,35 25,50 C30,65 45,55 50,40 Z" />
                   <path d="M50,40 C65,20 80,35 75,50 C70,65 55,55 50,40 Z" />
                   <circle cx="50" cy="40" r="3" fill="currentColor" />
@@ -392,65 +382,63 @@ export default function DefaultTemplate({
                   <path d="M65,25 C60,28 55,35 50,40" />
                 </svg>
 
-                {/* Schedule items list */}
+                {/* 6.3 e 6.4 Linha temporal de eventos */}
                 <div className="space-y-4 w-full px-2 mt-1">
                   {displaySchedules.map((item) => (
                     <div key={item.id} className="flex items-center gap-3 py-0.5 text-left">
-                      {getScheduleIcon(item.icon)}
+                      <div className="w-7 h-7 flex items-center justify-center shrink-0">
+                        {getScheduleIcon(item.icon)}
+                      </div>
                       <div>
-                        <div className="text-[11.5px] font-serif text-[#4A4844] leading-snug">{item.title}</div>
-                        <div className="text-xs font-bold text-[#2C2B29] font-sans tracking-tight mt-0.5">{item.time}</div>
+                        <div className="text-[12px] font-alice text-[#B99A4C] font-semibold leading-snug">{item.title}</div>
+                        <div className="text-xs font-bold text-[#2C2A25] font-sans tracking-tight mt-0.5">{item.time}</div>
                       </div>
                     </div>
                   ))}
                 </div>
               </div>
 
-              {/* Bottom: Locations QR code */}
-              <div className="flex flex-col items-center pb-2">
+              {/* 6.5 QR code de localização */}
+              <div className="flex flex-col items-center pb-2 w-full">
                 {locationsQrCodeUrl ? (
-                  <div className="relative p-2.5 inline-block bg-white shadow-sm border border-[#cda344]/25">
-                    <div className="absolute -top-1 -left-1 w-3 h-3 border-t-2 border-l-2 border-[#cda344]" />
-                    <div className="absolute -top-1 -right-1 w-3 h-3 border-t-2 border-r-2 border-[#cda344]" />
-                    <div className="absolute -bottom-1 -left-1 w-3 h-3 border-b-2 border-l-2 border-[#cda344]" />
-                    <div className="absolute -bottom-1 -right-1 w-3 h-3 border-b-2 border-r-2 border-[#cda344]" />
+                  <div className="p-2 bg-white shadow-sm border border-[#B99A4C]/25 inline-block">
                     <img src={locationsQrCodeUrl} alt="Código de Localizações" className="w-28 h-28 object-contain" />
                   </div>
                 ) : (
                   <div className="w-28 h-28" />
                 )}
-                <span className="font-serif text-xs font-bold text-[#cda344] tracking-wider uppercase block mt-2.5">
+                <span className="font-alice text-xs font-bold text-[#B99A4C] tracking-wider uppercase block mt-2.5">
                   Código de Localizações
                 </span>
-                <span className="font-serif text-[9px] text-[#555] text-center leading-tight mt-1 max-w-[190px]">
+                <span className="font-alice text-[9.5px] text-[#4A3827] text-center leading-tight mt-1 max-w-[200px]">
                   Scaneie o código QR para ver a localização pelo Google Maps.
                 </span>
               </div>
             </div>
 
-            {/* PAINEL CENTRAL: O CORAÇÃO DO CONVITE */}
+            {/* 7. PAINEL CENTRAL: CONVITE PRINCIPAL */}
             <div className="relative h-full flex flex-col justify-between items-center text-center overflow-hidden p-6">
-              {/* Couple Background Photo */}
+              {/* 7.1 Fundo fotográfico com película suave */}
               {bgPhoto ? (
                 <div className="absolute inset-0 z-0 select-none pointer-events-none">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img 
                     src={bgPhoto} 
                     alt="Background" 
-                    className="w-full h-full object-cover opacity-60"
+                    className="w-full h-full object-cover opacity-55"
                   />
-                  <div className="absolute inset-0 bg-[#FAF8F5]/85" />
+                  <div className="absolute inset-0 bg-[#FAF8F1]/85" />
                 </div>
               ) : null}
 
               <div className="relative z-10 w-full h-full flex flex-col justify-between items-center text-center py-2 px-4">
-                {/* Blessing of God and Parents */}
+                {/* 7.2 Texto superior sobre os pais */}
                 <div className="w-full space-y-2 pt-2">
-                  <p className="font-serif text-xs text-[#6E6B65] tracking-wide">
-                    Com a magnifica bênção de Deus e de seus Pais,
+                  <p className="font-alice text-xs text-[#B99A4C] font-medium tracking-wide">
+                    Com a magnífica bênção de Deus e de seus Pais,
                   </p>
 
-                  <div className="w-full max-w-sm mx-auto flex justify-between items-start text-xs font-serif text-[#cda344] px-4 pt-1">
+                  <div className="w-full max-w-sm mx-auto flex justify-between items-start text-xs font-alice text-[#B99A4C] px-4 pt-1 font-medium">
                     <div className="text-left space-y-0.5">
                       <p>Armando Quitamba</p>
                       <p>Maria Quitamba</p>
@@ -462,62 +450,62 @@ export default function DefaultTemplate({
                   </div>
                 </div>
 
-                {/* Hosts names stacked */}
+                {/* 7.3 Nomes dos noivos empilhados */}
                 <div className="flex flex-col items-center justify-center my-1 select-none">
-                  <span className="font-alex text-5xl sm:text-6xl text-[#cda344] leading-tight font-normal">
+                  <span className="font-alex text-5xl sm:text-6xl text-[#B99A4C] leading-tight font-normal">
                     {hosts.firstName || 'Abiúd'}
                   </span>
-                  <span className="font-alex text-3xl sm:text-4xl text-[#cda344] leading-none my-0.5">
+                  <span className="font-alex text-3xl sm:text-4xl text-[#B99A4C] leading-none my-0.5">
                     &
                   </span>
-                  <span className="font-alex text-5xl sm:text-6xl text-[#cda344] leading-tight font-normal">
+                  <span className="font-alex text-5xl sm:text-6xl text-[#B99A4C] leading-tight font-normal">
                     {hosts.secondName || 'Marinela'}
                   </span>
                 </div>
 
-                {/* Invitation Line */}
-                <p className="font-serif text-xs text-[#555] tracking-wide max-w-sm mx-auto">
+                {/* 7.4 Frase de convite */}
+                <p className="font-alice text-xs text-[#4A3827] tracking-wide max-w-sm mx-auto">
                   Temos a honra de convidar-te para o nosso casamento
                 </p>
 
-                {/* Date Block */}
+                {/* 7.5 e 7.6 Data principal, dia e hora */}
                 <div className="my-1">
-                  <div className="font-playfair text-3xl sm:text-4xl font-bold tracking-widest text-[#2C2B29]">
+                  <div className="font-playfair text-3xl sm:text-4xl font-bold tracking-widest text-[#2C2A25]">
                     <span>{dateDetails.monthDayYear.split('|')[0]?.trim() || 'NOV'}</span>
-                    <span className="text-[#cda344] font-normal mx-2.5">|</span>
+                    <span className="text-[#B99A4C] font-normal mx-2.5">|</span>
                     <span>{dateDetails.monthDayYear.split('|')[1]?.trim() || '06'}</span>
-                    <span className="text-[#cda344] font-normal mx-2.5">|</span>
+                    <span className="text-[#B99A4C] font-normal mx-2.5">|</span>
                     <span>{dateDetails.monthDayYear.split('|')[2]?.trim() || '2026'}</span>
                   </div>
-                  <p className="font-serif text-xs sm:text-sm text-[#4A4844] mt-1 font-medium">
+                  <p className="font-alice text-xs sm:text-sm text-[#4A3827] mt-1 font-medium">
                     {dateDetails.weekdayAtTime}
                   </p>
                 </div>
 
-                {/* Locations */}
-                <div className="space-y-1 text-center my-1 max-w-md mx-auto">
-                  <p className="font-serif text-xs text-[#cda344] font-medium leading-relaxed">
-                    {event.ceremony_location ? `Cerimonia Religiosa no ${event.ceremony_location}` : 'Cerimonia Religiosa no Centro Nossa Senhora da Paz, Golf2'}
+                {/* 7.7 Local da cerimónia e recepção */}
+                <div className="space-y-0.5 text-center my-1 max-w-md mx-auto">
+                  <p className="font-alice text-xs text-[#B99A4C] font-medium leading-relaxed">
+                    {event.ceremony_location ? `Cerimónia Religiosa no ${event.ceremony_location}` : 'Cerimónia Religiosa no Centro Nossa Senhora da Paz, Golf 2'}
                   </p>
-                  <p className="font-serif text-xs text-[#cda344] font-medium leading-relaxed">
-                    {event.party_location ? `copo d´agua no ${event.party_location}` : 'copo d´agua no Salão de Festas Jailinda, Camama.'}
+                  <p className="font-alice text-xs text-[#B99A4C] font-medium leading-relaxed">
+                    {event.party_location ? `copo-d'água no ${event.party_location}` : 'copo-d\'água no Salão de Festas Jailinda, Camama.'}
                   </p>
                 </div>
 
-                {/* Bottom: Nosso Casamento */}
+                {/* 7.8 Frase inferior: Nosso Casamento */}
                 <div className="pb-1">
-                  <p className="font-alex text-3xl sm:text-4xl text-[#cda344] font-normal tracking-wide">
+                  <p className="font-alex text-3xl sm:text-4xl text-[#B99A4C] font-normal tracking-wide">
                     Nosso Casamento
                   </p>
                 </div>
               </div>
             </div>
 
-            {/* ABA DIREITA: RSVP & CÓDIGO DE ACESSO */}
+            {/* 8. PAINEL DIREITO: RSVP E CONFIRMAÇÃO DE PRESENÇA */}
             <div className="p-6 flex flex-col justify-between items-center text-center h-full relative">
               <div className="w-full flex flex-col items-center">
-                {/* Top minimalist line-art flower SVG */}
-                <svg className="w-20 h-28 mx-auto text-[#cda344]" viewBox="0 0 100 160" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                {/* 8.1 Ilustração floral vertical */}
+                <svg className="w-20 h-28 mx-auto text-[#B99A4C]" viewBox="0 0 100 160" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M52,150 C54,120 50,85 53,50" />
                   <path d="M51,105 C42,108 34,103 36,92 C38,82 48,89 52,98" />
                   <path d="M52,80 C62,82 70,76 68,66 C66,58 56,64 53,72" />
@@ -526,36 +514,32 @@ export default function DefaultTemplate({
                   <path d="M42,20 C32,15 26,24 32,34 C38,44 48,46 53,50" />
                 </svg>
 
-                {/* RSPV Header */}
-                <span className="font-cinzel text-base tracking-[4px] text-[#cda344] font-bold block my-3">
-                  RSPV
+                {/* 8.2 Título RSVP */}
+                <span className="font-cinzel text-base tracking-[4px] text-[#B99A4C] font-bold block my-3">
+                  RSVP
                 </span>
 
-                {/* Portaria / Access QR Code */}
+                {/* 8.3 QR code de acesso */}
                 {qrCodeUrl ? (
-                  <div className="relative p-2.5 inline-block bg-white shadow-sm border border-[#cda344]/25 mt-1">
-                    <div className="absolute -top-1 -left-1 w-3 h-3 border-t-2 border-l-2 border-[#cda344]" />
-                    <div className="absolute -top-1 -right-1 w-3 h-3 border-t-2 border-r-2 border-[#cda344]" />
-                    <div className="absolute -bottom-1 -left-1 w-3 h-3 border-b-2 border-l-2 border-[#cda344]" />
-                    <div className="absolute -bottom-1 -right-1 w-3 h-3 border-b-2 border-r-2 border-[#cda344]" />
+                  <div className="p-2 bg-white shadow-sm border border-[#B99A4C]/25 mt-1 inline-block">
                     <img src={qrCodeUrl} alt="Código de Acesso" className="w-28 h-28 object-contain" />
                   </div>
                 ) : (
                   <div className="w-28 h-28" />
                 )}
 
-                <span className="font-serif text-xs font-bold text-[#cda344] tracking-wider uppercase block mt-2.5">
+                <span className="font-alice text-xs font-bold text-[#B99A4C] tracking-wider uppercase block mt-2">
                   Código de Acesso
                 </span>
               </div>
 
-              {/* RSVP confirmation note */}
-              <div className="text-center space-y-0.5 pb-2">
-                <p className="font-serif text-[10px] text-[#4A4844] leading-tight">
-                  Por Favor, confirme a presença
+              {/* 8.4 Instrução de confirmação e 8.5 Observação sobre crianças */}
+              <div className="text-center space-y-1.5 pb-2 w-full">
+                <p className="font-alice text-[10.5px] text-[#4A3827] leading-tight">
+                  Por Favor, confirme a presença até o dia {formatRSVPDeadline()}
                 </p>
-                <p className="font-serif text-[10px] text-[#4A4844] leading-tight font-medium">
-                  até o dia {formatRSVPDeadline()}
+                <p className="font-alice text-[10.5px] text-[#2C2A25] font-bold tracking-tight">
+                  {event.kids_restriction_note ? `OBS: ${event.kids_restriction_note}` : 'OBS: Por favor, não levar crianças'}
                 </p>
               </div>
             </div>
