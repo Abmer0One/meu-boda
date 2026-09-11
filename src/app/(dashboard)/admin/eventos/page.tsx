@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Dialog } from '@/components/ui/Dialog';
-import { Heart, MapPin, Calendar, Palette, Loader2, Plus, Trash2, Clock, Users, Gift, Link2, Shirt, Info, Pencil } from 'lucide-react';
+import { Heart, MapPin, Calendar, Palette, Loader2, Plus, Trash2, Clock, Users, Gift, Link2, Shirt, Info, Pencil, Sparkles, Upload, Sliders, CheckCircle2, RotateCcw, QrCode } from 'lucide-react';
 
 export default function EventosPage() {
   const { currentEvent, refreshEvents, setCurrentEvent } = useEvent();
@@ -24,6 +24,27 @@ export default function EventosPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isUploadingBg, setIsUploadingBg] = useState(false);
+
+  // Canva Template States
+  const [canvaCoverUrl, setCanvaCoverUrl] = useState<string>('');
+  const [canvaInfoUrl, setCanvaInfoUrl] = useState<string>('');
+  const [qrLocCoords, setQrLocCoords] = useState<{ left: number; top: number; width: number; height: number }>({
+    left: 8.76,
+    top: 69.56,
+    width: 11.85,
+    height: 16.76,
+  });
+  const [qrAccessCoords, setQrAccessCoords] = useState<{ left: number; top: number; width: number; height: number }>({
+    left: 80.99,
+    top: 54.14,
+    width: 13.10,
+    height: 18.52,
+  });
+  const [isUploadingCanvaCover, setIsUploadingCanvaCover] = useState(false);
+  const [isUploadingCanvaInfo, setIsUploadingCanvaInfo] = useState(false);
+  const [isSavingCanva, setIsSavingCanva] = useState(false);
+  const [canvaSuccessMessage, setCanvaSuccessMessage] = useState<string | null>(null);
+  const [showQrFineTuning, setShowQrFineTuning] = useState(false);
 
   // Timeline / Schedules States
   const [schedules, setSchedules] = useState<EventSchedule[]>([]);
@@ -87,6 +108,20 @@ export default function EventosPage() {
         instagram_host_2: currentEvent.instagram_host_2 || '',
         rsvp_deadline: currentEvent.rsvp_deadline || '',
       });
+
+      const cfg = currentEvent.template_config || {};
+      setCanvaCoverUrl(cfg.canva_cover_url || '');
+      setCanvaInfoUrl(cfg.canva_info_url || '');
+      if (cfg.qr_locations_coords) {
+        setQrLocCoords(cfg.qr_locations_coords);
+      } else {
+        setQrLocCoords({ left: 8.76, top: 69.56, width: 11.85, height: 16.76 });
+      }
+      if (cfg.qr_access_coords) {
+        setQrAccessCoords(cfg.qr_access_coords);
+      } else {
+        setQrAccessCoords({ left: 80.99, top: 54.14, width: 13.10, height: 18.52 });
+      }
     }
   }, [currentEvent, reset]);
 
@@ -183,6 +218,190 @@ export default function EventosPage() {
     } finally {
       setIsUploadingBg(false);
     }
+  };
+
+  // Handle Canva Cover Image Upload
+  const handleCanvaCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !currentEvent) return;
+
+    setIsUploadingCanvaCover(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${currentEvent.id}/canva_capa_${Date.now()}.${fileExt}`;
+
+      const { data, error } = await supabase.storage
+        .from('invitations')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: true,
+        });
+
+      if (error) throw error;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('invitations')
+        .getPublicUrl(fileName);
+
+      setCanvaCoverUrl(publicUrl);
+
+      // Auto-save to template_config
+      const updatedConfig = {
+        ...(currentEvent.template_config || {}),
+        canva_cover_url: publicUrl,
+        qr_locations_coords: qrLocCoords,
+        qr_access_coords: qrAccessCoords,
+      };
+      const updated = await EventRepository.update(currentEvent.id, {
+        template_config: updatedConfig,
+      });
+      if (updated) {
+        setCurrentEvent(updated);
+        await refreshEvents();
+        setCanvaSuccessMessage('Capa do Canva carregada e guardada com sucesso!');
+        setTimeout(() => setCanvaSuccessMessage(null), 4000);
+      }
+    } catch (err: any) {
+      alert('Erro ao carregar a imagem da capa do Canva: ' + err.message);
+    } finally {
+      setIsUploadingCanvaCover(false);
+    }
+  };
+
+  // Handle Canva Info Image Upload
+  const handleCanvaInfoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !currentEvent) return;
+
+    setIsUploadingCanvaInfo(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${currentEvent.id}/canva_verso_${Date.now()}.${fileExt}`;
+
+      const { data, error } = await supabase.storage
+        .from('invitations')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: true,
+        });
+
+      if (error) throw error;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('invitations')
+        .getPublicUrl(fileName);
+
+      setCanvaInfoUrl(publicUrl);
+
+      // Auto-save to template_config
+      const updatedConfig = {
+        ...(currentEvent.template_config || {}),
+        canva_info_url: publicUrl,
+        qr_locations_coords: qrLocCoords,
+        qr_access_coords: qrAccessCoords,
+      };
+      const updated = await EventRepository.update(currentEvent.id, {
+        template_config: updatedConfig,
+      });
+      if (updated) {
+        setCurrentEvent(updated);
+        await refreshEvents();
+        setCanvaSuccessMessage('Verso do Canva carregado e guardado com sucesso!');
+        setTimeout(() => setCanvaSuccessMessage(null), 4000);
+      }
+    } catch (err: any) {
+      alert('Erro ao carregar a imagem do verso do Canva: ' + err.message);
+    } finally {
+      setIsUploadingCanvaInfo(false);
+    }
+  };
+
+  // Remove Canva Cover
+  const handleRemoveCanvaCover = async () => {
+    if (!currentEvent) return;
+    setCanvaCoverUrl('');
+    try {
+      const updatedConfig = {
+        ...(currentEvent.template_config || {}),
+        canva_cover_url: null,
+        qr_locations_coords: qrLocCoords,
+        qr_access_coords: qrAccessCoords,
+      };
+      const updated = await EventRepository.update(currentEvent.id, {
+        template_config: updatedConfig,
+      });
+      if (updated) {
+        setCurrentEvent(updated);
+        await refreshEvents();
+        setCanvaSuccessMessage('Capa do Canva reposta para o modelo padrão.');
+        setTimeout(() => setCanvaSuccessMessage(null), 4000);
+      }
+    } catch (err: any) {
+      alert('Erro ao remover capa do Canva: ' + err.message);
+    }
+  };
+
+  // Remove Canva Info
+  const handleRemoveCanvaInfo = async () => {
+    if (!currentEvent) return;
+    setCanvaInfoUrl('');
+    try {
+      const updatedConfig = {
+        ...(currentEvent.template_config || {}),
+        canva_info_url: null,
+        qr_locations_coords: qrLocCoords,
+        qr_access_coords: qrAccessCoords,
+      };
+      const updated = await EventRepository.update(currentEvent.id, {
+        template_config: updatedConfig,
+      });
+      if (updated) {
+        setCurrentEvent(updated);
+        await refreshEvents();
+        setCanvaSuccessMessage('Verso do Canva reposto para o modelo padrão.');
+        setTimeout(() => setCanvaSuccessMessage(null), 4000);
+      }
+    } catch (err: any) {
+      alert('Erro ao remover verso do Canva: ' + err.message);
+    }
+  };
+
+  // Save Canva Template Configuration (including QR coordinates)
+  const handleSaveCanvaConfig = async () => {
+    if (!currentEvent) return;
+    setIsSavingCanva(true);
+    setCanvaSuccessMessage(null);
+    try {
+      const updatedConfig = {
+        ...(currentEvent.template_config || {}),
+        canva_cover_url: canvaCoverUrl || null,
+        canva_info_url: canvaInfoUrl || null,
+        qr_locations_coords: qrLocCoords,
+        qr_access_coords: qrAccessCoords,
+      };
+      const updated = await EventRepository.update(currentEvent.id, {
+        template_config: updatedConfig,
+      });
+      if (updated) {
+        setCurrentEvent(updated);
+        await refreshEvents();
+        setCanvaSuccessMessage('Configurações do Template Canva guardadas com sucesso!');
+        setTimeout(() => setCanvaSuccessMessage(null), 4000);
+      }
+    } catch (err: any) {
+      alert('Erro ao guardar configurações do Canva: ' + err.message);
+    } finally {
+      setIsSavingCanva(false);
+    }
+  };
+
+  // Reset QR Coordinates to default Canva dimensions
+  const handleResetCanvaDefaults = () => {
+    if (!confirm('Deseja repor as posições padrão dos códigos QR no verso?')) return;
+    const defaultLoc = { left: 8.76, top: 69.56, width: 11.85, height: 16.76 };
+    const defaultAccess = { left: 80.99, top: 54.14, width: 13.10, height: 18.52 };
+    setQrLocCoords(defaultLoc);
+    setQrAccessCoords(defaultAccess);
   };
 
   // Add Schedule Item
@@ -305,6 +524,13 @@ export default function EventosPage() {
         instagram_host_1: data.instagram_host_1 || null,
         instagram_host_2: data.instagram_host_2 || null,
         rsvp_deadline: data.rsvp_deadline || null,
+        template_config: {
+          ...(currentEvent.template_config || {}),
+          canva_cover_url: canvaCoverUrl || null,
+          canva_info_url: canvaInfoUrl || null,
+          qr_locations_coords: qrLocCoords,
+          qr_access_coords: qrAccessCoords,
+        },
       });
 
       if (updatedEvent) {
@@ -578,6 +804,352 @@ export default function EventosPage() {
                   </Button>
                 </div>
               </form>
+            </CardContent>
+          </Card>
+
+          {/* Template Canva para Convite Impresso / PDF */}
+          <Card className="bg-card-bg border border-border-custom overflow-hidden">
+            <CardHeader className="border-b border-border-custom bg-secondary/5 pb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Sparkles className="h-5 w-5 text-amber-500" /> Template Canva do Convite (PDF / Impressão)
+                  </CardTitle>
+                  <p className="text-xs text-foreground/60 mt-1">
+                    Faça o upload das artes do convite desenhadas no Canva (Frente e Verso). O sistema sobrepõe automaticamente os códigos QR reais e dinâmicos de cada convidado (Localização e Acesso) ao gerar o PDF.
+                  </p>
+                </div>
+                <Badge variant="default" className="self-start sm:self-center border-amber-500/30 text-amber-600 dark:text-amber-400 bg-amber-500/10">
+                  Canva A4 Trifold
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6 space-y-6">
+              {canvaSuccessMessage && (
+                <div className="flex items-center gap-2 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-600 dark:text-emerald-400 text-xs font-semibold animate-in fade-in">
+                  <CheckCircle2 className="h-4 w-4 shrink-0" />
+                  <span>{canvaSuccessMessage}</span>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* 1. Frente do Convite (Capa) */}
+                <div className="space-y-3 bg-secondary/5 p-4 rounded-2xl border border-border-custom flex flex-col justify-between">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-foreground flex items-center gap-1.5 uppercase tracking-wider">
+                        1. Frente / Capa
+                      </label>
+                      <span className="text-[10px] font-medium bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                        Página 1 do PDF
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-foreground/60">
+                      Arte da capa dobrável desenhada no Canva.
+                    </p>
+
+                    {/* Preview da Capa */}
+                    <div className="relative aspect-[16/11.3] w-full rounded-xl overflow-hidden border border-border-custom bg-black/5 shadow-inner flex items-center justify-center group">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={canvaCoverUrl || '/templates/canva/page_1.png'}
+                        alt="Pré-visualização da Capa Canva"
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-md text-white px-2 py-0.5 rounded text-[10px] font-medium">
+                        {canvaCoverUrl ? 'Capa Personalizada' : 'Capa Oficial Padrão'}
+                      </div>
+                      {canvaCoverUrl && (
+                        <button
+                          type="button"
+                          onClick={handleRemoveCanvaCover}
+                          className="absolute top-2 right-2 bg-red-600/90 text-white rounded-lg px-2 py-1 text-[11px] font-medium hover:bg-red-700 transition-colors shadow-md"
+                        >
+                          Repor Padrão
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Upload Controls */}
+                  <div className="space-y-2 pt-2">
+                    <div className="flex gap-2 items-center">
+                      <Input
+                        placeholder="URL da imagem da frente..."
+                        value={canvaCoverUrl}
+                        onChange={(e) => setCanvaCoverUrl(e.target.value)}
+                        className="text-xs h-9"
+                      />
+                      <label className="shrink-0">
+                        <div className="flex items-center gap-1.5 px-3 py-2 bg-primary text-white rounded-xl text-xs font-semibold hover:bg-primary/95 transition-all cursor-pointer shadow-sm">
+                          {isUploadingCanvaCover ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <>
+                              <Upload className="h-3.5 w-3.5" />
+                              <span>Carregar</span>
+                            </>
+                          )}
+                        </div>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleCanvaCoverUpload}
+                          disabled={isUploadingCanvaCover}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Verso do Convite (Informações e Códigos QR) */}
+                <div className="space-y-3 bg-secondary/5 p-4 rounded-2xl border border-border-custom flex flex-col justify-between">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-foreground flex items-center gap-1.5 uppercase tracking-wider">
+                        2. Verso / Miolo
+                      </label>
+                      <span className="text-[10px] font-medium bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                        Página 2 do PDF
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-foreground/60">
+                      Arte com os 3 painéis (Localização, Mensagem e Acesso).
+                    </p>
+
+                    {/* Preview Interativo do Verso com sobreposição dos Códigos QR */}
+                    <div className="relative aspect-[16/11.3] w-full rounded-xl overflow-hidden border border-border-custom bg-black/5 shadow-inner group">
+                      {/* Imagem de Fundo do Verso */}
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={canvaInfoUrl || '/templates/canva/page_2_clean.png'}
+                        alt="Pré-visualização do Verso Canva"
+                        className="w-full h-full object-cover"
+                      />
+
+                      {/* Caixa 1: Código QR de Localizações (Aba Esquerda) */}
+                      <div
+                        className="absolute border-2 border-emerald-500 bg-white/95 text-emerald-900 rounded-sm flex flex-col items-center justify-center p-0.5 shadow-md select-none transition-all"
+                        style={{
+                          left: `${qrLocCoords.left}%`,
+                          top: `${qrLocCoords.top}%`,
+                          width: `${qrLocCoords.width}%`,
+                          height: `${qrLocCoords.height}%`,
+                        }}
+                        title="Posição do Código QR de Localizações"
+                      >
+                        <QrCode className="h-3.5 w-3.5 text-emerald-600" />
+                        <span className="text-[8px] font-bold text-emerald-800 leading-tight text-center truncate w-full px-0.5">
+                          QR Mapa
+                        </span>
+                      </div>
+
+                      {/* Caixa 2: Código QR de Acesso / Portaria (Aba Direita) */}
+                      <div
+                        className="absolute border-2 border-indigo-500 bg-white/95 text-indigo-900 rounded-sm flex flex-col items-center justify-center p-0.5 shadow-md select-none transition-all"
+                        style={{
+                          left: `${qrAccessCoords.left}%`,
+                          top: `${qrAccessCoords.top}%`,
+                          width: `${qrAccessCoords.width}%`,
+                          height: `${qrAccessCoords.height}%`,
+                        }}
+                        title="Posição do Código QR de Acesso à Portaria"
+                      >
+                        <QrCode className="h-3.5 w-3.5 text-indigo-600" />
+                        <span className="text-[8px] font-bold text-indigo-800 leading-tight text-center truncate w-full px-0.5">
+                          QR Acesso
+                        </span>
+                      </div>
+
+                      <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-md text-white px-2 py-0.5 rounded text-[10px] font-medium">
+                        {canvaInfoUrl ? 'Verso Personalizado' : 'Verso Oficial Padrão'}
+                      </div>
+                      {canvaInfoUrl && (
+                        <button
+                          type="button"
+                          onClick={handleRemoveCanvaInfo}
+                          className="absolute top-2 right-2 bg-red-600/90 text-white rounded-lg px-2 py-1 text-[11px] font-medium hover:bg-red-700 transition-colors shadow-md"
+                        >
+                          Repor Padrão
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Upload Controls */}
+                  <div className="space-y-2 pt-2">
+                    <div className="flex gap-2 items-center">
+                      <Input
+                        placeholder="URL da imagem do verso..."
+                        value={canvaInfoUrl}
+                        onChange={(e) => setCanvaInfoUrl(e.target.value)}
+                        className="text-xs h-9"
+                      />
+                      <label className="shrink-0">
+                        <div className="flex items-center gap-1.5 px-3 py-2 bg-primary text-white rounded-xl text-xs font-semibold hover:bg-primary/95 transition-all cursor-pointer shadow-sm">
+                          {isUploadingCanvaInfo ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <>
+                              <Upload className="h-3.5 w-3.5" />
+                              <span>Carregar</span>
+                            </>
+                          )}
+                        </div>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleCanvaInfoUpload}
+                          disabled={isUploadingCanvaInfo}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Ajustes Finos de Posição dos Códigos QR (Opcional / Retrátil) */}
+              <div className="border border-border-custom rounded-xl p-4 bg-secondary/5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => setShowQrFineTuning(!showQrFineTuning)}
+                    className="flex items-center gap-2 text-xs font-bold text-foreground hover:text-primary transition-colors"
+                  >
+                    <Sliders className="h-4 w-4 text-primary" />
+                    <span>{showQrFineTuning ? 'Ocultar Ajuste Fino dos Códigos QR' : 'Ajustar Posição dos Códigos QR no Verso (Opcional)'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleResetCanvaDefaults}
+                    className="flex items-center gap-1 text-[11px] text-foreground/50 hover:text-foreground transition-colors"
+                  >
+                    <RotateCcw className="h-3 w-3" />
+                    <span>Repor Posições Padrão</span>
+                  </button>
+                </div>
+
+                {showQrFineTuning && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-border-custom/60 animate-in fade-in">
+                    {/* QR Localizações */}
+                    <div className="p-3 bg-card-bg rounded-xl border border-emerald-500/20 space-y-3">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                        Código QR de Localização (Aba Esquerda)
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-[11px]">
+                        <div>
+                          <label className="text-foreground/60 block mb-1">Posição X (%):</label>
+                          <input
+                            type="number"
+                            step="0.1"
+                            value={qrLocCoords.left}
+                            onChange={(e) => setQrLocCoords({ ...qrLocCoords, left: parseFloat(e.target.value) || 0 })}
+                            className="w-full bg-secondary/10 border border-border-custom rounded-lg px-2 py-1 text-xs"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-foreground/60 block mb-1">Posição Y (%):</label>
+                          <input
+                            type="number"
+                            step="0.1"
+                            value={qrLocCoords.top}
+                            onChange={(e) => setQrLocCoords({ ...qrLocCoords, top: parseFloat(e.target.value) || 0 })}
+                            className="w-full bg-secondary/10 border border-border-custom rounded-lg px-2 py-1 text-xs"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-foreground/60 block mb-1">Largura (%):</label>
+                          <input
+                            type="number"
+                            step="0.1"
+                            value={qrLocCoords.width}
+                            onChange={(e) => setQrLocCoords({ ...qrLocCoords, width: parseFloat(e.target.value) || 0 })}
+                            className="w-full bg-secondary/10 border border-border-custom rounded-lg px-2 py-1 text-xs"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-foreground/60 block mb-1">Altura (%):</label>
+                          <input
+                            type="number"
+                            step="0.1"
+                            value={qrLocCoords.height}
+                            onChange={(e) => setQrLocCoords({ ...qrLocCoords, height: parseFloat(e.target.value) || 0 })}
+                            className="w-full bg-secondary/10 border border-border-custom rounded-lg px-2 py-1 text-xs"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* QR Acesso */}
+                    <div className="p-3 bg-card-bg rounded-xl border border-indigo-500/20 space-y-3">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-600 dark:text-indigo-400">
+                        <span className="w-2 h-2 rounded-full bg-indigo-500" />
+                        Código QR de Acesso (Aba Direita)
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-[11px]">
+                        <div>
+                          <label className="text-foreground/60 block mb-1">Posição X (%):</label>
+                          <input
+                            type="number"
+                            step="0.1"
+                            value={qrAccessCoords.left}
+                            onChange={(e) => setQrAccessCoords({ ...qrAccessCoords, left: parseFloat(e.target.value) || 0 })}
+                            className="w-full bg-secondary/10 border border-border-custom rounded-lg px-2 py-1 text-xs"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-foreground/60 block mb-1">Posição Y (%):</label>
+                          <input
+                            type="number"
+                            step="0.1"
+                            value={qrAccessCoords.top}
+                            onChange={(e) => setQrAccessCoords({ ...qrAccessCoords, top: parseFloat(e.target.value) || 0 })}
+                            className="w-full bg-secondary/10 border border-border-custom rounded-lg px-2 py-1 text-xs"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-foreground/60 block mb-1">Largura (%):</label>
+                          <input
+                            type="number"
+                            step="0.1"
+                            value={qrAccessCoords.width}
+                            onChange={(e) => setQrAccessCoords({ ...qrAccessCoords, width: parseFloat(e.target.value) || 0 })}
+                            className="w-full bg-secondary/10 border border-border-custom rounded-lg px-2 py-1 text-xs"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-foreground/60 block mb-1">Altura (%):</label>
+                          <input
+                            type="number"
+                            step="0.1"
+                            value={qrAccessCoords.height}
+                            onChange={(e) => setQrAccessCoords({ ...qrAccessCoords, height: parseFloat(e.target.value) || 0 })}
+                            className="w-full bg-secondary/10 border border-border-custom rounded-lg px-2 py-1 text-xs"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Botão de Guardar Configuração do Template Canva */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-border-custom">
+                <p className="text-[11px] text-foreground/50">
+                  *As alterações de imagens e posições serão aplicadas a todos os PDFs descarregados na página de Convites.
+                </p>
+                <Button
+                  type="button"
+                  onClick={handleSaveCanvaConfig}
+                  isLoading={isSavingCanva}
+                  className="rounded-xl px-5 w-full sm:w-auto"
+                >
+                  Guardar Template Canva
+                </Button>
+              </div>
             </CardContent>
           </Card>
 

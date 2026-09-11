@@ -208,6 +208,20 @@ export default function DefaultTemplate({
     const canvaCover = event.template_config?.canva_cover_url || '/templates/canva/page_1.png';
     const canvaInfo = event.template_config?.canva_info_url || '/templates/canva/page_2_clean.png';
 
+    const locCoords = event.template_config?.qr_locations_coords || {
+      left: 8.76,
+      top: 69.56,
+      width: 11.85,
+      height: 16.76,
+    };
+
+    const accessCoords = event.template_config?.qr_access_coords || {
+      left: 80.99,
+      top: 54.14,
+      width: 13.10,
+      height: 18.52,
+    };
+
     // PAGE 1: COVER (Aba da Capa - Horizontal A4 Canva Oficial)
     if (renderPage === 'cover') {
       return (
@@ -216,6 +230,7 @@ export default function DefaultTemplate({
           <img 
             src={canvaCover} 
             alt="Capa do Convite Oficial Canva" 
+            crossOrigin="anonymous"
             className="w-full h-full object-cover select-none pointer-events-none"
           />
         </div>
@@ -229,44 +244,47 @@ export default function DefaultTemplate({
           <img 
             src={canvaInfo} 
             alt="Verso do Convite Oficial Canva" 
+            crossOrigin="anonymous"
             className="w-full h-full object-cover select-none pointer-events-none absolute inset-0 z-0"
           />
 
-          {/* 1. Código QR Real de Localizações (Aba Esquerda - Coordenadas exatas do design Canva) */}
+          {/* 1. Código QR Real de Localizações (Aba Esquerda - Coordenadas dinâmicas do design Canva) */}
           {locationsQrCodeUrl && (
             <div 
               className="absolute z-10 flex items-center justify-center bg-white"
               style={{
-                left: '8.76%',
-                top: '69.56%',
-                width: '11.85%',
-                height: '16.76%',
+                left: `${locCoords.left}%`,
+                top: `${locCoords.top}%`,
+                width: `${locCoords.width}%`,
+                height: `${locCoords.height}%`,
               }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img 
                 src={locationsQrCodeUrl} 
                 alt="Código de Localizações Real" 
+                crossOrigin="anonymous"
                 className="w-full h-full object-contain p-0.5"
               />
             </div>
           )}
 
-          {/* 2. Código QR Real de Acesso / Portaria (Aba Direita - Coordenadas exatas do design Canva) */}
+          {/* 2. Código QR Real de Acesso / Portaria (Aba Direita - Coordenadas dinâmicas do design Canva) */}
           {qrCodeUrl && (
             <div 
               className="absolute z-10 flex items-center justify-center bg-white"
               style={{
-                left: '80.99%',
-                top: '54.14%',
-                width: '13.10%',
-                height: '18.52%',
+                left: `${accessCoords.left}%`,
+                top: `${accessCoords.top}%`,
+                width: `${accessCoords.width}%`,
+                height: `${accessCoords.height}%`,
               }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img 
                 src={qrCodeUrl} 
                 alt="Código de Acesso Real" 
+                crossOrigin="anonymous"
                 className="w-full h-full object-contain p-0.5"
               />
             </div>
