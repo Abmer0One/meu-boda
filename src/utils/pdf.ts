@@ -63,7 +63,7 @@ export async function generateGuestPDF(
   container.style.top = '-9999px';
   container.style.width = '1120px';
   container.style.height = '792px';
-  container.style.background = '#0c0c0e';
+  container.style.background = event.template_config?.print_theme === 'dark' ? '#0c0c0e' : '#FAF8F5';
   container.style.boxSizing = 'border-box';
   container.style.overflow = 'hidden';
   document.body.appendChild(container);

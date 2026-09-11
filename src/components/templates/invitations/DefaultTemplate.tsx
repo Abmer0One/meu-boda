@@ -105,6 +105,8 @@ export default function DefaultTemplate({
       return {
         initials: `${parts[0].charAt(0).toUpperCase()} & ${parts[1].charAt(0).toUpperCase()}`,
         names: cleanTitle,
+        firstName: parts[0],
+        secondName: parts[1],
       };
     }
     const words = cleanTitle.split(/\s+/).filter(Boolean);
@@ -112,11 +114,15 @@ export default function DefaultTemplate({
       return {
         initials: `${words[0].charAt(0).toUpperCase()} & ${words[1].charAt(0).toUpperCase()}`,
         names: cleanTitle,
+        firstName: words[0],
+        secondName: words[1],
       };
     }
     return {
       initials: cleanTitle.charAt(0).toUpperCase(),
       names: cleanTitle,
+      firstName: cleanTitle,
+      secondName: '',
     };
   };
 
@@ -162,9 +168,10 @@ export default function DefaultTemplate({
     try {
       const d = new Date(event.date);
       const weekdayStr = d.toLocaleDateString('pt-PT', { weekday: 'long' });
-      const day = d.getDate().toString();
+      const day = d.getDate().toString().padStart(2, '0');
       const monthRaw = d.toLocaleDateString('pt-PT', { month: 'long' });
       const monthCapitalized = monthRaw.charAt(0).toUpperCase() + monthRaw.slice(1);
+      const monthShort = d.toLocaleDateString('pt-PT', { month: 'short' }).replace('.', '').toUpperCase();
       const year = d.getFullYear().toString();
       const dayMonthYear = d.toLocaleDateString('pt-PT', { day: 'numeric', month: 'long', year: 'numeric' });
       
@@ -172,18 +179,22 @@ export default function DefaultTemplate({
       const weekdayCapitalized = weekdayStr.charAt(0).toUpperCase() + weekdayStr.slice(1);
       
       const timeStr = event.party_time || d.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
+      const timeDisplay = timeStr.endsWith(':00') ? timeStr.replace(':00', 'h') : `${timeStr}h`;
+
       return {
         weekday: weekdayCapitalized,
         date: dayMonthYear,
-        monthDayYear: `${monthCapitalized} | ${day} | ${year}`,
+        monthDayYear: `${monthShort} | ${day} | ${year}`,
+        weekdayAtTime: `${weekdayCapitalized} às ${timeDisplay}`,
         time: timeStr,
       };
     } catch (e) {
       return {
-        weekday: 'Sábado',
-        date: '18 de Junho de 2026',
-        monthDayYear: 'Junho | 18 | 2026',
-        time: '15:00',
+        weekday: 'Sexta Feira',
+        date: '06 de Novembro de 2026',
+        monthDayYear: 'NOV | 06 | 2026',
+        weekdayAtTime: 'Sexta Feira às 22h',
+        time: '22:00',
       };
     }
   };
@@ -196,28 +207,17 @@ export default function DefaultTemplate({
   if (isPrinting) {
     const isLight = event.template_config?.print_theme !== 'dark'; // DEFAULT TO LIGHT (ivory) as requested!
 
-    // Core Theme Styling Classes (replicated from the analyzed user images)
-    const containerBg = isLight ? 'bg-[#FAF8F5]' : 'bg-[#0c0c0e]'; // Warm Luxury Ivory card stock
-    const containerText = isLight ? 'text-[#2C2B29]' : 'text-[#f4f4f5]'; // Warm Dark Charcoal text
-    const borderGold = isLight ? 'border-[#cda344]' : 'border-[#d4af37]/35';
-    const borderInner = isLight ? 'border-[#cda344]/30' : 'border-[#d4af37]/20';
-    const columnBg = isLight ? 'bg-[#FAF8F5]' : 'bg-[#121215]';
-    const columnBorder = isLight ? 'border-[#cda344]/20' : 'border-[#d4af37]/20';
-    const cardBgAlternative = isLight ? 'bg-zinc-100/50 border border-[#cda344]/20' : 'bg-white/5 border border-[#d4af37]/15';
-    const textColorMuted = isLight ? 'text-zinc-500' : 'text-white/50';
-    const textColorMain = isLight ? 'text-zinc-800' : 'text-white';
-    const textColorWhite = isLight ? 'text-zinc-900' : 'text-white';
-    const textColorTime = isLight ? 'text-zinc-600' : 'text-white/70';
-    const overlayBg = isLight ? 'bg-white/55' : 'bg-[#121215]/75';
-
-    // Couple photo fallback logic to show them in the center panel of print
+    const containerBg = isLight ? 'bg-[#FAF8F5]' : 'bg-[#0c0c0e]';
+    const containerText = isLight ? 'text-[#2C2B29]' : 'text-[#f4f4f5]';
     const bgPhoto = event.background_image || event.cover_image;
 
+    // PAGE 1: COVER (Aba da Capa - Horizontal A4)
     if (renderPage === 'cover') {
       return (
-        <div className={`w-[1120px] h-[792px] ${containerBg} ${containerText} p-0 flex flex-col justify-between font-sans relative overflow-hidden select-none box-border border-[6px] ${borderGold} rounded-none`}>
+        <div className={`w-[1120px] h-[792px] ${containerBg} ${containerText} p-0 flex flex-col justify-between font-sans relative overflow-hidden select-none box-border`}>
           <style jsx global>{`
-            @import url('https://fonts.googleapis.com/css2?family=Alex+Brush&family=Cinzel:wght@400;600;700;900&family=Cinzel+Decorative:wght@700;900&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap');
+            @import url('https://fonts.googleapis.com/css2?family=Alex+Brush&family=Ballet:opsz@16..72&family=Cinzel:wght@400;600;700;900&family=Cinzel+Decorative:wght@700;900&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap');
+            .font-ballet { font-family: 'Ballet', cursive; }
             .font-cinzel { font-family: 'Cinzel', serif; }
             .font-alex { font-family: 'Alex Brush', cursive; }
             .font-playfair { font-family: 'Playfair Display', serif; }
@@ -228,94 +228,145 @@ export default function DefaultTemplate({
               -webkit-text-fill-color: transparent;
             }
           `}</style>
-          
-          <div className={`absolute inset-3 border ${borderInner} rounded-none pointer-events-none`} />
 
+          {/* 3 Panels layout: Left (25%), Center (50%), Right (25%) */}
           <div className="grid grid-cols-[1fr_2fr_1fr] gap-0 h-full items-stretch relative z-10 box-border">
-            <div className={`${columnBg} border-r ${columnBorder} rounded-none p-0 flex flex-col items-center justify-center shadow-xl relative overflow-hidden h-full`}>
-              {event.cover_image ? (
-                <img 
-                  src={event.cover_image} 
-                  alt="Couple" 
-                  className="w-full h-full object-cover rounded-none border-0"
-                />
-              ) : (
-                <div className={`w-full h-full border-0 flex flex-col items-center justify-center ${isLight ? 'bg-zinc-100/60' : 'bg-white/5'} text-center p-6 my-auto`}>
-                  <span className="text-5xl">📸</span>
-                  <span className="text-xs font-bold text-[#d4af37] uppercase tracking-wider mt-4">Sua Foto Aqui</span>
-                  <span className={`text-[9px] ${textColorMuted} mt-2`}>Carregue no painel do evento</span>
+            {/* Aba Esquerda: limpa para dobra */}
+            <div className="h-full" />
+
+            {/* Painel Central: Exatamente como na Página 1 do PDF fornecido */}
+            <div className="h-full flex flex-col justify-between items-center text-center py-20 px-8 relative">
+              <div className="flex-1 flex flex-col items-center justify-center space-y-4">
+                {/* Monograma com a fonte Ballet solicitada */}
+                <div className="py-2 select-none overflow-visible leading-normal">
+                  <span className="font-ballet text-8xl md:text-9xl text-[#cda344] leading-none block font-normal tracking-wider px-6">
+                    {hosts.initials}
+                  </span>
                 </div>
-              )}
-            </div>
 
-            <div className={`${columnBg} border-r ${columnBorder} rounded-none p-10 flex flex-col justify-between items-center text-center shadow-2xl relative overflow-hidden h-full`}>
-              <div className={`absolute inset-4 border border-dashed ${isLight ? 'border-[#cda344]/35' : 'border-[#d4af37]/25'} rounded-none pointer-events-none`} />
-              <div className={`absolute inset-5 ${isLight ? 'bg-gradient-to-b from-[#cda344]/5 to-[#cda344]/0' : 'bg-gradient-to-b from-[#b89742]/5 to-[#d4af37]/0'} rounded-none pointer-events-none`} />
+                {/* CONVITE EXCLUSIVO */}
+                <span className="font-cinzel text-sm sm:text-base font-bold tracking-[4px] text-[#cda344] uppercase block mt-3 mb-6">
+                  CONVITE EXCLUSIVO
+                </span>
 
-              <div className="my-auto py-8 flex flex-col items-center justify-center relative z-10">
-                <span className="font-cinzel-dec text-5xl sm:text-6xl tracking-wider gold-foil-text font-black block select-none whitespace-nowrap py-4">
-                  {hosts.initials}
-                </span>
-                <div className="h-[1px] w-32 bg-gradient-to-r from-transparent via-[#d4af37]/50 to-transparent mx-auto mt-4" />
-                <span className={`text-xs font-black uppercase tracking-[8px] ${textColorMuted} block mt-4`}>
-                  CONVITE DIGITAL EXCLUSIVO
-                </span>
+                {/* Versículo Bíblico */}
+                <div className="max-w-md mx-auto space-y-1.5 my-4 text-center">
+                  <p className="font-serif text-xs sm:text-sm text-[#4A4844] leading-relaxed italic">
+                    “Assim, permanecem agora estes três: a fé, a esperança e o amor.<br />
+                    O maior deles, porém, é o amor.”
+                  </p>
+                  <p className="font-serif text-xs text-[#6E6B65] mt-1 font-medium">
+                    1 Coríntios 13, 13
+                  </p>
+                </div>
               </div>
 
-              <div className="text-center pb-4 z-10">
-                <p className={`text-xs font-mono tracking-widest ${textColorMuted} uppercase`}>
-                  Desenvolvido com carinho através da aplicação www.meuboda.com
+              {/* Nosso Casamento */}
+              <div className="pb-4">
+                <p className="font-alex text-4xl sm:text-5xl text-[#cda344] font-normal tracking-wide">
+                  Nosso Casamento
                 </p>
               </div>
             </div>
 
-            <div className={`${columnBg} rounded-none p-6 flex flex-col justify-between shadow-xl relative h-full`}>
-              <div className={`absolute inset-3 border ${isLight ? 'border-[#cda344]/15' : 'border-[#d4af37]/10'} rounded-none pointer-events-none`} />
-              
-              <div className="flex-1 flex flex-col justify-around items-center text-center py-10">
-                <div className="space-y-2">
-                  <span className="text-xs font-black uppercase tracking-[6px] text-[#d4af37]">CONVITE</span>
-                  <div className="h-[1px] w-12 bg-[#d4af37]/40 mx-auto mt-2.5" />
-                </div>
-
-                <div className="my-auto w-full px-2">
-                  <h1 className="text-3xl sm:text-4xl font-alex leading-relaxed gold-foil-text font-black whitespace-normal break-words py-4 max-w-full">
-                    {hosts.names}
-                  </h1>
-                  <span className={`text-xs font-black tracking-[3px] ${isLight ? 'text-zinc-600' : 'text-white/60'} uppercase block mt-2`}>
-                    {event.type === 'casamento' ? 'CASAMENTO' : event.type === 'aniversario' ? 'ANIVERSÁRIO' : 'PEDIDO'}
-                  </span>
-                </div>
-
-                <div className="space-y-2 w-full">
-                  <span className="text-xs font-cinzel tracking-[3px] text-[#f3e0aa] font-black block">
-                    {new Date(event.date).toLocaleDateString('pt-PT', { year: 'numeric' })}
-                  </span>
-                </div>
-              </div>
-            </div>
+            {/* Aba Direita: limpa para dobra */}
+            <div className="h-full" />
           </div>
         </div>
       );
     } else {
-      // RSVP deadline date formatter helper
+      // PAGE 2: INFO (Folha de Informações - Horizontal A4)
       const formatRSVPDeadline = () => {
-        if (!event.rsvp_deadline) return '15.06.2026';
+        if (!event.rsvp_deadline) return '25 de Outubro de 2026';
         try {
           const d = new Date(event.rsvp_deadline);
-          const day = d.getDate().toString().padStart(2, '0');
-          const month = (d.getMonth() + 1).toString().padStart(2, '0');
-          const year = d.getFullYear();
-          return `${day}.${month}.${year}`;
+          return d.toLocaleDateString('pt-PT', { day: 'numeric', month: 'long', year: 'numeric' });
         } catch (e) {
-          return '15.06.2026';
+          return '25 de Outubro de 2026';
+        }
+      };
+
+      const defaultSchedules = [
+        { id: '1', title: 'Cerimonia Religiosa', time: '16:00', icon: 'church' },
+        { id: '2', title: 'Cortejo', time: '18:00', icon: 'procession' },
+        { id: '3', title: 'Recepção de Convidados', time: '20:30', icon: 'reception' },
+        { id: '4', title: 'Aperitivos', time: '21:30', icon: 'appetizers' },
+        { id: '5', title: 'Dança dos Noivos', time: '23:30', icon: 'dance' },
+      ];
+
+      const displaySchedules = schedules && schedules.length > 0 
+        ? schedules.slice(0, 5).map((s, idx) => ({
+            id: s.id,
+            title: s.title,
+            time: s.time,
+            icon: idx === 0 ? 'church' : idx === 1 ? 'procession' : idx === 2 ? 'reception' : idx === 3 ? 'appetizers' : 'dance'
+          }))
+        : defaultSchedules;
+
+      const getScheduleIcon = (type: string) => {
+        switch (type) {
+          case 'church':
+            return (
+              <svg className="w-7 h-7 text-[#cda344] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2v3m-2-1.5h4" />
+                <path d="M12 5l-4 3v13h8V8l-4-3z" />
+                <path d="M4 11l4-3v13H3v-7l1-3z" />
+                <path d="M20 11l-4-3v13h5v-7l-1-3z" />
+                <path d="M10 21v-4a2 2 0 0 1 4 0v4" />
+                <circle cx="12" cy="11" r="1.5" />
+              </svg>
+            );
+          case 'procession':
+            return (
+              <svg className="w-7 h-7 text-[#cda344] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="9" cy="5" r="2" />
+                <circle cx="15" cy="5" r="2" />
+                <path d="M7 21l2-8 2 8" />
+                <path d="M13 13l-2 8" />
+                <path d="M13 13l4 8" />
+                <path d="M15 7l-2 6h4l-2-6z" />
+              </svg>
+            );
+          case 'reception':
+            return (
+              <svg className="w-7 h-7 text-[#cda344] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M8 3l-3 7a3 3 0 0 0 3 3h0a3 3 0 0 0 3-3L8 3z" />
+                <path d="M8 13v7m-3 0h6" />
+                <path d="M16 3l-3 7a3 3 0 0 0 3 3h0a3 3 0 0 0 3-3l-3-7z" />
+                <path d="M16 13v7m-3 0h6" />
+                <path d="M11 6l2-1" />
+              </svg>
+            );
+          case 'appetizers':
+            return (
+              <svg className="w-7 h-7 text-[#cda344] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="8" />
+                <circle cx="12" cy="12" r="5" />
+                <path d="M2 7v5a2 2 0 0 0 2 2h0v8" />
+                <path d="M3 4v4m-2-4v4m4-4v4" />
+                <path d="M22 4c0 3-1 6-2 7v11" />
+              </svg>
+            );
+          case 'dance':
+          default:
+            return (
+              <svg className="w-7 h-7 text-[#cda344] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="9" cy="4" r="1.5" />
+                <circle cx="15" cy="4.5" r="1.5" />
+                <path d="M8 8l2 5-3 8" />
+                <path d="M10 13l2 8" />
+                <path d="M14 6l-3 3 3 3-2 9" />
+                <path d="M16 9l-2 4 4 8" />
+              </svg>
+            );
         }
       };
 
       return (
-        <div className={`w-[1120px] h-[792px] ${containerBg} ${containerText} p-0 flex flex-col justify-between font-sans relative overflow-hidden select-none box-border border-[6px] ${borderGold} rounded-none`}>
+        <div className={`w-[1120px] h-[792px] ${containerBg} ${containerText} p-0 flex flex-col justify-between font-sans relative overflow-hidden select-none box-border`}>
           <style jsx global>{`
-            @import url('https://fonts.googleapis.com/css2?family=Alex+Brush&family=Cinzel:wght@400;600;700;900&family=Cinzel+Decorative:wght@700;900&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap');
+            @import url('https://fonts.googleapis.com/css2?family=Alex+Brush&family=Ballet:opsz@16..72&family=Cinzel:wght@400;600;700;900&family=Cinzel+Decorative:wght@700;900&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap');
+            .font-ballet { font-family: 'Ballet', cursive; }
             .font-cinzel { font-family: 'Cinzel', serif; }
             .font-alex { font-family: 'Alex Brush', cursive; }
             .font-playfair { font-family: 'Playfair Display', serif; }
@@ -326,193 +377,186 @@ export default function DefaultTemplate({
               -webkit-text-fill-color: transparent;
             }
           `}</style>
-          
-          <div className={`absolute inset-3 border ${borderInner} rounded-none pointer-events-none`} />
 
           <div className="grid grid-cols-[1fr_2fr_1fr] gap-0 h-full items-stretch relative z-10 box-border">
-            {/* ABA ESQUERDA: DETAILS / DETALHES */}
-            <div className={`${columnBg} border-r ${columnBorder} rounded-none p-6 flex flex-col justify-between shadow-xl relative h-full`}>
-              <div className={`absolute inset-3 border ${isLight ? 'border-[#cda344]/10' : 'border-[#d4af37]/5'} rounded-none pointer-events-none`} />
-              
-              <div className="space-y-4 relative z-10 flex-1 flex flex-col justify-between h-full">
-                <div className="text-center pt-2">
-                  <h3 className="font-cinzel font-black text-xs tracking-[4px] text-[#d4af37]">
-                    DETAILS
-                  </h3>
-                  <h4 className="font-cinzel font-bold text-[9px] uppercase tracking-[2px] text-[#d4af37] mt-3">
-                    ACCOMMODATIONS
-                  </h4>
-                  <div className="h-[1px] w-full bg-[#d4af37]/35 mt-1.5 mb-2" />
+            {/* ABA ESQUERDA: CRONOGRAMA & CÓDIGO DE LOCALIZAÇÕES */}
+            <div className="p-6 flex flex-col justify-between items-center text-center h-full relative">
+              {/* Top floral ornament */}
+              <div className="w-full flex flex-col items-center">
+                <svg className="w-12 h-10 text-[#cda344] mx-auto opacity-90 mb-2" viewBox="0 0 100 80" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M50,40 C35,20 20,35 25,50 C30,65 45,55 50,40 Z" />
+                  <path d="M50,40 C65,20 80,35 75,50 C70,65 55,55 50,40 Z" />
+                  <circle cx="50" cy="40" r="3" fill="currentColor" />
+                  <path d="M50,15 C48,25 52,35 50,40" />
+                  <path d="M35,25 C40,28 45,35 50,40" />
+                  <path d="M65,25 C60,28 55,35 50,40" />
+                </svg>
+
+                {/* Schedule items list */}
+                <div className="space-y-4 w-full px-2 mt-1">
+                  {displaySchedules.map((item) => (
+                    <div key={item.id} className="flex items-center gap-3 py-0.5 text-left">
+                      {getScheduleIcon(item.icon)}
+                      <div>
+                        <div className="text-[11.5px] font-serif text-[#4A4844] leading-snug">{item.title}</div>
+                        <div className="text-xs font-bold text-[#2C2B29] font-sans tracking-tight mt-0.5">{item.time}</div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
+              </div>
 
-                <div className="space-y-4 text-xs leading-relaxed flex-1 py-4 flex flex-col justify-center text-left">
-                  {(event.dress_code_style || event.dress_code_colors) && (
-                    <div className="space-y-0.5">
-                      <h5 className="font-bold text-[9px] uppercase tracking-wider text-[#d4af37]">👗 DRESS CODE</h5>
-                      <p className={`${textColorWhite} font-semibold text-[10px]`}>{event.dress_code_style || 'Esporte Fino / Social'}</p>
-                      {event.dress_code_colors && (
-                        <p className={`text-[9px] ${textColorMuted}`}>Paleta sugerida: {event.dress_code_colors}</p>
-                      )}
-                    </div>
-                  )}
-
-                  {event.gift_suggestions && (
-                    <div className="space-y-0.5">
-                      <h5 className="font-bold text-[9px] uppercase tracking-wider text-[#d4af37]">🎁 GIFT REGISTRY</h5>
-                      <p className={`${textColorWhite} font-semibold text-[10px] line-clamp-3`}>{event.gift_suggestions}</p>
-                    </div>
-                  )}
-
-                  {event.kids_restriction_note && (
-                    <div className="space-y-0.5">
-                      <h5 className="font-bold text-[9px] uppercase tracking-wider text-[#d4af37]">👶 KIDS NOTE</h5>
-                      <p className={`${textColorWhite} font-semibold text-[10px]`}>{event.kids_restriction_note}</p>
-                    </div>
-                  )}
-                </div>
-
+              {/* Bottom: Locations QR code */}
+              <div className="flex flex-col items-center pb-2">
                 {locationsQrCodeUrl ? (
-                  <div className={`${cardBgAlternative} rounded-none p-4 flex flex-col items-center gap-2 relative overflow-hidden`}>
-                    <span className="text-[9px] font-black tracking-[2px] text-[#d4af37] uppercase">MAPAS E LOCALIZAÇÕES</span>
-                    
-                    <div className="bg-white p-2 rounded-none border border-[#d4af37]/35 shadow-md">
-                      <img src={locationsQrCodeUrl} alt="Locais QR" className="w-36 h-36 object-contain" />
-                    </div>
-                    <span className={`text-[8.5px] ${textColorTime} font-bold uppercase text-center leading-tight mt-1`}>SCAN PARA MAPAS E COORDENADAS</span>
+                  <div className="relative p-2.5 inline-block bg-white shadow-sm border border-[#cda344]/25">
+                    <div className="absolute -top-1 -left-1 w-3 h-3 border-t-2 border-l-2 border-[#cda344]" />
+                    <div className="absolute -top-1 -right-1 w-3 h-3 border-t-2 border-r-2 border-[#cda344]" />
+                    <div className="absolute -bottom-1 -left-1 w-3 h-3 border-b-2 border-l-2 border-[#cda344]" />
+                    <div className="absolute -bottom-1 -right-1 w-3 h-3 border-b-2 border-r-2 border-[#cda344]" />
+                    <img src={locationsQrCodeUrl} alt="Código de Localizações" className="w-28 h-28 object-contain" />
                   </div>
                 ) : (
-                  <div className="h-36" />
+                  <div className="w-28 h-28" />
                 )}
+                <span className="font-serif text-xs font-bold text-[#cda344] tracking-wider uppercase block mt-2.5">
+                  Código de Localizações
+                </span>
+                <span className="font-serif text-[9px] text-[#555] text-center leading-tight mt-1 max-w-[190px]">
+                  Scaneie o código QR para ver a localização pelo Google Maps.
+                </span>
               </div>
             </div>
 
             {/* PAINEL CENTRAL: O CORAÇÃO DO CONVITE */}
-            <div className={`${columnBg} border-r ${columnBorder} rounded-none p-10 flex flex-col justify-around items-center text-center shadow-2xl relative overflow-hidden h-full`}>
-              <div className={`absolute inset-4 border border-dashed ${isLight ? 'border-[#cda344]/35' : 'border-[#d4af37]/25'} rounded-none pointer-events-none z-10`} />
-              <div className={`absolute inset-5 ${isLight ? 'bg-gradient-to-b from-[#cda344]/5 to-[#cda344]/0' : 'bg-gradient-to-b from-[#b89742]/5 to-[#d4af37]/0'} rounded-none pointer-events-none z-10`} />
-
-              {/* Dynamic Background Photo with simulated photo corners, overlaid with text */}
+            <div className="relative h-full flex flex-col justify-between items-center text-center overflow-hidden p-6">
+              {/* Couple Background Photo */}
               {bgPhoto ? (
-                <div className="absolute inset-0 z-0 select-none pointer-events-none p-4">
-                  <div className="w-full h-full relative overflow-hidden">
-                    {/* Simulated Photo Corners */}
-                    <div className="absolute top-1.5 left-1.5 w-4 h-[1px] bg-[#d4af37] rotate-45 z-20" />
-                    <div className="absolute top-1.5 right-1.5 w-4 h-[1px] bg-[#d4af37] -rotate-45 z-20" />
-                    <div className="absolute bottom-1.5 left-1.5 w-4 h-[1px] bg-[#d4af37] -rotate-45 z-20" />
-                    <div className="absolute bottom-1.5 right-1.5 w-4 h-[1px] bg-[#d4af37] rotate-45 z-20" />
-
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img 
-                      src={bgPhoto} 
-                      alt="Background" 
-                      className="w-full h-full object-cover opacity-50"
-                    />
-                    <div className={`absolute inset-0 ${overlayBg}`} />
-                  </div>
+                <div className="absolute inset-0 z-0 select-none pointer-events-none">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img 
+                    src={bgPhoto} 
+                    alt="Background" 
+                    className="w-full h-full object-cover opacity-60"
+                  />
+                  <div className="absolute inset-0 bg-[#FAF8F5]/85" />
                 </div>
               ) : null}
 
-              <div className="space-y-5 relative z-10 py-4 my-auto w-full">
-                <h1 className="text-4xl md:text-5xl font-alex tracking-wide text-white leading-relaxed gold-foil-text font-black px-2 py-1">
-                  {hosts.names}
-                </h1>
+              <div className="relative z-10 w-full h-full flex flex-col justify-between items-center text-center py-2 px-4">
+                {/* Blessing of God and Parents */}
+                <div className="w-full space-y-2 pt-2">
+                  <p className="font-serif text-xs text-[#6E6B65] tracking-wide">
+                    Com a magnifica bênção de Deus e de seus Pais,
+                  </p>
 
-                <p className="text-[9.5px] font-cinzel tracking-[4px] text-[#d4af37] font-black uppercase block mt-1">
-                  {phrases.intro}
-                </p>
-                
-                {/* Date line styled exactly like the user's images (clean vertical separators, no card borders) */}
-                <div className="py-2.5 my-4 text-center space-y-1 w-full max-w-md mx-auto">
-                  <span className={`text-[21px] font-playfair ${textColorWhite} font-black block tracking-widest`}>
-                    {dateDetails.monthDayYear}
+                  <div className="w-full max-w-sm mx-auto flex justify-between items-start text-xs font-serif text-[#cda344] px-4 pt-1">
+                    <div className="text-left space-y-0.5">
+                      <p>Armando Quitamba</p>
+                      <p>Maria Quitamba</p>
+                    </div>
+                    <div className="text-right space-y-0.5">
+                      <p>António da Costa</p>
+                      <p>Beatriz da Costa</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Hosts names stacked */}
+                <div className="flex flex-col items-center justify-center my-1 select-none">
+                  <span className="font-alex text-5xl sm:text-6xl text-[#cda344] leading-tight font-normal">
+                    {hosts.firstName || 'Abiúd'}
                   </span>
-                  <span className="text-[10px] font-cinzel tracking-[4px] text-[#d4af37] font-bold uppercase block mt-1">
-                    {dateDetails.weekday} ÀS {dateDetails.time}
+                  <span className="font-alex text-3xl sm:text-4xl text-[#cda344] leading-none my-0.5">
+                    &
+                  </span>
+                  <span className="font-alex text-5xl sm:text-6xl text-[#cda344] leading-tight font-normal">
+                    {hosts.secondName || 'Marinela'}
                   </span>
                 </div>
 
-                {/* Location text rendered dynamically beneath the date block */}
-                <div className="space-y-0.5 mt-2">
-                  <span className="text-[11px] font-cinzel font-black tracking-[3px] text-[#d4af37] uppercase block">
-                    {event.party_location || event.ceremony_location || 'SALÃO DE EVENTOS'}
-                  </span>
-                  {event.party_location && event.ceremony_location && (
-                    <span className={`text-[8.5px] font-cinzel tracking-[2px] ${textColorMuted} uppercase block`}>
-                      {event.ceremony_location}
-                    </span>
-                  )}
+                {/* Invitation Line */}
+                <p className="font-serif text-xs text-[#555] tracking-wide max-w-sm mx-auto">
+                  Temos a honra de convidar-te para o nosso casamento
+                </p>
+
+                {/* Date Block */}
+                <div className="my-1">
+                  <div className="font-playfair text-3xl sm:text-4xl font-bold tracking-widest text-[#2C2B29]">
+                    <span>{dateDetails.monthDayYear.split('|')[0]?.trim() || 'NOV'}</span>
+                    <span className="text-[#cda344] font-normal mx-2.5">|</span>
+                    <span>{dateDetails.monthDayYear.split('|')[1]?.trim() || '06'}</span>
+                    <span className="text-[#cda344] font-normal mx-2.5">|</span>
+                    <span>{dateDetails.monthDayYear.split('|')[2]?.trim() || '2026'}</span>
+                  </div>
+                  <p className="font-serif text-xs sm:text-sm text-[#4A4844] mt-1 font-medium">
+                    {dateDetails.weekdayAtTime}
+                  </p>
                 </div>
 
-                <p className="text-sm font-alex gold-foil-text font-semibold mt-4">
-                  &quot;{phrases.outro}&quot;
-                </p>
+                {/* Locations */}
+                <div className="space-y-1 text-center my-1 max-w-md mx-auto">
+                  <p className="font-serif text-xs text-[#cda344] font-medium leading-relaxed">
+                    {event.ceremony_location ? `Cerimonia Religiosa no ${event.ceremony_location}` : 'Cerimonia Religiosa no Centro Nossa Senhora da Paz, Golf2'}
+                  </p>
+                  <p className="font-serif text-xs text-[#cda344] font-medium leading-relaxed">
+                    {event.party_location ? `copo d´agua no ${event.party_location}` : 'copo d´agua no Salão de Festas Jailinda, Camama.'}
+                  </p>
+                </div>
+
+                {/* Bottom: Nosso Casamento */}
+                <div className="pb-1">
+                  <p className="font-alex text-3xl sm:text-4xl text-[#cda344] font-normal tracking-wide">
+                    Nosso Casamento
+                  </p>
+                </div>
               </div>
-
-              <div className="h-4" />
             </div>
 
-            {/* ABA DIREITA: RSVP / CONFIRMAÇÃO */}
-            <div className={`${columnBg} rounded-none p-6 flex flex-col justify-between shadow-xl relative h-full`}>
-              <div className={`absolute inset-3 border ${isLight ? 'border-[#cda344]/10' : 'border-[#d4af37]/5'} rounded-none pointer-events-none`} />
-              
-              <div className="space-y-4 relative z-10 flex-1 flex flex-col justify-between h-full">
-                {/* Botanical leaf branch at the top (replicated from the analysed images) */}
-                <div className="pt-2 text-center select-none pointer-events-none">
-                  <svg className="w-10 h-10 text-[#d4af37] mx-auto opacity-80" viewBox="0 0 100 100" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M50,90 C50,60 55,40 65,15" />
-                    <path d="M50,80 C40,75 38,68 45,65 C48,63 50,68 50,80 Z" fill="currentColor" opacity="0.2" />
-                    <path d="M50,80 C40,75 38,68 45,65 C48,63 50,68 50,80 Z" />
-                    
-                    <path d="M51,70 C60,65 62,58 55,55 C52,53 51,58 51,70 Z" fill="currentColor" opacity="0.2" />
-                    <path d="M51,70 C60,65 62,58 55,55 C52,53 51,58 51,70 Z" />
+            {/* ABA DIREITA: RSVP & CÓDIGO DE ACESSO */}
+            <div className="p-6 flex flex-col justify-between items-center text-center h-full relative">
+              <div className="w-full flex flex-col items-center">
+                {/* Top minimalist line-art flower SVG */}
+                <svg className="w-20 h-28 mx-auto text-[#cda344]" viewBox="0 0 100 160" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M52,150 C54,120 50,85 53,50" />
+                  <path d="M51,105 C42,108 34,103 36,92 C38,82 48,89 52,98" />
+                  <path d="M52,80 C62,82 70,76 68,66 C66,58 56,64 53,72" />
+                  <path d="M53,50 C44,45 36,32 42,18 C48,4 62,10 58,26 C56,36 53,46 53,50 Z" />
+                  <path d="M53,50 C63,46 74,36 71,22 C68,8 54,16 53,28" />
+                  <path d="M42,20 C32,15 26,24 32,34 C38,44 48,46 53,50" />
+                </svg>
 
-                    <path d="M49,60 C39,55 37,48 44,45 C47,43 49,48 49,60 Z" fill="currentColor" opacity="0.2" />
-                    <path d="M49,60 C39,55 37,48 44,45 C47,43 49,48 49,60 Z" />
+                {/* RSPV Header */}
+                <span className="font-cinzel text-base tracking-[4px] text-[#cda344] font-bold block my-3">
+                  RSPV
+                </span>
 
-                    <path d="M52,50 C61,45 63,38 56,35 C53,33 52,38 52,50 Z" fill="currentColor" opacity="0.2" />
-                    <path d="M52,50 C61,45 63,38 56,35 C53,33 52,38 52,50 Z" />
-
-                    <path d="M48,40 C38,35 36,28 43,25 C46,23 48,28 48,40 Z" fill="currentColor" opacity="0.2" />
-                    <path d="M48,40 C38,35 36,28 43,25 C46,23 48,28 48,40 Z" />
-
-                    <path d="M53,30 C62,25 64,18 57,15 C54,13 53,18 53,30 Z" fill="currentColor" opacity="0.2" />
-                    <path d="M53,30 C62,25 64,18 57,15 C54,13 53,18 53,30 Z" />
-
-                    <path d="M65,15 C60,10 52,8 55,3 C58,-2 68,5 65,15 Z" fill="currentColor" opacity="0.2" />
-                    <path d="M65,15 C60,10 52,8 55,3 C58,-2 68,5 65,15 Z" />
-                  </svg>
-                </div>
-
-                <div className="text-center">
-                  <h3 className="font-cinzel font-black text-xs tracking-[3px] text-[#d4af37] uppercase">
-                    RSVP
-                  </h3>
-                </div>
-
+                {/* Portaria / Access QR Code */}
                 {qrCodeUrl ? (
-                  <div className={`${cardBgAlternative} rounded-none p-3.5 flex flex-col items-center gap-1.5 relative overflow-hidden`}>
-                    <span className="text-[9px] font-black tracking-[2px] text-[#d4af37] uppercase">CONFIRMAÇÃO DIGITAL</span>
-                    
-                    <div className="bg-white p-1.5 rounded-none border border-[#d4af37]/35 shadow-md">
-                      <img src={qrCodeUrl} alt="Acesso QR" className="w-32 h-32 object-contain" />
-                    </div>
-                    <span className={`text-[10px] ${textColorWhite} font-bold uppercase truncate max-w-full leading-none mt-1`}>{guest.name}</span>
-                    <span className="text-[8.5px] text-[#d4af37] font-black uppercase tracking-wider">
-                      {guest.companions > 0 ? `Com Acompanhante (${guest.companions})` : 'Individual'}
-                    </span>
+                  <div className="relative p-2.5 inline-block bg-white shadow-sm border border-[#cda344]/25 mt-1">
+                    <div className="absolute -top-1 -left-1 w-3 h-3 border-t-2 border-l-2 border-[#cda344]" />
+                    <div className="absolute -top-1 -right-1 w-3 h-3 border-t-2 border-r-2 border-[#cda344]" />
+                    <div className="absolute -bottom-1 -left-1 w-3 h-3 border-b-2 border-l-2 border-[#cda344]" />
+                    <div className="absolute -bottom-1 -right-1 w-3 h-3 border-b-2 border-r-2 border-[#cda344]" />
+                    <img src={qrCodeUrl} alt="Código de Acesso" className="w-28 h-28 object-contain" />
                   </div>
                 ) : (
-                  <div className="h-32" />
+                  <div className="w-28 h-28" />
                 )}
 
-                <div className="text-center space-y-1 pb-2">
-                  <span className="text-[9px] text-[#d4af37] font-black uppercase tracking-wider block">
-                    PLEASE RESPOND BY {formatRSVPDeadline()}
-                  </span>
-                  <span className={`text-[8px] ${textColorMuted} uppercase block break-all font-mono leading-tight`}>
-                    www.meuboda.com/convite/{guest.qr_token}
-                  </span>
-                </div>
+                <span className="font-serif text-xs font-bold text-[#cda344] tracking-wider uppercase block mt-2.5">
+                  Código de Acesso
+                </span>
+              </div>
+
+              {/* RSVP confirmation note */}
+              <div className="text-center space-y-0.5 pb-2">
+                <p className="font-serif text-[10px] text-[#4A4844] leading-tight">
+                  Por Favor, confirme a presença
+                </p>
+                <p className="font-serif text-[10px] text-[#4A4844] leading-tight font-medium">
+                  até o dia {formatRSVPDeadline()}
+                </p>
               </div>
             </div>
           </div>
