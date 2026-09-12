@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Dialog } from '@/components/ui/Dialog';
-import { Heart, MapPin, Calendar, Palette, Loader2, Plus, Trash2, Clock, Users, Gift, Link2, Shirt, Info, Pencil, Sparkles, Upload, Sliders, CheckCircle2, RotateCcw, QrCode } from 'lucide-react';
+import { Heart, MapPin, Calendar, Palette, Loader2, Plus, Trash2, Clock, Users, Gift, Link2, Shirt, Info, Pencil, Sparkles, Upload, Sliders, CheckCircle2, RotateCcw, QrCode, FileText } from 'lucide-react';
 import { resolveCanvaConfig, persistCanvaConfig, CANVA_CONFIG_BLOCK_TITLE } from '@/utils/canvaConfig';
 
 export default function EventosPage() {
@@ -27,6 +27,9 @@ export default function EventosPage() {
   const [isUploadingBg, setIsUploadingBg] = useState(false);
 
   // Canva Template States
+  const [pdfMode, setPdfMode] = useState<'double_page' | 'single_page'>('double_page');
+  const [showLocationsQr, setShowLocationsQr] = useState(true);
+  const [showAccessQr, setShowAccessQr] = useState(true);
   const [canvaCoverUrl, setCanvaCoverUrl] = useState<string>('');
   const [canvaInfoUrl, setCanvaInfoUrl] = useState<string>('');
   const [qrLocCoords, setQrLocCoords] = useState<{ left: number; top: number; width: number; height: number }>({
@@ -113,6 +116,9 @@ export default function EventosPage() {
       const resolved = resolveCanvaConfig(currentEvent.id, currentEvent.template_config, null, currentEvent.background_image);
       setCanvaCoverUrl(resolved.canva_cover_url || '');
       setCanvaInfoUrl(resolved.canva_info_url || '');
+      setPdfMode(resolved.pdf_mode || 'double_page');
+      setShowLocationsQr(resolved.show_locations_qr !== false);
+      setShowAccessQr(resolved.show_access_qr !== false);
       if (resolved.qr_locations_coords) {
         setQrLocCoords(resolved.qr_locations_coords);
       } else {
@@ -159,6 +165,9 @@ export default function EventosPage() {
           if (parsed.canva_info_url) setCanvaInfoUrl(parsed.canva_info_url);
           if (parsed.qr_locations_coords) setQrLocCoords(parsed.qr_locations_coords);
           if (parsed.qr_access_coords) setQrAccessCoords(parsed.qr_access_coords);
+          if (parsed.pdf_mode) setPdfMode(parsed.pdf_mode);
+          if (parsed.show_locations_qr !== undefined) setShowLocationsQr(parsed.show_locations_qr);
+          if (parsed.show_access_qr !== undefined) setShowAccessQr(parsed.show_access_qr);
         } catch (e) {}
       }
     } catch (err) {
@@ -267,6 +276,9 @@ export default function EventosPage() {
         canva_info_url: canvaInfoUrl || null,
         qr_locations_coords: qrLocCoords,
         qr_access_coords: qrAccessCoords,
+        pdf_mode: pdfMode,
+        show_locations_qr: showLocationsQr,
+        show_access_qr: showAccessQr,
       };
       await persistCanvaConfig(currentEvent.id, updatedConfig);
 
@@ -316,6 +328,9 @@ export default function EventosPage() {
         canva_info_url: publicUrl,
         qr_locations_coords: qrLocCoords,
         qr_access_coords: qrAccessCoords,
+        pdf_mode: pdfMode,
+        show_locations_qr: showLocationsQr,
+        show_access_qr: showAccessQr,
       };
       await persistCanvaConfig(currentEvent.id, updatedConfig);
 
@@ -345,6 +360,9 @@ export default function EventosPage() {
         canva_info_url: canvaInfoUrl || null,
         qr_locations_coords: qrLocCoords,
         qr_access_coords: qrAccessCoords,
+        pdf_mode: pdfMode,
+        show_locations_qr: showLocationsQr,
+        show_access_qr: showAccessQr,
       };
       await persistCanvaConfig(currentEvent.id, updatedConfig);
       setCurrentEvent({
@@ -369,6 +387,9 @@ export default function EventosPage() {
         canva_info_url: null,
         qr_locations_coords: qrLocCoords,
         qr_access_coords: qrAccessCoords,
+        pdf_mode: pdfMode,
+        show_locations_qr: showLocationsQr,
+        show_access_qr: showAccessQr,
       };
       await persistCanvaConfig(currentEvent.id, updatedConfig);
       setCurrentEvent({
@@ -394,6 +415,9 @@ export default function EventosPage() {
         canva_info_url: canvaInfoUrl || null,
         qr_locations_coords: qrLocCoords,
         qr_access_coords: qrAccessCoords,
+        pdf_mode: pdfMode,
+        show_locations_qr: showLocationsQr,
+        show_access_qr: showAccessQr,
       };
       await persistCanvaConfig(currentEvent.id, updatedConfig);
       setCurrentEvent({
@@ -412,11 +436,15 @@ export default function EventosPage() {
 
   // Reset QR Coordinates to default Canva dimensions
   const handleResetCanvaDefaults = () => {
-    if (!confirm('Deseja repor as posições padrão dos códigos QR no verso?')) return;
-    const defaultLoc = { left: 8.76, top: 69.56, width: 11.85, height: 16.76 };
-    const defaultAccess = { left: 80.99, top: 54.14, width: 13.10, height: 18.52 };
-    setQrLocCoords(defaultLoc);
-    setQrAccessCoords(defaultAccess);
+    if (pdfMode === 'single_page') {
+      if (!confirm('Deseja repor as posições padrão dos códigos QR para Página Única?')) return;
+      setQrLocCoords({ left: 10, top: 76, width: 14, height: 18 });
+      setQrAccessCoords({ left: 76, top: 76, width: 14, height: 18 });
+    } else {
+      if (!confirm('Deseja repor as posições padrão dos códigos QR para Frente e Verso (Tríptico)?')) return;
+      setQrLocCoords({ left: 8.76, top: 69.56, width: 11.85, height: 16.76 });
+      setQrAccessCoords({ left: 80.99, top: 54.14, width: 13.10, height: 18.52 });
+    }
   };
 
   // Add Schedule Item
@@ -523,6 +551,9 @@ export default function EventosPage() {
         canva_info_url: canvaInfoUrl || null,
         qr_locations_coords: qrLocCoords,
         qr_access_coords: qrAccessCoords,
+        pdf_mode: pdfMode,
+        show_locations_qr: showLocationsQr,
+        show_access_qr: showAccessQr,
       };
 
       await persistCanvaConfig(currentEvent.id, updatedConfig);
@@ -838,11 +869,11 @@ export default function EventosPage() {
                     <Sparkles className="h-5 w-5 text-amber-500" /> Template Canva do Convite (PDF / Impressão)
                   </CardTitle>
                   <p className="text-xs text-foreground/60 mt-1">
-                    Faça o upload das artes do convite desenhadas no Canva (Frente e Verso). O sistema sobrepõe automaticamente os códigos QR reais e dinâmicos de cada convidado (Localização e Acesso) ao gerar o PDF.
+                    Faça o upload das artes do convite desenhadas no Canva. O sistema sobrepõe automaticamente os códigos QR reais e dinâmicos de cada convidado (Localização e Acesso) ao gerar o PDF.
                   </p>
                 </div>
                 <Badge variant="default" className="self-start sm:self-center border-amber-500/30 text-amber-600 dark:text-amber-400 bg-amber-500/10">
-                  Canva A4 Trifold
+                  {pdfMode === 'single_page' ? 'Canva Página Única' : 'Canva A4 Trifold'}
                 </Badge>
               </div>
             </CardHeader>
@@ -854,23 +885,88 @@ export default function EventosPage() {
                 </div>
               )}
 
+              {/* Seletor de Formato do PDF / Template */}
+              <div className="bg-secondary/15 p-4 rounded-2xl border border-border-custom space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <label className="text-xs font-bold text-foreground flex items-center gap-1.5 uppercase tracking-wider">
+                      Formato do Convite / PDF
+                    </label>
+                    <p className="text-[11px] text-foreground/60">
+                      Escolha se o seu convite possui frente e verso (2 páginas dobráveis) ou apenas 1 página única.
+                    </p>
+                  </div>
+                  <div className="inline-flex p-1 bg-secondary/30 rounded-xl border border-border-custom shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setPdfMode('double_page')}
+                      className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                        pdfMode === 'double_page'
+                          ? 'bg-primary text-white shadow-sm'
+                          : 'text-foreground/70 hover:text-foreground'
+                      }`}
+                    >
+                      📖 Frente e Verso (2 Páginas)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPdfMode('single_page')}
+                      className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                        pdfMode === 'single_page'
+                          ? 'bg-primary text-white shadow-sm'
+                          : 'text-foreground/70 hover:text-foreground'
+                      }`}
+                    >
+                      📄 Página Única (1 Página)
+                    </button>
+                  </div>
+                </div>
+
+                {/* Opções de QR para Página Única */}
+                {pdfMode === 'single_page' && (
+                  <div className="pt-2 border-t border-border-custom/50 flex flex-wrap items-center gap-4 text-xs animate-in fade-in">
+                    <span className="text-[11px] font-semibold text-foreground/70">Códigos QR a sobrepor na página:</span>
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={showAccessQr}
+                        onChange={(e) => setShowAccessQr(e.target.checked)}
+                        className="rounded border-border-custom text-primary focus:ring-primary h-4 w-4"
+                      />
+                      <span className="text-foreground">QR de Acesso / Portaria</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={showLocationsQr}
+                        onChange={(e) => setShowLocationsQr(e.target.checked)}
+                        className="rounded border-border-custom text-primary focus:ring-primary h-4 w-4"
+                      />
+                      <span className="text-foreground">QR de Localização (Mapas)</span>
+                    </label>
+                  </div>
+                )}
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* 1. Frente do Convite (Capa) */}
+                {/* 1. Frente do Convite (Capa ou Página Única) */}
                 <div className="space-y-3 bg-secondary/5 p-4 rounded-2xl border border-border-custom flex flex-col justify-between">
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <label className="text-xs font-bold text-foreground flex items-center gap-1.5 uppercase tracking-wider">
-                        1. Frente / Capa
+                        {pdfMode === 'single_page' ? '1. Página Única do Convite' : '1. Frente / Capa'}
                       </label>
                       <span className="text-[10px] font-medium bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-                        Página 1 do PDF
+                        {pdfMode === 'single_page' ? 'PDF (1 Página)' : 'Página 1 do PDF'}
                       </span>
                     </div>
                     <p className="text-[11px] text-foreground/60">
-                      Arte da capa dobrável desenhada no Canva.
+                      {pdfMode === 'single_page'
+                        ? 'Arte do convite em folha única desenhada no Canva.'
+                        : 'Arte da capa dobrável desenhada no Canva.'}
                     </p>
 
-                    {/* Preview da Capa */}
+                    {/* Preview da Capa / Página Única */}
                     <div className="relative aspect-[16/11.3] w-full rounded-xl overflow-hidden border border-border-custom bg-black/5 shadow-inner flex items-center justify-center group">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
@@ -878,8 +974,51 @@ export default function EventosPage() {
                         alt="Pré-visualização da Capa Canva"
                         className="w-full h-full object-cover"
                       />
+
+                      {/* Se for Página Única, sobrepor os códigos QR configurados */}
+                      {pdfMode === 'single_page' && (
+                        <>
+                          {showLocationsQr && (
+                            <div
+                              className="absolute border-2 border-emerald-500 bg-white/95 text-emerald-900 rounded-sm flex flex-col items-center justify-center p-0.5 shadow-md select-none transition-all"
+                              style={{
+                                left: `${qrLocCoords.left}%`,
+                                top: `${qrLocCoords.top}%`,
+                                width: `${qrLocCoords.width}%`,
+                                height: `${qrLocCoords.height}%`,
+                              }}
+                              title="Posição do Código QR de Localizações"
+                            >
+                              <QrCode className="h-3.5 w-3.5 text-emerald-600" />
+                              <span className="text-[8px] font-bold text-emerald-800 leading-tight text-center truncate w-full px-0.5">
+                                QR Mapa
+                              </span>
+                            </div>
+                          )}
+                          {showAccessQr && (
+                            <div
+                              className="absolute border-2 border-indigo-500 bg-white/95 text-indigo-900 rounded-sm flex flex-col items-center justify-center p-0.5 shadow-md select-none transition-all"
+                              style={{
+                                left: `${qrAccessCoords.left}%`,
+                                top: `${qrAccessCoords.top}%`,
+                                width: `${qrAccessCoords.width}%`,
+                                height: `${qrAccessCoords.height}%`,
+                              }}
+                              title="Posição do Código QR de Acesso à Portaria"
+                            >
+                              <QrCode className="h-3.5 w-3.5 text-indigo-600" />
+                              <span className="text-[8px] font-bold text-indigo-800 leading-tight text-center truncate w-full px-0.5">
+                                QR Acesso
+                              </span>
+                            </div>
+                          )}
+                        </>
+                      )}
+
                       <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-md text-white px-2 py-0.5 rounded text-[10px] font-medium">
-                        {canvaCoverUrl ? 'Capa Personalizada' : 'Capa Oficial Padrão'}
+                        {canvaCoverUrl 
+                          ? (pdfMode === 'single_page' ? 'Página Única Personalizada' : 'Capa Personalizada') 
+                          : (pdfMode === 'single_page' ? 'Página Única Padrão' : 'Capa Oficial Padrão')}
                       </div>
                       {canvaCoverUrl && (
                         <button
@@ -925,132 +1064,187 @@ export default function EventosPage() {
                   </div>
                 </div>
 
-                {/* 2. Verso do Convite (Informações e Códigos QR) */}
-                <div className="space-y-3 bg-secondary/5 p-4 rounded-2xl border border-border-custom flex flex-col justify-between">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-bold text-foreground flex items-center gap-1.5 uppercase tracking-wider">
-                        2. Verso / Miolo
-                      </label>
-                      <span className="text-[10px] font-medium bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-                        Página 2 do PDF
+                {/* 2. Verso do Convite (Informações e Códigos QR ou Aviso de Página Única) */}
+                {pdfMode === 'single_page' ? (
+                  <div className="space-y-3 bg-secondary/5 p-6 rounded-2xl border border-dashed border-border-custom flex flex-col justify-center items-center text-center">
+                    <div className="w-12 h-12 rounded-full bg-secondary/30 flex items-center justify-center text-foreground/40 mb-2">
+                      <FileText className="h-6 w-6" />
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="text-xs font-bold text-foreground">Verso Desativado</h4>
+                      <span className="text-[10px] font-medium bg-secondary text-foreground/70 px-2.5 py-0.5 rounded-full inline-block">
+                        Modo Página Única Ativo
                       </span>
                     </div>
-                    <p className="text-[11px] text-foreground/60">
-                      Arte com os 3 painéis (Localização, Mensagem e Acesso).
+                    <p className="text-[11px] text-foreground/60 max-w-xs leading-relaxed mt-1">
+                      O PDF do convite será gerado com apenas 1 página, omitindo o verso. Todos os códigos QR configurados estão sobrepostos diretamente na página frontal.
                     </p>
-
-                    {/* Preview Interativo do Verso com sobreposição dos Códigos QR */}
-                    <div className="relative aspect-[16/11.3] w-full rounded-xl overflow-hidden border border-border-custom bg-black/5 shadow-inner group">
-                      {/* Imagem de Fundo do Verso */}
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={canvaInfoUrl || '/templates/canva/page_2_clean.png'}
-                        alt="Pré-visualização do Verso Canva"
-                        className="w-full h-full object-cover"
-                      />
-
-                      {/* Caixa 1: Código QR de Localizações (Aba Esquerda) */}
-                      <div
-                        className="absolute border-2 border-emerald-500 bg-white/95 text-emerald-900 rounded-sm flex flex-col items-center justify-center p-0.5 shadow-md select-none transition-all"
-                        style={{
-                          left: `${qrLocCoords.left}%`,
-                          top: `${qrLocCoords.top}%`,
-                          width: `${qrLocCoords.width}%`,
-                          height: `${qrLocCoords.height}%`,
-                        }}
-                        title="Posição do Código QR de Localizações"
-                      >
-                        <QrCode className="h-3.5 w-3.5 text-emerald-600" />
-                        <span className="text-[8px] font-bold text-emerald-800 leading-tight text-center truncate w-full px-0.5">
-                          QR Mapa
-                        </span>
-                      </div>
-
-                      {/* Caixa 2: Código QR de Acesso / Portaria (Aba Direita) */}
-                      <div
-                        className="absolute border-2 border-indigo-500 bg-white/95 text-indigo-900 rounded-sm flex flex-col items-center justify-center p-0.5 shadow-md select-none transition-all"
-                        style={{
-                          left: `${qrAccessCoords.left}%`,
-                          top: `${qrAccessCoords.top}%`,
-                          width: `${qrAccessCoords.width}%`,
-                          height: `${qrAccessCoords.height}%`,
-                        }}
-                        title="Posição do Código QR de Acesso à Portaria"
-                      >
-                        <QrCode className="h-3.5 w-3.5 text-indigo-600" />
-                        <span className="text-[8px] font-bold text-indigo-800 leading-tight text-center truncate w-full px-0.5">
-                          QR Acesso
-                        </span>
-                      </div>
-
-                      <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-md text-white px-2 py-0.5 rounded text-[10px] font-medium">
-                        {canvaInfoUrl ? 'Verso Personalizado' : 'Verso Oficial Padrão'}
-                      </div>
-                      {canvaInfoUrl && (
-                        <button
-                          type="button"
-                          onClick={handleRemoveCanvaInfo}
-                          className="absolute top-2 right-2 bg-red-600/90 text-white rounded-lg px-2 py-1 text-[11px] font-medium hover:bg-red-700 transition-colors shadow-md"
-                        >
-                          Repor Padrão
-                        </button>
-                      )}
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setPdfMode('double_page')}
+                      className="text-xs text-primary underline font-semibold hover:text-primary/80 pt-2 cursor-pointer"
+                    >
+                      Mudar para Frente e Verso (2 Páginas)
+                    </button>
                   </div>
+                ) : (
+                  <div className="space-y-3 bg-secondary/5 p-4 rounded-2xl border border-border-custom flex flex-col justify-between">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-foreground flex items-center gap-1.5 uppercase tracking-wider">
+                          2. Verso / Miolo
+                        </label>
+                        <span className="text-[10px] font-medium bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                          Página 2 do PDF
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-foreground/60">
+                        Arte com os 3 painéis (Localização, Mensagem e Acesso).
+                      </p>
 
-                  {/* Upload Controls */}
-                  <div className="space-y-2 pt-2">
-                    <div className="flex gap-2 items-center">
-                      <Input
-                        placeholder="URL da imagem do verso..."
-                        value={canvaInfoUrl}
-                        onChange={(e) => setCanvaInfoUrl(e.target.value)}
-                        className="text-xs h-9"
-                      />
-                      <label className="shrink-0">
-                        <div className="flex items-center gap-1.5 px-3 py-2 bg-primary text-white rounded-xl text-xs font-semibold hover:bg-primary/95 transition-all cursor-pointer shadow-sm">
-                          {isUploadingCanvaInfo ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <>
-                              <Upload className="h-3.5 w-3.5" />
-                              <span>Carregar</span>
-                            </>
-                          )}
-                        </div>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={handleCanvaInfoUpload}
-                          disabled={isUploadingCanvaInfo}
-                          className="hidden"
+                      {/* Preview Interativo do Verso com sobreposição dos Códigos QR */}
+                      <div className="relative aspect-[16/11.3] w-full rounded-xl overflow-hidden border border-border-custom bg-black/5 shadow-inner group">
+                        {/* Imagem de Fundo do Verso */}
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={canvaInfoUrl || '/templates/canva/page_2_clean.png'}
+                          alt="Pré-visualização do Verso Canva"
+                          className="w-full h-full object-cover"
                         />
-                      </label>
+
+                        {/* Caixa 1: Código QR de Localizações (Aba Esquerda) */}
+                        <div
+                          className="absolute border-2 border-emerald-500 bg-white/95 text-emerald-900 rounded-sm flex flex-col items-center justify-center p-0.5 shadow-md select-none transition-all"
+                          style={{
+                            left: `${qrLocCoords.left}%`,
+                            top: `${qrLocCoords.top}%`,
+                            width: `${qrLocCoords.width}%`,
+                            height: `${qrLocCoords.height}%`,
+                          }}
+                          title="Posição do Código QR de Localizações"
+                        >
+                          <QrCode className="h-3.5 w-3.5 text-emerald-600" />
+                          <span className="text-[8px] font-bold text-emerald-800 leading-tight text-center truncate w-full px-0.5">
+                            QR Mapa
+                          </span>
+                        </div>
+
+                        {/* Caixa 2: Código QR de Acesso / Portaria (Aba Direita) */}
+                        <div
+                          className="absolute border-2 border-indigo-500 bg-white/95 text-indigo-900 rounded-sm flex flex-col items-center justify-center p-0.5 shadow-md select-none transition-all"
+                          style={{
+                            left: `${qrAccessCoords.left}%`,
+                            top: `${qrAccessCoords.top}%`,
+                            width: `${qrAccessCoords.width}%`,
+                            height: `${qrAccessCoords.height}%`,
+                          }}
+                          title="Posição do Código QR de Acesso à Portaria"
+                        >
+                          <QrCode className="h-3.5 w-3.5 text-indigo-600" />
+                          <span className="text-[8px] font-bold text-indigo-800 leading-tight text-center truncate w-full px-0.5">
+                            QR Acesso
+                          </span>
+                        </div>
+
+                        <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-md text-white px-2 py-0.5 rounded text-[10px] font-medium">
+                          {canvaInfoUrl ? 'Verso Personalizado' : 'Verso Oficial Padrão'}
+                        </div>
+                        {canvaInfoUrl && (
+                          <button
+                            type="button"
+                            onClick={handleRemoveCanvaInfo}
+                            className="absolute top-2 right-2 bg-red-600/90 text-white rounded-lg px-2 py-1 text-[11px] font-medium hover:bg-red-700 transition-colors shadow-md"
+                          >
+                            Repor Padrão
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Upload Controls */}
+                    <div className="space-y-2 pt-2">
+                      <div className="flex gap-2 items-center">
+                        <Input
+                          placeholder="URL da imagem do verso..."
+                          value={canvaInfoUrl}
+                          onChange={(e) => setCanvaInfoUrl(e.target.value)}
+                          className="text-xs h-9"
+                        />
+                        <label className="shrink-0">
+                          <div className="flex items-center gap-1.5 px-3 py-2 bg-primary text-white rounded-xl text-xs font-semibold hover:bg-primary/95 transition-all cursor-pointer shadow-sm">
+                            {isUploadingCanvaInfo ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <>
+                                <Upload className="h-3.5 w-3.5" />
+                                <span>Carregar</span>
+                              </>
+                            )}
+                          </div>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleCanvaInfoUpload}
+                            disabled={isUploadingCanvaInfo}
+                            className="hidden"
+                          />
+                        </label>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
 
               {/* Ajustes Finos de Posição dos Códigos QR (Opcional / Retrátil) */}
               <div className="border border-border-custom rounded-xl p-4 bg-secondary/5 space-y-4">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <button
                     type="button"
                     onClick={() => setShowQrFineTuning(!showQrFineTuning)}
-                    className="flex items-center gap-2 text-xs font-bold text-foreground hover:text-primary transition-colors"
+                    className="flex items-center gap-2 text-xs font-bold text-foreground hover:text-primary transition-colors cursor-pointer"
                   >
                     <Sliders className="h-4 w-4 text-primary" />
-                    <span>{showQrFineTuning ? 'Ocultar Ajuste Fino dos Códigos QR' : 'Ajustar Posição dos Códigos QR no Verso (Opcional)'}</span>
+                    <span>
+                      {showQrFineTuning
+                        ? 'Ocultar Ajuste Fino dos Códigos QR'
+                        : pdfMode === 'single_page'
+                        ? 'Ajustar Posição dos Códigos QR na Página Única (Opcional)'
+                        : 'Ajustar Posição dos Códigos QR no Verso (Opcional)'}
+                    </span>
                   </button>
-                  <button
-                    type="button"
-                    onClick={handleResetCanvaDefaults}
-                    className="flex items-center gap-1 text-[11px] text-foreground/50 hover:text-foreground transition-colors"
-                  >
-                    <RotateCcw className="h-3 w-3" />
-                    <span>Repor Posições Padrão</span>
-                  </button>
+
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setQrLocCoords({ left: 10, top: 76, width: 14, height: 18 });
+                        setQrAccessCoords({ left: 76, top: 76, width: 14, height: 18 });
+                      }}
+                      className="text-[11px] bg-secondary/40 hover:bg-secondary px-2.5 py-1 rounded-lg text-foreground/70 hover:text-foreground transition-colors cursor-pointer"
+                      title="Aplicar coordenadas ideais para página única"
+                    >
+                      Padrão Página Única
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setQrLocCoords({ left: 8.76, top: 69.56, width: 11.85, height: 16.76 });
+                        setQrAccessCoords({ left: 80.99, top: 54.14, width: 13.10, height: 18.52 });
+                      }}
+                      className="text-[11px] bg-secondary/40 hover:bg-secondary px-2.5 py-1 rounded-lg text-foreground/70 hover:text-foreground transition-colors cursor-pointer"
+                      title="Aplicar coordenadas ideais para tríptico"
+                    >
+                      Padrão Tríptico
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleResetCanvaDefaults}
+                      className="flex items-center gap-1 text-[11px] text-foreground/50 hover:text-foreground transition-colors cursor-pointer ml-1"
+                    >
+                      <RotateCcw className="h-3 w-3" />
+                      <span>Repor</span>
+                    </button>
+                  </div>
                 </div>
 
                 {showQrFineTuning && (
@@ -1059,7 +1253,7 @@ export default function EventosPage() {
                     <div className="p-3 bg-card-bg rounded-xl border border-emerald-500/20 space-y-3">
                       <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400">
                         <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                        Código QR de Localização (Aba Esquerda)
+                        Código QR de Localização {pdfMode === 'single_page' ? '(Página Única)' : '(Aba Esquerda)'}
                       </div>
                       <div className="grid grid-cols-2 gap-2 text-[11px]">
                         <div>
@@ -1109,7 +1303,7 @@ export default function EventosPage() {
                     <div className="p-3 bg-card-bg rounded-xl border border-indigo-500/20 space-y-3">
                       <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-600 dark:text-indigo-400">
                         <span className="w-2 h-2 rounded-full bg-indigo-500" />
-                        Código QR de Acesso (Aba Direita)
+                        Código QR de Acesso {pdfMode === 'single_page' ? '(Página Única)' : '(Aba Direita)'}
                       </div>
                       <div className="grid grid-cols-2 gap-2 text-[11px]">
                         <div>

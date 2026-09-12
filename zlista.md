@@ -1,13 +1,16 @@
 Dazzle e esposa
 GM e Mama Lando
 Salomão e Namorada
+josy e Esposa
 
 foller
 elidio
 eliandro
 Isabel
+bacia
 boss Menezes
 Boss Pain
+Boss Amelia
 Director
 Mavungo
 
@@ -26,3 +29,4 @@ Syria e Esposo
 
 Madre Veronique e Padre Nicodemos
 The One e Esposa
+https://www.youtube.com/watch?v=4x5LnowSg3c

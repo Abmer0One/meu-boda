@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Dialog } from '@/components/ui/Dialog';
 import { generateQRCode } from '@/utils/qr';
 import { generateGuestPDF } from '@/utils/pdf';
+import { resolveCanvaConfig } from '@/utils/canvaConfig';
 import { supabase } from '@/lib/supabase';
 import DefaultTemplate from '@/components/templates/invitations/DefaultTemplate';
 import {
@@ -40,6 +41,9 @@ export default function ConvitesPage() {
   const [uploading, setUploading] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [bulkDownloading, setBulkDownloading] = useState(false);
+
+  const canvaConfig = currentEvent ? resolveCanvaConfig(currentEvent.id, currentEvent.template_config, infoBlocks, currentEvent.background_image) : null;
+  const isSinglePage = canvaConfig?.pdf_mode === 'single_page';
 
   // Individual send modal
   const [sendModalOpen, setSendModalOpen] = useState(false);
@@ -801,26 +805,41 @@ export default function ConvitesPage() {
               💻 Computador (Interativo)
             </button>
             <div className="h-6 w-[1px] bg-border-custom hidden sm:block" />
-            <button
-              onClick={() => { setPreviewType('cover'); }}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                previewType === 'cover'
-                  ? 'bg-[#b89742] text-[#0d0d0f] shadow-md shadow-[#b89742]/20'
-                  : 'bg-secondary hover:bg-secondary/70 text-foreground/70'
-              }`}
-            >
-              📄 Capa (Frente Impressão)
-            </button>
-            <button
-              onClick={() => { setPreviewType('info'); }}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                previewType === 'info'
-                  ? 'bg-[#b89742] text-[#0d0d0f] shadow-md shadow-[#b89742]/20'
-                  : 'bg-secondary hover:bg-secondary/70 text-foreground/70'
-              }`}
-            >
-              📝 Informações (Verso Impressão)
-            </button>
+            {isSinglePage ? (
+              <button
+                onClick={() => { setPreviewType('cover'); }}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  previewType === 'cover'
+                    ? 'bg-[#b89742] text-[#0d0d0f] shadow-md shadow-[#b89742]/20'
+                    : 'bg-secondary hover:bg-secondary/70 text-foreground/70'
+                }`}
+              >
+                📄 Convite (Página Única Impressão)
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={() => { setPreviewType('cover'); }}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    previewType === 'cover'
+                      ? 'bg-[#b89742] text-[#0d0d0f] shadow-md shadow-[#b89742]/20'
+                      : 'bg-secondary hover:bg-secondary/70 text-foreground/70'
+                  }`}
+                >
+                  📄 Capa (Frente Impressão)
+                </button>
+                <button
+                  onClick={() => { setPreviewType('info'); }}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    previewType === 'info'
+                      ? 'bg-[#b89742] text-[#0d0d0f] shadow-md shadow-[#b89742]/20'
+                      : 'bg-secondary hover:bg-secondary/70 text-foreground/70'
+                  }`}
+                >
+                  📝 Informações (Verso Impressão)
+                </button>
+              </>
+            )}
           </div>
 
           <div className="max-h-[68vh] overflow-y-auto p-1 bg-background relative text-left rounded-xl">

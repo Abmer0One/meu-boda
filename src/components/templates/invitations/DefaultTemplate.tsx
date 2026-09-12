@@ -224,17 +224,66 @@ export default function DefaultTemplate({
       height: 18.52,
     };
 
-    // PAGE 1: COVER (Aba da Capa - Horizontal A4 Canva Oficial)
-    if (renderPage === 'cover') {
+    const isSinglePage = canvaConfig.pdf_mode === 'single_page';
+
+    // PAGE 1: COVER (or SINGLE PAGE INVITATION)
+    if (renderPage === 'cover' || isSinglePage) {
       return (
         <div className="w-[1120px] h-[792px] bg-[#FAF8F1] p-0 relative overflow-hidden select-none box-border flex items-center justify-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img 
             src={canvaCover} 
-            alt="Capa do Convite Oficial Canva" 
+            alt="Convite Oficial Canva" 
             crossOrigin="anonymous"
-            className="w-full h-full object-cover select-none pointer-events-none"
+            className="w-full h-full object-cover select-none pointer-events-none absolute inset-0 z-0"
           />
+
+          {/* Em modo Página Única, sobrepõe os códigos QR diretamente na Frente */}
+          {isSinglePage && (
+            <>
+              {/* 1. Código QR Real de Localizações */}
+              {locationsQrCodeUrl && canvaConfig.show_locations_qr !== false && (
+                <div 
+                  className="absolute z-10 flex items-center justify-center bg-white shadow-sm overflow-hidden"
+                  style={{
+                    left: `${locCoords.left}%`,
+                    top: `${locCoords.top}%`,
+                    width: `${locCoords.width}%`,
+                    height: `${locCoords.height}%`,
+                  }}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img 
+                    src={locationsQrCodeUrl} 
+                    alt="Código de Localizações Real" 
+                    crossOrigin="anonymous"
+                    className="w-full h-full object-contain p-0.5"
+                  />
+                </div>
+              )}
+
+              {/* 2. Código QR Real de Acesso / Portaria */}
+              {qrCodeUrl && canvaConfig.show_access_qr !== false && (
+                <div 
+                  className="absolute z-10 flex items-center justify-center bg-white shadow-sm overflow-hidden"
+                  style={{
+                    left: `${accessCoords.left}%`,
+                    top: `${accessCoords.top}%`,
+                    width: `${accessCoords.width}%`,
+                    height: `${accessCoords.height}%`,
+                  }}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img 
+                    src={qrCodeUrl} 
+                    alt="Código de Acesso Real" 
+                    crossOrigin="anonymous"
+                    className="w-full h-full object-contain p-0.5"
+                  />
+                </div>
+              )}
+            </>
+          )}
         </div>
       );
     } else {

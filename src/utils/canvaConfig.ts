@@ -11,6 +11,9 @@ export interface QrCoordinates {
 export interface CanvaTemplateConfig {
   canva_cover_url?: string | null;
   canva_info_url?: string | null;
+  pdf_mode?: 'double_page' | 'single_page';
+  show_locations_qr?: boolean;
+  show_access_qr?: boolean;
   qr_locations_coords?: QrCoordinates;
   qr_access_coords?: QrCoordinates;
   [key: string]: any;
@@ -50,6 +53,9 @@ export function resolveCanvaConfig(
   let resolved: CanvaTemplateConfig = {
     canva_cover_url: null,
     canva_info_url: null,
+    pdf_mode: 'double_page',
+    show_locations_qr: true,
+    show_access_qr: true,
     qr_locations_coords: { ...DEFAULT_LOC_COORDS },
     qr_access_coords: { ...DEFAULT_ACCESS_COORDS },
   };
@@ -58,6 +64,9 @@ export function resolveCanvaConfig(
   if (templateConfig) {
     if (templateConfig.canva_cover_url) resolved.canva_cover_url = templateConfig.canva_cover_url;
     if (templateConfig.canva_info_url) resolved.canva_info_url = templateConfig.canva_info_url;
+    if (templateConfig.pdf_mode) resolved.pdf_mode = templateConfig.pdf_mode;
+    if (templateConfig.show_locations_qr !== undefined) resolved.show_locations_qr = templateConfig.show_locations_qr;
+    if (templateConfig.show_access_qr !== undefined) resolved.show_access_qr = templateConfig.show_access_qr;
     if (templateConfig.qr_locations_coords) resolved.qr_locations_coords = { ...templateConfig.qr_locations_coords };
     if (templateConfig.qr_access_coords) resolved.qr_access_coords = { ...templateConfig.qr_access_coords };
   }
@@ -70,6 +79,9 @@ export function resolveCanvaConfig(
         const parsed = JSON.parse(configBlock.content);
         if (!resolved.canva_cover_url && parsed.canva_cover_url) resolved.canva_cover_url = parsed.canva_cover_url;
         if (!resolved.canva_info_url && parsed.canva_info_url) resolved.canva_info_url = parsed.canva_info_url;
+        if (parsed.pdf_mode) resolved.pdf_mode = parsed.pdf_mode;
+        if (parsed.show_locations_qr !== undefined) resolved.show_locations_qr = parsed.show_locations_qr;
+        if (parsed.show_access_qr !== undefined) resolved.show_access_qr = parsed.show_access_qr;
         if (parsed.qr_locations_coords) resolved.qr_locations_coords = { ...parsed.qr_locations_coords };
         if (parsed.qr_access_coords) resolved.qr_access_coords = { ...parsed.qr_access_coords };
       } catch (err) {
@@ -86,6 +98,9 @@ export function resolveCanvaConfig(
         const parsed = JSON.parse(stored);
         if (!resolved.canva_cover_url && parsed.canva_cover_url) resolved.canva_cover_url = parsed.canva_cover_url;
         if (!resolved.canva_info_url && parsed.canva_info_url) resolved.canva_info_url = parsed.canva_info_url;
+        if (parsed.pdf_mode) resolved.pdf_mode = parsed.pdf_mode;
+        if (parsed.show_locations_qr !== undefined) resolved.show_locations_qr = parsed.show_locations_qr;
+        if (parsed.show_access_qr !== undefined) resolved.show_access_qr = parsed.show_access_qr;
         if (parsed.qr_locations_coords) resolved.qr_locations_coords = { ...parsed.qr_locations_coords };
         if (parsed.qr_access_coords) resolved.qr_access_coords = { ...parsed.qr_access_coords };
       }

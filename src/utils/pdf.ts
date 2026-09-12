@@ -6,6 +6,7 @@ import { Guest, Event, EventSchedule, EventInfoBlock } from '@/types';
 import DefaultTemplate from '@/components/templates/invitations/DefaultTemplate';
 
 import { generateQRCode } from '@/utils/qr';
+import { resolveCanvaConfig } from '@/utils/canvaConfig';
 
 export async function generateGuestPDF(
   guest: Guest,
@@ -15,6 +16,9 @@ export async function generateGuestPDF(
   schedules: EventSchedule[] = [],
   infoBlocks: EventInfoBlock[] = []
 ): Promise<jsPDF> {
+  const canvaConfig = resolveCanvaConfig(event.id, event.template_config, infoBlocks, event.background_image);
+  const isSinglePage = canvaConfig.pdf_mode === 'single_page';
+
   // Generate locations redirect QR code link
   const locationsLink = `${typeof window !== 'undefined' ? window.location.origin : ''}/convite/${guest.qr_token}#mapas`;
   const locationsQrCodeUrl = await generateQRCode(locationsLink);
@@ -100,37 +104,42 @@ export async function generateGuestPDF(
   root1.unmount();
   container.innerHTML = ''; // clear content
 
-  // 2. Render and capture Page 2: INFO
-  const root2 = createRoot(container);
-  await new Promise<void>((resolve) => {
-    const element = React.createElement(DefaultTemplate, { ...templateProps, renderPage: 'info' });
-    root2.render(element);
-    setTimeout(resolve, 600);
-  });
+  let infoDataUrl = '';
 
-  // Wait for images to load on Page 2
-  const images2 = Array.from(container.getElementsByTagName('img'));
-  await Promise.all(
-    images2.map((img) => {
-      if (img.complete) return Promise.resolve();
-      return new Promise<void>((resolve) => {
-        img.onload = () => resolve();
-        img.onerror = () => resolve();
-      });
-    })
-  );
+  // 2. Render and capture Page 2: INFO (only if double page mode)
+  if (!isSinglePage) {
+    const root2 = createRoot(container);
+    await new Promise<void>((resolve) => {
+      const element = React.createElement(DefaultTemplate, { ...templateProps, renderPage: 'info' });
+      root2.render(element);
+      setTimeout(resolve, 600);
+    });
 
-  const infoDataUrl = await toPng(container, {
-    cacheBust: true,
-    pixelRatio: 2,
-    style: {
-      transform: 'none',
-      left: '0',
-      top: '0',
-    }
-  });
+    // Wait for images to load on Page 2
+    const images2 = Array.from(container.getElementsByTagName('img'));
+    await Promise.all(
+      images2.map((img) => {
+        if (img.complete) return Promise.resolve();
+        return new Promise<void>((resolve) => {
+          img.onload = () => resolve();
+          img.onerror = () => resolve();
+        });
+      })
+    );
 
-  root2.unmount();
+    infoDataUrl = await toPng(container, {
+      cacheBust: true,
+      pixelRatio: 2,
+      style: {
+        transform: 'none',
+        left: '0',
+        top: '0',
+      }
+    });
+
+    root2.unmount();
+  }
+
   document.body.removeChild(container);
 
   // 3. Assemble A4 landscape PDF
@@ -143,12 +152,14 @@ export async function generateGuestPDF(
   const imgWidth = 297;
   const imgHeight = 210;
 
-  // Add cover page
+  // Add cover page (Page 1)
   doc.addImage(coverDataUrl, 'PNG', 0, 0, imgWidth, imgHeight);
 
-  // Add inside info page
-  doc.addPage();
-  doc.addImage(infoDataUrl, 'PNG', 0, 0, imgWidth, imgHeight);
+  // Add inside info page (Page 2) if not single page
+  if (!isSinglePage && infoDataUrl) {
+    doc.addPage();
+    doc.addImage(infoDataUrl, 'PNG', 0, 0, imgWidth, imgHeight);
+  }
 
   return doc;
 }
