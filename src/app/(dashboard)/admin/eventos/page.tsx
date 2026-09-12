@@ -16,6 +16,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Dialog } from '@/components/ui/Dialog';
 import { Heart, MapPin, Calendar, Palette, Loader2, Plus, Trash2, Clock, Users, Gift, Link2, Shirt, Info, Pencil, Sparkles, Upload, Sliders, CheckCircle2, RotateCcw, QrCode } from 'lucide-react';
+import { resolveCanvaConfig, persistCanvaConfig, CANVA_CONFIG_BLOCK_TITLE } from '@/utils/canvaConfig';
 
 export default function EventosPage() {
   const { currentEvent, refreshEvents, setCurrentEvent } = useEvent();
@@ -109,16 +110,16 @@ export default function EventosPage() {
         rsvp_deadline: currentEvent.rsvp_deadline || '',
       });
 
-      const cfg = currentEvent.template_config || {};
-      setCanvaCoverUrl(cfg.canva_cover_url || '');
-      setCanvaInfoUrl(cfg.canva_info_url || '');
-      if (cfg.qr_locations_coords) {
-        setQrLocCoords(cfg.qr_locations_coords);
+      const resolved = resolveCanvaConfig(currentEvent.id, currentEvent.template_config, null, currentEvent.background_image);
+      setCanvaCoverUrl(resolved.canva_cover_url || '');
+      setCanvaInfoUrl(resolved.canva_info_url || '');
+      if (resolved.qr_locations_coords) {
+        setQrLocCoords(resolved.qr_locations_coords);
       } else {
         setQrLocCoords({ left: 8.76, top: 69.56, width: 11.85, height: 16.76 });
       }
-      if (cfg.qr_access_coords) {
-        setQrAccessCoords(cfg.qr_access_coords);
+      if (resolved.qr_access_coords) {
+        setQrAccessCoords(resolved.qr_access_coords);
       } else {
         setQrAccessCoords({ left: 80.99, top: 54.14, width: 13.10, height: 18.52 });
       }
@@ -145,7 +146,21 @@ export default function EventosPage() {
     setIsLoadingBlocks(true);
     try {
       const data = await InfoBlockRepository.getAll(currentEvent.id);
-      setInfoBlocks(data);
+      // Filter out internal canva config block so user only sees their real custom blocks
+      const realBlocks = data.filter((b) => b.title !== CANVA_CONFIG_BLOCK_TITLE);
+      setInfoBlocks(realBlocks);
+
+      // Check if there is an internal canva config block to restore values
+      const canvaBlock = data.find((b) => b.title === CANVA_CONFIG_BLOCK_TITLE);
+      if (canvaBlock?.content) {
+        try {
+          const parsed = JSON.parse(canvaBlock.content);
+          if (parsed.canva_cover_url) setCanvaCoverUrl(parsed.canva_cover_url);
+          if (parsed.canva_info_url) setCanvaInfoUrl(parsed.canva_info_url);
+          if (parsed.qr_locations_coords) setQrLocCoords(parsed.qr_locations_coords);
+          if (parsed.qr_access_coords) setQrAccessCoords(parsed.qr_access_coords);
+        } catch (e) {}
+      }
     } catch (err) {
       console.error('Error loading info blocks:', err);
     } finally {
@@ -245,22 +260,23 @@ export default function EventosPage() {
 
       setCanvaCoverUrl(publicUrl);
 
-      // Auto-save to template_config
+      // Auto-save across all storage layers
       const updatedConfig = {
         ...(currentEvent.template_config || {}),
         canva_cover_url: publicUrl,
+        canva_info_url: canvaInfoUrl || null,
         qr_locations_coords: qrLocCoords,
         qr_access_coords: qrAccessCoords,
       };
-      const updated = await EventRepository.update(currentEvent.id, {
+      await persistCanvaConfig(currentEvent.id, updatedConfig);
+
+      setCurrentEvent({
+        ...currentEvent,
         template_config: updatedConfig,
       });
-      if (updated) {
-        setCurrentEvent(updated);
-        await refreshEvents();
-        setCanvaSuccessMessage('Capa do Canva carregada e guardada com sucesso!');
-        setTimeout(() => setCanvaSuccessMessage(null), 4000);
-      }
+
+      setCanvaSuccessMessage('Capa do Canva carregada e guardada com sucesso!');
+      setTimeout(() => setCanvaSuccessMessage(null), 4000);
     } catch (err: any) {
       alert('Erro ao carregar a imagem da capa do Canva: ' + err.message);
     } finally {
@@ -293,22 +309,24 @@ export default function EventosPage() {
 
       setCanvaInfoUrl(publicUrl);
 
-      // Auto-save to template_config
+      // Auto-save across all storage layers
       const updatedConfig = {
         ...(currentEvent.template_config || {}),
+        canva_cover_url: canvaCoverUrl || null,
         canva_info_url: publicUrl,
         qr_locations_coords: qrLocCoords,
         qr_access_coords: qrAccessCoords,
       };
-      const updated = await EventRepository.update(currentEvent.id, {
+      await persistCanvaConfig(currentEvent.id, updatedConfig);
+
+      setCurrentEvent({
+        ...currentEvent,
+        background_image: publicUrl,
         template_config: updatedConfig,
       });
-      if (updated) {
-        setCurrentEvent(updated);
-        await refreshEvents();
-        setCanvaSuccessMessage('Verso do Canva carregado e guardado com sucesso!');
-        setTimeout(() => setCanvaSuccessMessage(null), 4000);
-      }
+
+      setCanvaSuccessMessage('Verso do Canva carregado e guardado com sucesso!');
+      setTimeout(() => setCanvaSuccessMessage(null), 4000);
     } catch (err: any) {
       alert('Erro ao carregar a imagem do verso do Canva: ' + err.message);
     } finally {
@@ -324,18 +342,17 @@ export default function EventosPage() {
       const updatedConfig = {
         ...(currentEvent.template_config || {}),
         canva_cover_url: null,
+        canva_info_url: canvaInfoUrl || null,
         qr_locations_coords: qrLocCoords,
         qr_access_coords: qrAccessCoords,
       };
-      const updated = await EventRepository.update(currentEvent.id, {
+      await persistCanvaConfig(currentEvent.id, updatedConfig);
+      setCurrentEvent({
+        ...currentEvent,
         template_config: updatedConfig,
       });
-      if (updated) {
-        setCurrentEvent(updated);
-        await refreshEvents();
-        setCanvaSuccessMessage('Capa do Canva reposta para o modelo padrão.');
-        setTimeout(() => setCanvaSuccessMessage(null), 4000);
-      }
+      setCanvaSuccessMessage('Capa do Canva reposta para o modelo padrão.');
+      setTimeout(() => setCanvaSuccessMessage(null), 4000);
     } catch (err: any) {
       alert('Erro ao remover capa do Canva: ' + err.message);
     }
@@ -348,19 +365,18 @@ export default function EventosPage() {
     try {
       const updatedConfig = {
         ...(currentEvent.template_config || {}),
+        canva_cover_url: canvaCoverUrl || null,
         canva_info_url: null,
         qr_locations_coords: qrLocCoords,
         qr_access_coords: qrAccessCoords,
       };
-      const updated = await EventRepository.update(currentEvent.id, {
+      await persistCanvaConfig(currentEvent.id, updatedConfig);
+      setCurrentEvent({
+        ...currentEvent,
         template_config: updatedConfig,
       });
-      if (updated) {
-        setCurrentEvent(updated);
-        await refreshEvents();
-        setCanvaSuccessMessage('Verso do Canva reposto para o modelo padrão.');
-        setTimeout(() => setCanvaSuccessMessage(null), 4000);
-      }
+      setCanvaSuccessMessage('Verso do Canva reposto para o modelo padrão.');
+      setTimeout(() => setCanvaSuccessMessage(null), 4000);
     } catch (err: any) {
       alert('Erro ao remover verso do Canva: ' + err.message);
     }
@@ -379,15 +395,14 @@ export default function EventosPage() {
         qr_locations_coords: qrLocCoords,
         qr_access_coords: qrAccessCoords,
       };
-      const updated = await EventRepository.update(currentEvent.id, {
+      await persistCanvaConfig(currentEvent.id, updatedConfig);
+      setCurrentEvent({
+        ...currentEvent,
+        background_image: canvaInfoUrl || currentEvent.background_image,
         template_config: updatedConfig,
       });
-      if (updated) {
-        setCurrentEvent(updated);
-        await refreshEvents();
-        setCanvaSuccessMessage('Configurações do Template Canva guardadas com sucesso!');
-        setTimeout(() => setCanvaSuccessMessage(null), 4000);
-      }
+      setCanvaSuccessMessage('Configurações do Template Canva guardadas com sucesso!');
+      setTimeout(() => setCanvaSuccessMessage(null), 4000);
     } catch (err: any) {
       alert('Erro ao guardar configurações do Canva: ' + err.message);
     } finally {
@@ -502,6 +517,16 @@ export default function EventosPage() {
     setErrorMessage(null);
 
     try {
+      const updatedConfig = {
+        ...(currentEvent.template_config || {}),
+        canva_cover_url: canvaCoverUrl || null,
+        canva_info_url: canvaInfoUrl || null,
+        qr_locations_coords: qrLocCoords,
+        qr_access_coords: qrAccessCoords,
+      };
+
+      await persistCanvaConfig(currentEvent.id, updatedConfig);
+
       const updatedEvent = await EventRepository.update(currentEvent.id, {
         title: data.title,
         slug: data.slug,
@@ -510,7 +535,7 @@ export default function EventosPage() {
         party_location: data.party_location || null,
         theme: data.theme || null,
         cover_image: data.cover_image || null,
-        background_image: data.background_image || null,
+        background_image: data.background_image || canvaInfoUrl || null,
         description: data.description || null,
         ceremony_time: data.ceremony_time || null,
         ceremony_maps_url: data.ceremony_maps_url || null,
@@ -524,19 +549,16 @@ export default function EventosPage() {
         instagram_host_1: data.instagram_host_1 || null,
         instagram_host_2: data.instagram_host_2 || null,
         rsvp_deadline: data.rsvp_deadline || null,
-        template_config: {
-          ...(currentEvent.template_config || {}),
-          canva_cover_url: canvaCoverUrl || null,
-          canva_info_url: canvaInfoUrl || null,
-          qr_locations_coords: qrLocCoords,
-          qr_access_coords: qrAccessCoords,
-        },
+        template_config: updatedConfig,
       });
 
       if (updatedEvent) {
         setSuccessMessage('Configurações do evento guardadas com sucesso!');
         await refreshEvents();
-        setCurrentEvent(updatedEvent);
+        setCurrentEvent({
+          ...updatedEvent,
+          template_config: updatedConfig,
+        });
       } else {
         setErrorMessage('Não foi possível guardar as alterações.');
       }

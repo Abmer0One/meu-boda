@@ -18,6 +18,7 @@ import {
   Map,
 } from 'lucide-react';
 import { Guest, Event, Table, EventSchedule, EventInfoBlock } from '@/types';
+import { resolveCanvaConfig, DEFAULT_CANVA_COVER, DEFAULT_CANVA_INFO } from '@/utils/canvaConfig';
 
 export interface TemplateProps {
   guest: Guest;
@@ -205,17 +206,18 @@ export default function DefaultTemplate({
      PDF PRINT MODE LAYOUTS (Landscape A4: 1120x792)
      ========================================================================= */
   if (isPrinting) {
-    const canvaCover = event.template_config?.canva_cover_url || '/templates/canva/page_1.png';
-    const canvaInfo = event.template_config?.canva_info_url || '/templates/canva/page_2_clean.png';
+    const canvaConfig = resolveCanvaConfig(event.id, event.template_config, infoBlocks, event.background_image);
+    const canvaCover = canvaConfig.canva_cover_url || DEFAULT_CANVA_COVER;
+    const canvaInfo = canvaConfig.canva_info_url || DEFAULT_CANVA_INFO;
 
-    const locCoords = event.template_config?.qr_locations_coords || {
+    const locCoords = canvaConfig.qr_locations_coords || {
       left: 8.76,
       top: 69.56,
       width: 11.85,
       height: 16.76,
     };
 
-    const accessCoords = event.template_config?.qr_access_coords || {
+    const accessCoords = canvaConfig.qr_access_coords || {
       left: 80.99,
       top: 54.14,
       width: 13.10,

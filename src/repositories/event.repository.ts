@@ -58,6 +58,23 @@ export const EventRepository = {
       .single();
 
     if (error) {
+      if (error.code === 'PGRST204' && (event.template_config !== undefined || event.template_id !== undefined)) {
+        const { template_config, template_id, ...safePayload } = event as any;
+        const retry = await supabase
+          .from('events')
+          .update({ ...safePayload, updated_at: new Date().toISOString() })
+          .eq('id', id)
+          .select()
+          .single();
+
+        if (!retry.error && retry.data) {
+          return {
+            ...(retry.data as Event),
+            template_config: event.template_config,
+            template_id: event.template_id,
+          };
+        }
+      }
       console.error('Error updating event:', error);
       return null;
     }
