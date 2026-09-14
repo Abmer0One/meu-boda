@@ -176,6 +176,21 @@ export interface ChatRoom {
   last_message?: ChatMessage;
 }
 
+export interface PaymentInstallment {
+  id?: string;
+  name?: string;
+  percentage: number;
+  amount: number;
+  due_date?: string;
+  status: 'Pending' | 'UnderReview' | 'Paid' | 'Rejected';
+  receipt_url?: string | null;
+  receipt_name?: string | null;
+  submitted_at?: string | null;
+  verified_at?: string | null;
+  rejection_reason?: string | null;
+  notes?: string | null;
+}
+
 export interface VendorContract {
   id: string;
   room_id: string;
@@ -183,16 +198,13 @@ export interface VendorContract {
   event_id: string;
   service_title: string;
   total_value: number;
-  payment_installments: Array<{
-    percentage: number;
-    amount: number;
-    due_date?: string;
-    status: 'Pending' | 'Paid';
-  }>;
+  payment_installments: PaymentInstallment[];
   pdf_url: string | null;
   status: 'Pendente' | 'Ativo' | 'Recusado' | 'Concluido';
   event_date: string;
   created_at: string;
+  room?: ChatRoom;
+  vendor_profile?: VendorProfile;
 }
 
 export interface ChatMessage {

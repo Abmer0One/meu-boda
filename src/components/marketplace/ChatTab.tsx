@@ -22,8 +22,14 @@ import {
   Building2,
   Heart,
   Clock,
-  CheckCircle2,
-  XCircle
+  CheckCircle2, 
+  XCircle,
+  Upload,
+  Eye,
+  ExternalLink,
+  Paperclip,
+  CreditCard,
+  CheckSquare
 } from 'lucide-react';
 
 interface ChatTabProps {
@@ -56,6 +62,19 @@ export default function ChatTab({
   const [proposalTitle, setProposalTitle] = useState('');
   const [proposalValue, setProposalValue] = useState(0);
   const [isSendingProposal, setIsSendingProposal] = useState(false);
+
+  // Payment Receipt Modals
+  const [receiptModalOpen, setReceiptModalOpen] = useState(false);
+  const [selectedContract, setSelectedContract] = useState<VendorContract | null>(null);
+  const [selectedInstallmentIndex, setSelectedInstallmentIndex] = useState<number>(0);
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const [receiptNotes, setReceiptNotes] = useState('');
+  const [isUploadingReceipt, setIsUploadingReceipt] = useState(false);
+
+  // Rejection Modal
+  const [rejectModalOpen, setRejectModalOpen] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [isRejecting, setIsRejecting] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -373,6 +392,175 @@ export default function ChatTab({
     }
   };
 
+  // Open receipt upload modal
+  const handleOpenReceiptModal = (contract: VendorContract, index: number) => {
+    setSelectedContract(contract);
+    setSelectedInstallmentIndex(index);
+    setReceiptFile(null);
+    setReceiptNotes('');
+    setReceiptModalOpen(true);
+  };
+
+  // Submit payment receipt (Client)
+  const handleUploadReceipt = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedContract || !receiptFile || !activeRoom) return;
+    setIsUploadingReceipt(true);
+
+    try {
+      const cleanFileName = receiptFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const filePath = `${selectedContract.event_id}/${selectedContract.id}_inst${selectedInstallmentIndex}_${Date.now()}_${cleanFileName}`;
+
+      const { error: uploadErr } = await supabase.storage
+        .from('receipts')
+        .upload(filePath, receiptFile, {
+          cacheControl: '3600',
+          upsert: true
+        });
+
+      if (uploadErr) {
+        console.error('Error uploading receipt to storage:', uploadErr);
+        alert('Erro ao carregar o comprovativo. Verifique se o bucket "receipts" foi configurado no Supabase.');
+        return;
+      }
+
+      const { data: publicUrlData } = supabase.storage
+        .from('receipts')
+        .getPublicUrl(filePath);
+
+      const publicUrl = publicUrlData.publicUrl;
+
+      await ContractRepository.submitReceipt(
+        selectedContract.id,
+        selectedInstallmentIndex,
+        publicUrl,
+        receiptFile.name,
+        receiptNotes
+      );
+
+      const myUid = currentUserId || (await supabase.auth.getUser()).data.user?.id;
+      if (myUid && activeRoom) {
+        const amount = selectedContract.payment_installments?.[selectedInstallmentIndex]?.amount || 0;
+        await ChatRepository.sendMessage(
+          activeRoom.id,
+          myUid,
+          `📎 Comprovativo de pagamento submetido para a prestação #${selectedInstallmentIndex + 1} (${amount.toLocaleString('pt-AO')} Kz). Aguarda validação do fornecedor.`
+        );
+      }
+
+      setReceiptModalOpen(false);
+      loadMessages();
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao submeter comprovativo.');
+    } finally {
+      setIsUploadingReceipt(false);
+    }
+  };
+
+  // Confirm payment receipt (Vendor)
+  const handleConfirmPayment = async (contract: VendorContract, index: number) => {
+    if (!activeRoom) return;
+    try {
+      const category = activeRoom.vendor_profile?.category || 'Serviços';
+      await ContractRepository.confirmPayment(
+        contract.id,
+        index,
+        contract.event_id,
+        category
+      );
+
+      const myUid = currentUserId || (await supabase.auth.getUser()).data.user?.id;
+      if (myUid && activeRoom) {
+        const inst = contract.payment_installments?.[index];
+        const amount = inst?.amount || 0;
+        await ChatRepository.sendMessage(
+          activeRoom.id,
+          myUid,
+          `✅ Pagamento confirmado! A prestação #${index + 1} (${amount.toLocaleString('pt-AO')} Kz) foi validada e creditada no orçamento do casamento.`
+        );
+      }
+
+      loadMessages();
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao confirmar pagamento.');
+    }
+  };
+
+  // Open rejection modal
+  const handleOpenRejectModal = (contract: VendorContract, index: number) => {
+    setSelectedContract(contract);
+    setSelectedInstallmentIndex(index);
+    setRejectionReason('');
+    setRejectModalOpen(true);
+  };
+
+  // Reject payment receipt (Vendor)
+  const handleRejectPayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedContract || !rejectionReason.trim() || !activeRoom) return;
+    setIsRejecting(true);
+
+    try {
+      await ContractRepository.rejectPayment(
+        selectedContract.id,
+        selectedInstallmentIndex,
+        rejectionReason.trim()
+      );
+
+      const myUid = currentUserId || (await supabase.auth.getUser()).data.user?.id;
+      if (myUid && activeRoom) {
+        await ChatRepository.sendMessage(
+          activeRoom.id,
+          myUid,
+          `❌ O comprovativo de pagamento da prestação #${selectedInstallmentIndex + 1} foi recusado pelo fornecedor. Motivo: ${rejectionReason.trim()}`
+        );
+      }
+
+      setRejectModalOpen(false);
+      loadMessages();
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao recusar comprovativo.');
+    } finally {
+      setIsRejecting(false);
+    }
+  };
+
+  // Record direct payment (Vendor - Cash/TPA)
+  const handleDirectPayment = async (contract: VendorContract, index: number) => {
+    if (!activeRoom) return;
+    const amount = contract.payment_installments?.[index]?.amount || 0;
+    if (!confirm(`Confirma o recebimento direto (Presencial / TPA) da prestação #${index + 1} (${amount.toLocaleString('pt-AO')} Kz)?`)) {
+      return;
+    }
+
+    try {
+      const category = activeRoom.vendor_profile?.category || 'Serviços';
+      await ContractRepository.recordDirectPayment(
+        contract.id,
+        index,
+        contract.event_id,
+        category
+      );
+
+      const myUid = currentUserId || (await supabase.auth.getUser()).data.user?.id;
+      if (myUid && activeRoom) {
+        await ChatRepository.sendMessage(
+          activeRoom.id,
+          myUid,
+          `💵 Pagamento direto registado para a prestação #${index + 1} (${amount.toLocaleString('pt-AO')} Kz). Orçamento atualizado.`
+        );
+      }
+
+      loadMessages();
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao registar pagamento direto.');
+    }
+  };
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 border border-border-custom rounded-xl overflow-hidden min-h-[500px] bg-card-bg">
       {/* ROOMS LIST PANEL (LEFT) */}
@@ -602,20 +790,158 @@ export default function ChatTab({
                                 </span>
                               </div>
 
-                              <div className="text-[10px] text-foreground/60 bg-secondary/10 p-2.5 rounded-lg space-y-1">
-                                <p className="font-semibold text-foreground/75 mb-0.5">Plano de Pagamentos:</p>
-                                <p>• 50% Sinal: {((msg.proposal?.total_value || 0) * 0.5).toLocaleString('pt-AO')} Kz</p>
-                                <p>• 50% Final: {((msg.proposal?.total_value || 0) * 0.5).toLocaleString('pt-AO')} Kz</p>
-                              </div>
+                              {/* Installments Breakdown: Interactive if Ativo, summary if Pendente/Recusado */}
+                              {msg.proposal?.status === 'Ativo' && msg.proposal?.payment_installments && msg.proposal.payment_installments.length > 0 ? (
+                                <div className="space-y-2 bg-secondary/10 p-3 rounded-xl border border-border-custom/50">
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-bold text-xs text-foreground flex items-center gap-1.5">
+                                      <CreditCard className="h-3.5 w-3.5 text-primary" /> Parcelas de Pagamento
+                                    </span>
+                                    <span className="text-[10px] text-foreground/50">
+                                      {msg.proposal.payment_installments.filter((i: any) => i.status === 'Paid').length} de {msg.proposal.payment_installments.length} pagas
+                                    </span>
+                                  </div>
 
-                              {msg.proposal?.status === 'Ativo' && (
-                                <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 text-xs font-semibold flex items-center gap-2">
-                                  <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
-                                  <span>
-                                    {isMe 
-                                      ? 'Proposta aceite pelos noivos! Contrato ativo e sincronizado.' 
-                                      : 'Contrato aprovado! O serviço foi adicionado ao orçamento do casamento.'}
-                                  </span>
+                                  <div className="space-y-2">
+                                    {msg.proposal.payment_installments.map((inst: any, idx: number) => {
+                                      const isPaid = inst.status === 'Paid';
+                                      const isUnderReview = inst.status === 'UnderReview';
+                                      const isRejected = inst.status === 'Rejected';
+                                      const isPending = !inst.status || inst.status === 'Pending';
+
+                                      return (
+                                        <div 
+                                          key={idx} 
+                                          className={`p-2.5 rounded-lg border text-xs transition-all ${
+                                            isPaid
+                                              ? 'bg-emerald-500/10 border-emerald-500/30'
+                                              : isUnderReview
+                                              ? 'bg-blue-500/10 border-blue-500/30'
+                                              : isRejected
+                                              ? 'bg-rose-500/10 border-rose-500/30'
+                                              : 'bg-card border-border-custom'
+                                          }`}
+                                        >
+                                          <div className="flex items-start justify-between gap-2">
+                                            <div>
+                                              <span className="font-semibold text-foreground text-xs block">
+                                                Parcela {idx + 1} ({inst.percentage}%)
+                                              </span>
+                                              <span className="font-extrabold text-foreground text-xs">
+                                                {inst.amount.toLocaleString('pt-AO')} Kz
+                                              </span>
+                                            </div>
+
+                                            {/* Status Badge */}
+                                            <span className={`text-[9px] uppercase font-bold px-2 py-0.5 rounded-full ${
+                                              isPaid
+                                                ? 'bg-emerald-600 text-white'
+                                                : isUnderReview
+                                                ? 'bg-blue-600 text-white animate-pulse'
+                                                : isRejected
+                                                ? 'bg-rose-600 text-white'
+                                                : 'bg-amber-500/20 text-amber-700 dark:text-amber-400'
+                                            }`}>
+                                              {isPaid ? 'Pago & Confirmado' : isUnderReview ? 'Em Validação' : isRejected ? 'Recusado' : 'Pendente'}
+                                            </span>
+                                          </div>
+
+                                          {/* Receipt Link if available */}
+                                          {inst.receipt_url && (
+                                            <div className="mt-2 flex items-center justify-between text-[11px] bg-background/70 p-1.5 rounded-md border border-border-custom/50">
+                                              <a
+                                                href={inst.receipt_url}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="flex items-center gap-1.5 text-primary hover:underline font-medium truncate max-w-[200px]"
+                                                title={inst.receipt_name || 'Comprovativo'}
+                                              >
+                                                <Paperclip className="h-3 w-3 shrink-0" />
+                                                <span className="truncate">{inst.receipt_name || 'Ver Comprovativo'}</span>
+                                              </a>
+                                              <a
+                                                href={inst.receipt_url}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="text-[10px] text-foreground/50 hover:text-foreground flex items-center gap-0.5"
+                                              >
+                                                <ExternalLink className="h-2.5 w-2.5" /> Abrir
+                                              </a>
+                                            </div>
+                                          )}
+
+                                          {/* Rejection reason explanation */}
+                                          {isRejected && inst.rejection_reason && (
+                                            <p className="mt-1.5 text-[10px] text-rose-600 dark:text-rose-400 bg-rose-500/10 p-1.5 rounded">
+                                              <strong>Motivo da recusa:</strong> {inst.rejection_reason}
+                                            </p>
+                                          )}
+
+                                          {/* Notes if available */}
+                                          {inst.notes && (
+                                            <p className="mt-1 text-[10px] text-foreground/60 italic">
+                                              Nota: {inst.notes}
+                                            </p>
+                                          )}
+
+                                          {/* Action buttons */}
+                                          <div className="mt-2.5 flex flex-wrap gap-1.5 justify-end pt-1.5 border-t border-border-custom/30">
+                                            {/* Client Action: Upload / Re-upload Receipt */}
+                                            {userRole === 'client' && (isPending || isRejected) && (
+                                              <Button
+                                                size="sm"
+                                                variant="outline"
+                                                className="text-[10px] h-7 px-2.5 border-primary/40 text-primary hover:bg-primary/10"
+                                                onClick={() => handleOpenReceiptModal(msg.proposal!, idx)}
+                                              >
+                                                <Upload className="h-3 w-3 mr-1" />
+                                                {isRejected ? 'Reenviar Comprovativo' : 'Enviar Comprovativo'}
+                                              </Button>
+                                            )}
+
+                                            {/* Vendor Actions: Validate or Reject */}
+                                            {userRole === 'vendor' && isUnderReview && (
+                                              <>
+                                                <Button
+                                                  size="sm"
+                                                  variant="outline"
+                                                  className="text-[10px] h-7 px-2 border-rose-500/30 text-rose-600 dark:text-rose-400 hover:bg-rose-500/10"
+                                                  onClick={() => handleOpenRejectModal(msg.proposal!, idx)}
+                                                >
+                                                  <X className="h-3 w-3 mr-1" /> Recusar
+                                                </Button>
+                                                <Button
+                                                  size="sm"
+                                                  className="text-[10px] h-7 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white"
+                                                  onClick={() => handleConfirmPayment(msg.proposal!, idx)}
+                                                >
+                                                  <Check className="h-3 w-3 mr-1" /> Confirmar Recebimento
+                                                </Button>
+                                              </>
+                                            )}
+
+                                            {/* Vendor Action: Direct Payment (Cash/TPA) for Pending */}
+                                            {userRole === 'vendor' && isPending && (
+                                              <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                className="text-[10px] h-7 px-2 text-foreground/60 hover:text-foreground"
+                                                onClick={() => handleDirectPayment(msg.proposal!, idx)}
+                                              >
+                                                <CheckSquare className="h-3 w-3 mr-1" /> Registar Pagamento Direto
+                                              </Button>
+                                            )}
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="text-[10px] text-foreground/60 bg-secondary/10 p-2.5 rounded-lg space-y-1">
+                                  <p className="font-semibold text-foreground/75 mb-0.5">Plano de Pagamentos:</p>
+                                  <p>• 50% Sinal: {((msg.proposal?.total_value || 0) * 0.5).toLocaleString('pt-AO')} Kz</p>
+                                  <p>• 50% Final: {((msg.proposal?.total_value || 0) * 0.5).toLocaleString('pt-AO')} Kz</p>
                                 </div>
                               )}
 
@@ -719,6 +1045,107 @@ export default function ChatTab({
             </Button>
             <Button type="submit" isLoading={isSendingProposal}>
               Enviar Proposta
+            </Button>
+          </div>
+        </form>
+      </Dialog>
+
+      {/* SUBMIT RECEIPT MODAL (Client) */}
+      <Dialog
+        isOpen={receiptModalOpen}
+        onClose={() => setReceiptModalOpen(false)}
+        title={`Submeter Comprovativo de Pagamento`}
+      >
+        <form onSubmit={handleUploadReceipt} className="space-y-4">
+          <div className="bg-primary/5 p-3 rounded-xl border border-primary/20 text-xs">
+            <p className="font-bold text-foreground">{selectedContract?.service_title}</p>
+            <div className="flex justify-between items-center mt-1">
+              <span className="text-foreground/60">Parcela #{selectedInstallmentIndex + 1}:</span>
+              <span className="font-extrabold text-primary text-sm">
+                {selectedContract?.payment_installments?.[selectedInstallmentIndex]?.amount.toLocaleString('pt-AO')} Kz
+              </span>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-foreground mb-1">
+              Ficheiro do Comprovativo (PDF, JPG, PNG) *
+            </label>
+            <input
+              type="file"
+              accept="image/png,image/jpeg,application/pdf"
+              required
+              onChange={(e) => setReceiptFile(e.target.files?.[0] || null)}
+              className="w-full text-xs text-foreground file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-primary file:text-white hover:file:bg-primary/90 cursor-pointer border border-border-custom rounded-xl p-2 bg-secondary/5"
+            />
+            {receiptFile && (
+              <p className="text-[11px] text-foreground/60 mt-1 flex items-center gap-1">
+                <Paperclip className="h-3 w-3" />
+                {receiptFile.name} ({(receiptFile.size / 1024).toFixed(0)} KB)
+              </p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-foreground mb-1">
+              Observações adicionais (opcional)
+            </label>
+            <Input
+              placeholder="ex: Transferência via BAI Directo, ref: 123456"
+              value={receiptNotes}
+              onChange={(e) => setReceiptNotes(e.target.value)}
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" type="button" onClick={() => setReceiptModalOpen(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit" isLoading={isUploadingReceipt} disabled={!receiptFile}>
+              <Upload className="h-4 w-4 mr-1.5" /> Enviar Comprovativo
+            </Button>
+          </div>
+        </form>
+      </Dialog>
+
+      {/* REJECT RECEIPT MODAL (Vendor) */}
+      <Dialog
+        isOpen={rejectModalOpen}
+        onClose={() => setRejectModalOpen(false)}
+        title={`Recusar Comprovativo - Parcela #${selectedInstallmentIndex + 1}`}
+      >
+        <form onSubmit={handleRejectPayment} className="space-y-4">
+          <div className="bg-rose-500/10 p-3 rounded-xl border border-rose-500/20 text-xs text-rose-700 dark:text-rose-400">
+            <p className="font-semibold">
+              Indique o motivo pelo qual este comprovativo foi recusado para que o cliente possa reenviar devidamente.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-foreground mb-1">
+              Motivo da Recusa *
+            </label>
+            <textarea
+              rows={3}
+              required
+              placeholder="Descreva o motivo detalhado (ex: valor não recebido na conta bancária, imagem cortada/ilegível, etc.)..."
+              value={rejectionReason}
+              onChange={(e) => setRejectionReason(e.target.value)}
+              className="w-full text-xs rounded-xl border border-border-custom p-3 bg-secondary/5 text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" type="button" onClick={() => setRejectModalOpen(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              type="submit" 
+              isLoading={isRejecting} 
+              disabled={!rejectionReason.trim()}
+              className="bg-rose-600 hover:bg-rose-700 text-white"
+            >
+              <X className="h-4 w-4 mr-1.5" /> Confirmar Recusa
             </Button>
           </div>
         </form>

@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
-import { VendorProfile, VendorService, ChatRoom, ChatMessage, VendorContract } from '@/types';
+import { VendorProfile, VendorService, ChatRoom, ChatMessage, VendorContract, PaymentInstallment } from '@/types';
+import { BudgetRepository } from '@/repositories/budget.repository';
 
 export const VendorProfileRepository = {
   async get(id: string): Promise<VendorProfile | null> {
@@ -278,7 +279,7 @@ export const ContractRepository = {
   async getContractsForVendor(vendorId: string): Promise<VendorContract[]> {
     const { data, error } = await supabase
       .from('vendor_contracts')
-      .select('*, room:chat_rooms(*, event:events(*))')
+      .select('*, room:chat_rooms(*, event:events(*)), vendor_profile:vendor_profiles(*)')
       .eq('vendor_id', vendorId);
 
     if (error) {
@@ -329,5 +330,173 @@ export const ContractRepository = {
       return null;
     }
     return data as VendorContract;
+  },
+
+  async submitReceipt(
+    contractId: string, 
+    installmentIndex: number, 
+    receiptUrl: string, 
+    receiptName: string, 
+    notes?: string
+  ): Promise<VendorContract | null> {
+    const { data: contract, error: fetchErr } = await supabase
+      .from('vendor_contracts')
+      .select('*')
+      .eq('id', contractId)
+      .single();
+
+    if (fetchErr || !contract) {
+      console.error('Error fetching contract for submitReceipt:', fetchErr);
+      return null;
+    }
+
+    const installments: PaymentInstallment[] = [...(contract.payment_installments || [])];
+    if (!installments[installmentIndex]) return null;
+
+    installments[installmentIndex] = {
+      ...installments[installmentIndex],
+      status: 'UnderReview',
+      receipt_url: receiptUrl,
+      receipt_name: receiptName,
+      submitted_at: new Date().toISOString(),
+      rejection_reason: null,
+      notes: notes || installments[installmentIndex].notes || null,
+    };
+
+    return this.updateInstallments(contractId, installments);
+  },
+
+  async confirmPayment(
+    contractId: string, 
+    installmentIndex: number, 
+    eventId: string, 
+    category?: string
+  ): Promise<VendorContract | null> {
+    const { data: contract, error: fetchErr } = await supabase
+      .from('vendor_contracts')
+      .select('*')
+      .eq('id', contractId)
+      .single();
+
+    if (fetchErr || !contract) {
+      console.error('Error fetching contract for confirmPayment:', fetchErr);
+      return null;
+    }
+
+    const installments: PaymentInstallment[] = [...(contract.payment_installments || [])];
+    if (!installments[installmentIndex]) return null;
+
+    installments[installmentIndex] = {
+      ...installments[installmentIndex],
+      status: 'Paid',
+      verified_at: new Date().toISOString(),
+      rejection_reason: null,
+    };
+
+    const updated = await this.updateInstallments(contractId, installments);
+    if (updated) {
+      let targetCategory = category;
+      if (!targetCategory || targetCategory === 'Serviços') {
+        const { data: vp } = await supabase
+          .from('vendor_profiles')
+          .select('category')
+          .eq('id', contract.vendor_id)
+          .maybeSingle();
+        if (vp?.category) {
+          targetCategory = vp.category;
+        }
+      }
+
+      await BudgetRepository.incrementPaidAmount(
+        eventId, 
+        targetCategory || 'Serviços', 
+        installments[installmentIndex].amount
+      );
+    }
+    return updated;
+  },
+
+  async rejectPayment(
+    contractId: string, 
+    installmentIndex: number, 
+    reason: string
+  ): Promise<VendorContract | null> {
+    const { data: contract, error: fetchErr } = await supabase
+      .from('vendor_contracts')
+      .select('*')
+      .eq('id', contractId)
+      .single();
+
+    if (fetchErr || !contract) {
+      console.error('Error fetching contract for rejectPayment:', fetchErr);
+      return null;
+    }
+
+    const installments: PaymentInstallment[] = [...(contract.payment_installments || [])];
+    if (!installments[installmentIndex]) return null;
+
+    installments[installmentIndex] = {
+      ...installments[installmentIndex],
+      status: 'Rejected',
+      rejection_reason: reason,
+    };
+
+    return this.updateInstallments(contractId, installments);
+  },
+
+  async recordDirectPayment(
+    contractId: string, 
+    installmentIndex: number, 
+    eventId: string, 
+    category?: string, 
+    receiptUrl?: string, 
+    notes?: string
+  ): Promise<VendorContract | null> {
+    const { data: contract, error: fetchErr } = await supabase
+      .from('vendor_contracts')
+      .select('*')
+      .eq('id', contractId)
+      .single();
+
+    if (fetchErr || !contract) {
+      console.error('Error fetching contract for recordDirectPayment:', fetchErr);
+      return null;
+    }
+
+    const installments: PaymentInstallment[] = [...(contract.payment_installments || [])];
+    if (!installments[installmentIndex]) return null;
+
+    installments[installmentIndex] = {
+      ...installments[installmentIndex],
+      status: 'Paid',
+      receipt_url: receiptUrl || installments[installmentIndex].receipt_url || null,
+      receipt_name: receiptUrl ? 'Comprovativo de Pagamento' : installments[installmentIndex].receipt_name || null,
+      submitted_at: installments[installmentIndex].submitted_at || new Date().toISOString(),
+      verified_at: new Date().toISOString(),
+      rejection_reason: null,
+      notes: notes || 'Pagamento registado e confirmado diretamente pelo fornecedor',
+    };
+
+    const updated = await this.updateInstallments(contractId, installments);
+    if (updated) {
+      let targetCategory = category;
+      if (!targetCategory || targetCategory === 'Serviços') {
+        const { data: vp } = await supabase
+          .from('vendor_profiles')
+          .select('category')
+          .eq('id', contract.vendor_id)
+          .maybeSingle();
+        if (vp?.category) {
+          targetCategory = vp.category;
+        }
+      }
+
+      await BudgetRepository.incrementPaidAmount(
+        eventId, 
+        targetCategory || 'Serviços', 
+        installments[installmentIndex].amount
+      );
+    }
+    return updated;
   }
 };

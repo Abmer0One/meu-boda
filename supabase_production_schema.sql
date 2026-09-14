@@ -683,3 +683,27 @@ DROP TRIGGER IF EXISTS on_auth_user_created_vendor ON auth.users;
 CREATE TRIGGER on_auth_user_created_vendor
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_vendor_profile();
+
+-- ============================================================
+-- 10. PAYMENT RECEIPTS STORAGE
+-- ============================================================
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('receipts', 'receipts', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+DROP POLICY IF EXISTS "Allow public read receipts" ON storage.objects;
+CREATE POLICY "Allow public read receipts" ON storage.objects
+    FOR SELECT USING (bucket_id = 'receipts');
+
+DROP POLICY IF EXISTS "Allow authenticated upload receipts" ON storage.objects;
+CREATE POLICY "Allow authenticated upload receipts" ON storage.objects
+    FOR INSERT TO authenticated WITH CHECK (bucket_id = 'receipts');
+
+DROP POLICY IF EXISTS "Allow authenticated update receipts" ON storage.objects;
+CREATE POLICY "Allow authenticated update receipts" ON storage.objects
+    FOR UPDATE TO authenticated USING (bucket_id = 'receipts');
+
+DROP POLICY IF EXISTS "Allow authenticated delete receipts" ON storage.objects;
+CREATE POLICY "Allow authenticated delete receipts" ON storage.objects
+    FOR DELETE TO authenticated USING (bucket_id = 'receipts');
+

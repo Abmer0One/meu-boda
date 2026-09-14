@@ -56,5 +56,38 @@ export const BudgetRepository = {
       return false;
     }
     return true;
+  },
+
+  async incrementPaidAmount(eventId: string, category: string, amount: number): Promise<boolean> {
+    try {
+      const { data: existing } = await supabase
+        .from('budgets')
+        .select('*')
+        .eq('event_id', eventId)
+        .eq('category', category)
+        .maybeSingle();
+
+      if (existing) {
+        const newPaid = Number(existing.paid_amount || 0) + Number(amount);
+        const { error } = await supabase
+          .from('budgets')
+          .update({ paid_amount: newPaid })
+          .eq('id', existing.id);
+        return !error;
+      } else {
+        const { error } = await supabase
+          .from('budgets')
+          .insert({
+            event_id: eventId,
+            category: category,
+            estimated_amount: amount,
+            paid_amount: amount
+          });
+        return !error;
+      }
+    } catch (err) {
+      console.error('Error incrementing budget paid amount:', err);
+      return false;
+    }
   }
 };

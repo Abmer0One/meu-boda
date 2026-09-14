@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useEvent } from '@/contexts/EventContext';
 import { VendorRepository } from '@/repositories/vendor.repository';
-import { Vendor } from '@/types';
+import { Vendor, VendorContract } from '@/types';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -15,6 +15,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { vendorSchema } from '@/validations/schemas';
 import MarketplaceTab from '@/components/marketplace/MarketplaceTab';
 import ChatTab from '@/components/marketplace/ChatTab';
+import { ContractRepository } from '@/repositories/marketplace.repository';
 import { supabase } from '@/lib/supabase';
 import {
   Briefcase,
@@ -29,12 +30,18 @@ import {
   DollarSign,
   Search,
   MessageSquare,
-  Sparkles
+  Sparkles,
+  Paperclip,
+  ExternalLink,
+  Upload,
+  CreditCard,
+  CheckCircle2
 } from 'lucide-react';
 
 export default function FornecedoresPage() {
   const { currentEvent } = useEvent();
   const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [contracts, setContracts] = useState<VendorContract[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'contratos' | 'explorar' | 'mensagens'>('contratos');
   const [preselectedRoomId, setPreselectedRoomId] = useState<string | null>(null);
@@ -44,6 +51,14 @@ export default function FornecedoresPage() {
   const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [vendorToDelete, setVendorToDelete] = useState<Vendor | null>(null);
+
+  // Receipt Modal state
+  const [receiptModalOpen, setReceiptModalOpen] = useState(false);
+  const [selectedContract, setSelectedContract] = useState<VendorContract | null>(null);
+  const [selectedInstallmentIndex, setSelectedInstallmentIndex] = useState<number>(0);
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const [receiptNotes, setReceiptNotes] = useState('');
+  const [isUploadingReceipt, setIsUploadingReceipt] = useState(false);
 
   const {
     register,
@@ -58,7 +73,12 @@ export default function FornecedoresPage() {
     if (!currentEvent) return;
     setLoading(true);
     try {
-      const fetchedVendors = await VendorRepository.getAll(currentEvent.id);
+      const [fetchedVendors, fetchedContracts] = await Promise.all([
+        VendorRepository.getAll(currentEvent.id),
+        ContractRepository.getContractsForEvent(currentEvent.id)
+      ]);
+
+      setContracts(fetchedContracts);
 
       // Auto-enrich contacts from vendor_profiles if missing (e.g. for already contracted vendors)
       const enrichedVendors = await Promise.all(
@@ -107,6 +127,68 @@ export default function FornecedoresPage() {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleOpenReceiptModal = (contract: VendorContract, index: number) => {
+    setSelectedContract(contract);
+    setSelectedInstallmentIndex(index);
+    setReceiptFile(null);
+    setReceiptNotes('');
+    setReceiptModalOpen(true);
+  };
+
+  const handleUploadReceipt = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedContract || !receiptFile || !currentEvent) return;
+    setIsUploadingReceipt(true);
+    try {
+      const cleanFileName = receiptFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const filePath = `${currentEvent.id}/${selectedContract.id}_inst${selectedInstallmentIndex}_${Date.now()}_${cleanFileName}`;
+
+      const { error: uploadErr } = await supabase.storage
+        .from('receipts')
+        .upload(filePath, receiptFile, {
+          cacheControl: '3600',
+          upsert: true
+        });
+
+      if (uploadErr) {
+        console.error('Error uploading receipt to storage:', uploadErr);
+        alert('Erro ao carregar o comprovativo. Verifique se o bucket "receipts" foi configurado no Supabase.');
+        return;
+      }
+
+      const { data: publicUrlData } = supabase.storage
+        .from('receipts')
+        .getPublicUrl(filePath);
+
+      await ContractRepository.submitReceipt(
+        selectedContract.id,
+        selectedInstallmentIndex,
+        publicUrlData.publicUrl,
+        receiptFile.name,
+        receiptNotes
+      );
+
+      // Send chat message in room if room exists
+      const myUid = (await supabase.auth.getUser()).data.user?.id;
+      if (myUid && selectedContract.room_id) {
+        const amount = selectedContract.payment_installments?.[selectedInstallmentIndex]?.amount || 0;
+        await supabase.from('chat_messages').insert({
+          room_id: selectedContract.room_id,
+          sender_id: myUid,
+          content: `📎 Comprovativo de pagamento submetido para a prestação #${selectedInstallmentIndex + 1} (${amount.toLocaleString('pt-AO')} Kz). Aguarda validação do fornecedor.`
+        });
+      }
+
+      setReceiptModalOpen(false);
+      loadData();
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao submeter comprovativo.');
+    } finally {
+      setIsUploadingReceipt(false);
     }
   };
 
@@ -345,6 +427,123 @@ export default function FornecedoresPage() {
                         </div>
                       )}
                     </div>
+
+                    {/* Matched Contract Installments & Receipts */}
+                    {(() => {
+                      const matchedContract = contracts.find(c => 
+                        c.status === 'Ativo' && 
+                        (c.room?.vendor_profile?.company_name?.toLowerCase() === vendor.name.toLowerCase() ||
+                         c.service_title?.toLowerCase().includes(vendor.name.toLowerCase()))
+                      );
+
+                      if (!matchedContract || !matchedContract.payment_installments || matchedContract.payment_installments.length === 0) {
+                        return null;
+                      }
+
+                      return (
+                        <div className="mt-3 pt-3 border-t border-border-custom/60 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-bold text-foreground/60 uppercase tracking-wider flex items-center gap-1">
+                              <CreditCard className="h-3 w-3 text-primary" /> Parcelas do Contrato
+                            </span>
+                            {matchedContract.room_id && (
+                              <button
+                                onClick={() => {
+                                  setPreselectedRoomId(matchedContract.room_id);
+                                  setActiveTab('mensagens');
+                                }}
+                                className="text-[10px] text-primary hover:underline font-semibold flex items-center gap-1 cursor-pointer"
+                              >
+                                <MessageSquare className="h-3 w-3" /> Abrir Chat
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="space-y-1.5">
+                            {matchedContract.payment_installments.map((inst, idx) => {
+                              const isPaid = inst.status === 'Paid';
+                              const isUnderReview = inst.status === 'UnderReview';
+                              const isRejected = inst.status === 'Rejected';
+                              const isPending = !inst.status || inst.status === 'Pending';
+
+                              return (
+                                <div 
+                                  key={idx} 
+                                  className={`p-2 rounded-lg border text-[11px] space-y-1 ${
+                                    isPaid 
+                                      ? 'bg-emerald-500/5 border-emerald-500/20 text-emerald-800 dark:text-emerald-300'
+                                      : isUnderReview
+                                      ? 'bg-blue-500/5 border-blue-500/30 text-blue-800 dark:text-blue-300'
+                                      : isRejected
+                                      ? 'bg-rose-500/5 border-rose-500/30 text-rose-800 dark:text-rose-300'
+                                      : 'bg-secondary/10 border-border-custom/50 text-foreground'
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-semibold text-xs">
+                                      Parcela {idx + 1} ({inst.percentage}%): {inst.amount.toLocaleString('pt-AO')} Kz
+                                    </span>
+                                    <span className={`text-[9px] uppercase font-bold px-1.5 py-0.5 rounded-full ${
+                                      isPaid
+                                        ? 'bg-emerald-600 text-white'
+                                        : isUnderReview
+                                        ? 'bg-blue-600 text-white animate-pulse'
+                                        : isRejected
+                                        ? 'bg-rose-600 text-white'
+                                        : 'bg-amber-500/20 text-amber-700 dark:text-amber-400'
+                                    }`}>
+                                      {isPaid ? 'Pago' : isUnderReview ? 'Em Análise' : isRejected ? 'Recusado' : 'Pendente'}
+                                    </span>
+                                  </div>
+
+                                  {inst.receipt_url && (
+                                    <div className="flex items-center justify-between text-[10px] bg-background/60 p-1 rounded">
+                                      <a
+                                        href={inst.receipt_url}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="text-primary hover:underline flex items-center gap-1 truncate max-w-[170px]"
+                                      >
+                                        <Paperclip className="h-2.5 w-2.5 shrink-0" />
+                                        <span className="truncate">{inst.receipt_name || 'Comprovativo'}</span>
+                                      </a>
+                                      <a
+                                        href={inst.receipt_url}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="text-foreground/40 hover:text-foreground"
+                                      >
+                                        <ExternalLink className="h-2.5 w-2.5" />
+                                      </a>
+                                    </div>
+                                  )}
+
+                                  {isRejected && inst.rejection_reason && (
+                                    <p className="text-[10px] text-rose-600 dark:text-rose-400 bg-rose-500/10 p-1 rounded">
+                                      <strong>Motivo da recusa:</strong> {inst.rejection_reason}
+                                    </p>
+                                  )}
+
+                                  {(isPending || isRejected) && (
+                                    <div className="flex justify-end pt-1">
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="text-[10px] h-6 px-2 text-primary border-primary/30 hover:bg-primary/10"
+                                        onClick={() => handleOpenReceiptModal(matchedContract, idx)}
+                                      >
+                                        <Upload className="h-2.5 w-2.5 mr-1" />
+                                        {isRejected ? 'Reenviar Comprovativo' : 'Submeter Comprovativo'}
+                                      </Button>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {/* Card Footer */}
@@ -493,6 +692,64 @@ export default function FornecedoresPage() {
             </Button>
           </div>
         </div>
+      </Dialog>
+
+      {/* SUBMIT RECEIPT MODAL (Client) */}
+      <Dialog
+        isOpen={receiptModalOpen}
+        onClose={() => setReceiptModalOpen(false)}
+        title={`Submeter Comprovativo de Pagamento`}
+      >
+        <form onSubmit={handleUploadReceipt} className="space-y-4">
+          <div className="bg-primary/5 p-3 rounded-xl border border-primary/20 text-xs">
+            <p className="font-bold text-foreground">{selectedContract?.service_title}</p>
+            <div className="flex justify-between items-center mt-1">
+              <span className="text-foreground/60">Parcela #{selectedInstallmentIndex + 1}:</span>
+              <span className="font-extrabold text-primary text-sm">
+                {selectedContract?.payment_installments?.[selectedInstallmentIndex]?.amount.toLocaleString('pt-AO')} Kz
+              </span>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-foreground mb-1">
+              Ficheiro do Comprovativo (PDF, JPG, PNG) *
+            </label>
+            <input
+              type="file"
+              accept="image/png,image/jpeg,application/pdf"
+              required
+              onChange={(e) => setReceiptFile(e.target.files?.[0] || null)}
+              className="w-full text-xs text-foreground file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-primary file:text-white hover:file:bg-primary/90 cursor-pointer border border-border-custom rounded-xl p-2 bg-secondary/5"
+            />
+            {receiptFile && (
+              <p className="text-[11px] text-foreground/60 mt-1 flex items-center gap-1">
+                <Paperclip className="h-3 w-3" />
+                {receiptFile.name} ({(receiptFile.size / 1024).toFixed(0)} KB)
+              </p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-foreground mb-1">
+              Observações adicionais (opcional)
+            </label>
+            <Input
+              placeholder="ex: Transferência via BAI Directo, ref: 123456"
+              value={receiptNotes}
+              onChange={(e) => setReceiptNotes(e.target.value)}
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" type="button" onClick={() => setReceiptModalOpen(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit" isLoading={isUploadingReceipt} disabled={!receiptFile}>
+              <Upload className="h-4 w-4 mr-1.5" /> Enviar Comprovativo
+            </Button>
+          </div>
+        </form>
       </Dialog>
     </div>
   );
