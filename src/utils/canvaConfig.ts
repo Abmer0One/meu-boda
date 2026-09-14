@@ -38,17 +38,30 @@ export const DEFAULT_CANVA_INFO = '/templates/canva/page_2_clean.png';
 export const CANVA_CONFIG_BLOCK_TITLE = '__canva_template_config__';
 
 /**
+ * Ensures that a given URL is a genuine Canva invitation template artwork
+ * and not a decorative user photo (such as fundo_... or capa_...)
+ */
+export function isCleanCanvaUrl(url?: string | null): boolean {
+  if (!url || typeof url !== 'string') return false;
+  // If the file path contains fundo_ or capa_ (which are user photos), reject it
+  if (url.includes('/fundo_') || url.includes('/capa_')) {
+    return false;
+  }
+  return true;
+}
+
+/**
  * Resolves the Canva template configuration using all available sources:
  * 1. Event template_config field
  * 2. Event info blocks (__canva_template_config__)
  * 3. Browser localStorage
- * 4. Event background_image (as fallback for info image)
+ * 4. Official Canva default templates (DEFAULT_CANVA_COVER & DEFAULT_CANVA_INFO)
  */
 export function resolveCanvaConfig(
   eventId?: string | null,
   templateConfig?: Record<string, any> | null,
   infoBlocks?: EventInfoBlock[] | null,
-  backgroundImage?: string | null
+  _backgroundImage?: string | null
 ): CanvaTemplateConfig {
   let resolved: CanvaTemplateConfig = {
     canva_cover_url: null,
@@ -62,8 +75,8 @@ export function resolveCanvaConfig(
 
   // 1. From template_config if present
   if (templateConfig) {
-    if (templateConfig.canva_cover_url) resolved.canva_cover_url = templateConfig.canva_cover_url;
-    if (templateConfig.canva_info_url) resolved.canva_info_url = templateConfig.canva_info_url;
+    if (isCleanCanvaUrl(templateConfig.canva_cover_url)) resolved.canva_cover_url = templateConfig.canva_cover_url;
+    if (isCleanCanvaUrl(templateConfig.canva_info_url)) resolved.canva_info_url = templateConfig.canva_info_url;
     if (templateConfig.pdf_mode) resolved.pdf_mode = templateConfig.pdf_mode;
     if (templateConfig.show_locations_qr !== undefined) resolved.show_locations_qr = templateConfig.show_locations_qr;
     if (templateConfig.show_access_qr !== undefined) resolved.show_access_qr = templateConfig.show_access_qr;
@@ -71,14 +84,14 @@ export function resolveCanvaConfig(
     if (templateConfig.qr_access_coords) resolved.qr_access_coords = { ...templateConfig.qr_access_coords };
   }
 
-  // 2. From info blocks if present
+  // 2. From info blocks if present (database persistent config)
   if (infoBlocks && infoBlocks.length > 0) {
     const configBlock = infoBlocks.find((b) => b.title === CANVA_CONFIG_BLOCK_TITLE);
     if (configBlock?.content) {
       try {
         const parsed = JSON.parse(configBlock.content);
-        if (!resolved.canva_cover_url && parsed.canva_cover_url) resolved.canva_cover_url = parsed.canva_cover_url;
-        if (!resolved.canva_info_url && parsed.canva_info_url) resolved.canva_info_url = parsed.canva_info_url;
+        if (isCleanCanvaUrl(parsed.canva_cover_url)) resolved.canva_cover_url = parsed.canva_cover_url;
+        if (isCleanCanvaUrl(parsed.canva_info_url)) resolved.canva_info_url = parsed.canva_info_url;
         if (parsed.pdf_mode) resolved.pdf_mode = parsed.pdf_mode;
         if (parsed.show_locations_qr !== undefined) resolved.show_locations_qr = parsed.show_locations_qr;
         if (parsed.show_access_qr !== undefined) resolved.show_access_qr = parsed.show_access_qr;
@@ -96,8 +109,8 @@ export function resolveCanvaConfig(
       const stored = localStorage.getItem(`canva_template_${eventId}`);
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (!resolved.canva_cover_url && parsed.canva_cover_url) resolved.canva_cover_url = parsed.canva_cover_url;
-        if (!resolved.canva_info_url && parsed.canva_info_url) resolved.canva_info_url = parsed.canva_info_url;
+        if (!resolved.canva_cover_url && isCleanCanvaUrl(parsed.canva_cover_url)) resolved.canva_cover_url = parsed.canva_cover_url;
+        if (!resolved.canva_info_url && isCleanCanvaUrl(parsed.canva_info_url)) resolved.canva_info_url = parsed.canva_info_url;
         if (parsed.pdf_mode) resolved.pdf_mode = parsed.pdf_mode;
         if (parsed.show_locations_qr !== undefined) resolved.show_locations_qr = parsed.show_locations_qr;
         if (parsed.show_access_qr !== undefined) resolved.show_access_qr = parsed.show_access_qr;
@@ -109,10 +122,10 @@ export function resolveCanvaConfig(
     }
   }
 
-  // 4. Background image fallback for info image
-  if (!resolved.canva_info_url && backgroundImage) {
-    resolved.canva_info_url = backgroundImage;
-  }
+  // 4. Default fallbacks: NEVER fallback to decorative couple photos (backgroundImage)!
+  // Always fallback to the official clean Canva templates with all layout details.
+  resolved.canva_cover_url = resolved.canva_cover_url || DEFAULT_CANVA_COVER;
+  resolved.canva_info_url = resolved.canva_info_url || DEFAULT_CANVA_INFO;
 
   return resolved;
 }
@@ -121,7 +134,7 @@ export function resolveCanvaConfig(
  * Persists Canva template configuration to:
  * 1. localStorage (for instant offline & same-browser loading)
  * 2. event_info_blocks table (guaranteed persistent DB storage across all devices/guests)
- * 3. events table template_config & background_image (if column exists)
+ * 3. events table template_config (if column exists)
  */
 export async function persistCanvaConfig(
   eventId: string,
@@ -173,11 +186,8 @@ export async function persistCanvaConfig(
   try {
     const updatePayload: Record<string, any> = {
       updated_at: new Date().toISOString(),
+      template_config: config,
     };
-    if (config.canva_info_url) {
-      updatePayload.background_image = config.canva_info_url;
-    }
-    updatePayload.template_config = config;
 
     const { error } = await supabase
       .from('events')
@@ -185,12 +195,7 @@ export async function persistCanvaConfig(
       .eq('id', eventId);
 
     if (error && error.code === 'PGRST204') {
-      // Column template_config does not exist in schema cache; save without it
-      const { template_config, ...safePayload } = updatePayload;
-      await supabase
-        .from('events')
-        .update(safePayload)
-        .eq('id', eventId);
+      // Column template_config does not exist in schema cache; harmless
     }
   } catch (err) {
     console.warn('Notice: events table update had non-fatal error:', err);

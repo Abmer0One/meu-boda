@@ -9,7 +9,27 @@ export const EventRepository = {
       .eq('id', id)
       .single();
 
-    if (error) return null;
+    if (error || !data) return null;
+
+    try {
+      const { data: canvaBlock } = await supabase
+        .from('event_info_blocks')
+        .select('content')
+        .eq('event_id', id)
+        .eq('title', '__canva_template_config__')
+        .maybeSingle();
+
+      if (canvaBlock?.content) {
+        const parsed = JSON.parse(canvaBlock.content);
+        data.template_config = {
+          ...(data.template_config || {}),
+          ...parsed,
+        };
+      }
+    } catch (e) {
+      // Non-fatal
+    }
+
     return data as Event;
   },
 
@@ -20,7 +40,38 @@ export const EventRepository = {
       .eq('user_id', userId)
       .order('date', { ascending: true });
 
-    if (error) return [];
+    if (error || !data) return [];
+
+    try {
+      const eventIds = data.map((e) => e.id);
+      if (eventIds.length > 0) {
+        const { data: canvaBlocks } = await supabase
+          .from('event_info_blocks')
+          .select('event_id, content')
+          .in('event_id', eventIds)
+          .eq('title', '__canva_template_config__');
+
+        if (canvaBlocks && canvaBlocks.length > 0) {
+          const configMap = new Map<string, any>();
+          for (const b of canvaBlocks) {
+            try {
+              configMap.set(b.event_id, JSON.parse(b.content));
+            } catch (err) {}
+          }
+          for (const ev of data) {
+            if (configMap.has(ev.id)) {
+              ev.template_config = {
+                ...(ev.template_config || {}),
+                ...configMap.get(ev.id),
+              };
+            }
+          }
+        }
+      }
+    } catch (e) {
+      // Non-fatal
+    }
+
     return data as Event[];
   },
 
@@ -31,7 +82,27 @@ export const EventRepository = {
       .eq('slug', slug)
       .single();
 
-    if (error) return null;
+    if (error || !data) return null;
+
+    try {
+      const { data: canvaBlock } = await supabase
+        .from('event_info_blocks')
+        .select('content')
+        .eq('event_id', data.id)
+        .eq('title', '__canva_template_config__')
+        .maybeSingle();
+
+      if (canvaBlock?.content) {
+        const parsed = JSON.parse(canvaBlock.content);
+        data.template_config = {
+          ...(data.template_config || {}),
+          ...parsed,
+        };
+      }
+    } catch (e) {
+      // Non-fatal
+    }
+
     return data as Event;
   },
 

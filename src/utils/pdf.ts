@@ -191,7 +191,7 @@ export async function generateGuestPDF(
   schedules: EventSchedule[] = [],
   infoBlocks: EventInfoBlock[] = []
 ): Promise<jsPDF> {
-  const canvaConfig = resolveCanvaConfig(event.id, event.template_config, infoBlocks, event.background_image);
+  const canvaConfig = resolveCanvaConfig(event.id, event.template_config, infoBlocks, null);
   const isSinglePage = canvaConfig.pdf_mode === 'single_page';
 
   // Generate locations redirect QR code link

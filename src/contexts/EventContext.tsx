@@ -44,7 +44,7 @@ export const EventProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             templateId = localTemplate;
           }
         }
-        const resolvedCanva = resolveCanvaConfig(e.id, e.template_config, null, e.background_image);
+        const resolvedCanva = resolveCanvaConfig(e.id, e.template_config, null, null);
         return {
           ...e,
           template_id: templateId,
@@ -85,7 +85,7 @@ export const EventProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (event) {
       if (typeof window !== 'undefined') {
         const localTemplate = localStorage.getItem(`template_${event.id}`);
-        const resolvedCanva = resolveCanvaConfig(event.id, event.template_config, null, event.background_image);
+        const resolvedCanva = resolveCanvaConfig(event.id, event.template_config, null, null);
         const merged = {
           ...event,
           template_id: localTemplate || event.template_id,

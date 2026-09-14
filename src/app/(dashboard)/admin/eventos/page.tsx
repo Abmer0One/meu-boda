@@ -113,7 +113,7 @@ export default function EventosPage() {
         rsvp_deadline: currentEvent.rsvp_deadline || '',
       });
 
-      const resolved = resolveCanvaConfig(currentEvent.id, currentEvent.template_config, null, currentEvent.background_image);
+      const resolved = resolveCanvaConfig(currentEvent.id, currentEvent.template_config, null, null);
       setCanvaCoverUrl(resolved.canva_cover_url || '');
       setCanvaInfoUrl(resolved.canva_info_url || '');
       setPdfMode(resolved.pdf_mode || 'double_page');
@@ -336,7 +336,6 @@ export default function EventosPage() {
 
       setCurrentEvent({
         ...currentEvent,
-        background_image: publicUrl,
         template_config: updatedConfig,
       });
 
@@ -422,7 +421,6 @@ export default function EventosPage() {
       await persistCanvaConfig(currentEvent.id, updatedConfig);
       setCurrentEvent({
         ...currentEvent,
-        background_image: canvaInfoUrl || currentEvent.background_image,
         template_config: updatedConfig,
       });
       setCanvaSuccessMessage('Configurações do Template Canva guardadas com sucesso!');
@@ -566,7 +564,7 @@ export default function EventosPage() {
         party_location: data.party_location || null,
         theme: data.theme || null,
         cover_image: data.cover_image || null,
-        background_image: data.background_image || canvaInfoUrl || null,
+        background_image: data.background_image || null,
         description: data.description || null,
         ceremony_time: data.ceremony_time || null,
         ceremony_maps_url: data.ceremony_maps_url || null,
@@ -789,8 +787,11 @@ export default function EventosPage() {
 
                 <div className="space-y-2 border-t border-border-custom pt-4">
                   <label className="text-xs font-semibold text-foreground/75 tracking-wide block">
-                    Imagem de Fundo do Convite (PDF)
+                    Foto de Fundo / Galeria do Evento (Website)
                   </label>
+                  <p className="text-[11px] text-foreground/60">
+                    Foto do casal ou textura para o fundo do website. Para o design do convite em PDF / impressão, configure na secção &quot;Template Canva&quot; mais abaixo.
+                  </p>
                   
                   {backgroundImage && (
                     <div className="relative rounded-xl overflow-hidden border border-border-custom bg-secondary/10 h-40 w-full mb-3 group">

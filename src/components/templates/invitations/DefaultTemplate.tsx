@@ -206,7 +206,7 @@ export default function DefaultTemplate({
      PDF PRINT MODE LAYOUTS (Landscape A4: 1120x792)
      ========================================================================= */
   if (isPrinting) {
-    const canvaConfig = resolveCanvaConfig(event.id, event.template_config, infoBlocks, event.background_image);
+    const canvaConfig = resolveCanvaConfig(event.id, event.template_config, infoBlocks, null);
     const canvaCover = canvaConfig.canva_cover_url || DEFAULT_CANVA_COVER;
     const canvaInfo = canvaConfig.canva_info_url || DEFAULT_CANVA_INFO;
 

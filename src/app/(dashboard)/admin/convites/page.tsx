@@ -42,7 +42,7 @@ export default function ConvitesPage() {
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [bulkDownloading, setBulkDownloading] = useState(false);
 
-  const canvaConfig = currentEvent ? resolveCanvaConfig(currentEvent.id, currentEvent.template_config, infoBlocks, currentEvent.background_image) : null;
+  const canvaConfig = currentEvent ? resolveCanvaConfig(currentEvent.id, currentEvent.template_config, infoBlocks, null) : null;
   const isSinglePage = canvaConfig?.pdf_mode === 'single_page';
 
   // Individual send modal
