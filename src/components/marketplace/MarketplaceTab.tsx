@@ -258,15 +258,45 @@ export default function MarketplaceTab({ currentEvent, onStartChat }: Marketplac
             </div>
 
             {/* Contacts Info */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs text-foreground/75">
-              <div className="flex items-center gap-2 bg-card-bg p-3 rounded-xl border border-border-custom/50">
-                <Phone className="h-4 w-4 text-primary shrink-0" />
-                <span>{selectedVendor.nif ? `NIF: ${selectedVendor.nif}` : 'NIF não fornecido'}</span>
-              </div>
-              <div className="flex items-center gap-2 bg-card-bg p-3 rounded-xl border border-border-custom/50">
-                <Globe className="h-4 w-4 text-primary shrink-0" />
-                <span>IBAN configurado para transferências</span>
-              </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-foreground/75">
+              {selectedVendor.phone ? (
+                <div className="flex items-center gap-2 bg-card-bg p-3 rounded-xl border border-border-custom/50">
+                  <Phone className="h-4 w-4 text-primary shrink-0" />
+                  <a href={`tel:${selectedVendor.phone}`} className="hover:text-primary transition-colors truncate">
+                    {selectedVendor.phone}
+                  </a>
+                </div>
+              ) : null}
+
+              {selectedVendor.email ? (
+                <div className="flex items-center gap-2 bg-card-bg p-3 rounded-xl border border-border-custom/50">
+                  <Mail className="h-4 w-4 text-primary shrink-0" />
+                  <a href={`mailto:${selectedVendor.email}`} className="hover:text-primary transition-colors truncate">
+                    {selectedVendor.email}
+                  </a>
+                </div>
+              ) : null}
+
+              {selectedVendor.website ? (
+                <div className="flex items-center gap-2 bg-card-bg p-3 rounded-xl border border-border-custom/50">
+                  <Globe className="h-4 w-4 text-primary shrink-0" />
+                  <a 
+                    href={selectedVendor.website.startsWith('http') ? selectedVendor.website : `https://${selectedVendor.website}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="hover:text-primary transition-colors truncate"
+                  >
+                    {selectedVendor.website}
+                  </a>
+                </div>
+              ) : null}
+
+              {selectedVendor.nif ? (
+                <div className="flex items-center gap-2 bg-card-bg p-3 rounded-xl border border-border-custom/50">
+                  <span className="font-bold text-[10px] text-primary">NIF:</span>
+                  <span>{selectedVendor.nif}</span>
+                </div>
+              ) : null}
             </div>
 
             {/* Services / Portfolio packages */}

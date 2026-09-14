@@ -147,6 +147,9 @@ export interface VendorProfile {
   logo_url: string | null;
   category: string;
   description: string | null;
+  phone?: string | null;
+  email?: string | null;
+  website?: string | null;
   daily_limit: number;
   blocked_dates: string[];
   status: 'Pendente' | 'Aprovado' | 'Suspenso';

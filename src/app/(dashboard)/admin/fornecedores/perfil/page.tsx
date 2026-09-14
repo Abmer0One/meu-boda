@@ -16,7 +16,10 @@ import {
   Plus, 
   X, 
   CheckCircle2,
-  Loader2 
+  Loader2,
+  Phone,
+  Mail,
+  Globe 
 } from 'lucide-react';
 
 const CATEGORIES = ['Fotografia', 'Decoração', 'Buffet', 'DJ', 'Espaço', 'Vestuário', 'Outro'];
@@ -33,6 +36,9 @@ export default function VendorProfilePage() {
   const [category, setCategory] = useState('');
   const [nif, setNif] = useState('');
   const [iban, setIban] = useState('');
+  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
+  const [website, setWebsite] = useState('');
   const [description, setDescription] = useState('');
   const [dailyLimit, setDailyLimit] = useState(1);
   const [blockedDates, setBlockedDates] = useState<string[]>([]);
@@ -50,6 +56,9 @@ export default function VendorProfilePage() {
           setCategory(fetched.category || 'Fotografia');
           setNif(fetched.nif || '');
           setIban(fetched.iban || '');
+          setPhone(fetched.phone || user.user_metadata?.phone || '');
+          setEmail(fetched.email || user.email || '');
+          setWebsite(fetched.website || '');
           setDescription(fetched.description || '');
           setDailyLimit(fetched.daily_limit || 1);
           setBlockedDates(fetched.blocked_dates || []);
@@ -57,6 +66,9 @@ export default function VendorProfilePage() {
           // Initialize defaults in form state without failing
           setCompanyName(user.user_metadata?.full_name || 'Minha Empresa de Serviços');
           setCategory('Fotografia');
+          setPhone(user.user_metadata?.phone || '');
+          setEmail(user.email || '');
+          setWebsite('');
           setDailyLimit(1);
           setBlockedDates([]);
         }
@@ -86,6 +98,9 @@ export default function VendorProfilePage() {
         category: category || 'Outro',
         nif: nif || null,
         iban: iban || null,
+        phone: phone || null,
+        email: email || null,
+        website: website || null,
         description: description || null,
         daily_limit: Number(dailyLimit) || 1,
         blocked_dates: blockedDates,
@@ -256,6 +271,28 @@ export default function VendorProfilePage() {
                   placeholder="5000xxxxxx"
                   value={nif}
                   onChange={(e) => setNif(e.target.value)}
+                />
+                <Input
+                  label="Telefone / WhatsApp Comercial"
+                  placeholder="+244 9xx xxx xxx"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Input
+                  label="Email Comercial de Contacto"
+                  type="email"
+                  placeholder="contacto@empresa.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+                <Input
+                  label="Website ou Link das Redes Sociais"
+                  placeholder="https://instagram.com/minhaempresa"
+                  value={website}
+                  onChange={(e) => setWebsite(e.target.value)}
                 />
               </div>
 

@@ -517,6 +517,9 @@ CREATE TABLE IF NOT EXISTS public.vendor_profiles (
     company_name TEXT NOT NULL,
     nif TEXT,
     iban TEXT,
+    phone TEXT,
+    email TEXT,
+    website TEXT,
     logo_url TEXT,
     category TEXT NOT NULL DEFAULT 'Outro',
     description TEXT,
@@ -659,14 +662,18 @@ CREATE OR REPLACE FUNCTION public.handle_new_vendor_profile()
 RETURNS TRIGGER AS $$
 BEGIN
   IF (new.raw_user_meta_data->>'role' = 'vendor') THEN
-    INSERT INTO public.vendor_profiles (id, company_name, category, status)
+    INSERT INTO public.vendor_profiles (id, company_name, category, status, email, phone)
     VALUES (
       new.id,
       coalesce(new.raw_user_meta_data->>'full_name', 'Minha Empresa de Serviços'),
       'Fotografia',
-      'Aprovado'
+      'Aprovado',
+      new.email,
+      new.raw_user_meta_data->>'phone'
     )
-    ON CONFLICT (id) DO NOTHING;
+    ON CONFLICT (id) DO UPDATE SET
+      email = COALESCE(public.vendor_profiles.email, EXCLUDED.email),
+      phone = COALESCE(public.vendor_profiles.phone, EXCLUDED.phone);
   END IF;
   RETURN NEW;
 END;

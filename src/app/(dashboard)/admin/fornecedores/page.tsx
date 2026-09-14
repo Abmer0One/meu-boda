@@ -15,6 +15,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { vendorSchema } from '@/validations/schemas';
 import MarketplaceTab from '@/components/marketplace/MarketplaceTab';
 import ChatTab from '@/components/marketplace/ChatTab';
+import { supabase } from '@/lib/supabase';
 import {
   Briefcase,
   Plus,
@@ -58,7 +59,50 @@ export default function FornecedoresPage() {
     setLoading(true);
     try {
       const fetchedVendors = await VendorRepository.getAll(currentEvent.id);
-      setVendors(fetchedVendors);
+
+      // Auto-enrich contacts from vendor_profiles if missing (e.g. for already contracted vendors)
+      const enrichedVendors = await Promise.all(
+        fetchedVendors.map(async (v) => {
+          if (!v.phone || !v.email || !v.website) {
+            const { data: vp } = await supabase
+              .from('vendor_profiles')
+              .select('phone, email, website')
+              .eq('company_name', v.name)
+              .maybeSingle();
+
+            if (vp && (vp.phone || vp.email || vp.website)) {
+              const updated = {
+                ...v,
+                phone: v.phone || vp.phone || null,
+                email: v.email || vp.email || null,
+                website: v.website || vp.website || null,
+              };
+
+              // Asynchronously persist to database so it stays saved
+              if (
+                (vp.phone && !v.phone) ||
+                (vp.email && !v.email) ||
+                (vp.website && !v.website)
+              ) {
+                supabase
+                  .from('vendors')
+                  .update({
+                    phone: updated.phone,
+                    email: updated.email,
+                    website: updated.website
+                  })
+                  .eq('id', v.id)
+                  .then(() => {});
+              }
+
+              return updated;
+            }
+          }
+          return v;
+        })
+      );
+
+      setVendors(enrichedVendors);
     } catch (err) {
       console.error(err);
     } finally {
@@ -244,29 +288,60 @@ export default function FornecedoresPage() {
 
                     {/* Details */}
                     <div className="space-y-2 text-xs text-foreground/75 py-2">
-                      {vendor.phone && (
-                        <div className="flex items-center gap-2">
-                          <Phone className="h-3.5 w-3.5 text-foreground/45 shrink-0" />
-                          <span>{vendor.phone}</span>
+                      {vendor.phone ? (
+                        <div className="flex items-center justify-between gap-2">
+                          <a 
+                            href={`tel:${vendor.phone}`}
+                            className="flex items-center gap-2 hover:text-primary transition-colors truncate"
+                            title="Ligar"
+                          >
+                            <Phone className="h-3.5 w-3.5 text-primary shrink-0" />
+                            <span className="font-medium truncate">{vendor.phone}</span>
+                          </a>
+                          <a
+                            href={`https://wa.me/${vendor.phone.replace(/[^0-9]/g, '')}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold px-2 py-0.5 rounded-full hover:bg-emerald-500/20 transition-all shrink-0"
+                            title="Conversar no WhatsApp"
+                          >
+                            WhatsApp
+                          </a>
                         </div>
-                      )}
+                      ) : null}
+
                       {vendor.email && (
                         <div className="flex items-center gap-2">
-                          <Mail className="h-3.5 w-3.5 text-foreground/45 shrink-0" />
-                          <span className="truncate">{vendor.email}</span>
+                          <Mail className="h-3.5 w-3.5 text-primary shrink-0" />
+                          <a 
+                            href={`mailto:${vendor.email}`}
+                            className="truncate hover:text-primary transition-colors"
+                            title="Enviar Email"
+                          >
+                            {vendor.email}
+                          </a>
                         </div>
                       )}
+
                       {vendor.website && (
                         <div className="flex items-center gap-2">
-                          <Globe className="h-3.5 w-3.5 text-foreground/45 shrink-0" />
+                          <Globe className="h-3.5 w-3.5 text-primary shrink-0" />
                           <a
                             href={vendor.website.startsWith('http') ? vendor.website : `https://${vendor.website}`}
                             target="_blank"
                             rel="noreferrer"
                             className="text-primary hover:underline truncate"
+                            title="Visitar Website / Portfólio"
                           >
                             {vendor.website}
                           </a>
+                        </div>
+                      )}
+
+                      {!vendor.phone && !vendor.email && !vendor.website && (
+                        <div className="text-[11px] text-foreground/40 italic py-1 flex items-center gap-1.5">
+                          <AlertCircle className="h-3 w-3" />
+                          <span>Sem contactos adicionais registados.</span>
                         </div>
                       )}
                     </div>

@@ -284,15 +284,36 @@ export default function ChatTab({
         .eq('id', activeRoom.vendor_id)
         .single();
 
-      // 3. Create entry in client manual vendors table for budget sync
+      // 3. Create or update entry in client manual vendors table with full vendor contacts
       if (vendorProfile) {
-        await supabase.from('vendors').insert({
+        const { data: existingVendor } = await supabase
+          .from('vendors')
+          .select('id')
+          .eq('event_id', activeRoom.event_id)
+          .eq('name', vendorProfile.company_name)
+          .maybeSingle();
+
+        const vendorPayload = {
           event_id: activeRoom.event_id,
           name: vendorProfile.company_name,
           category: vendorProfile.category,
+          phone: vendorProfile.phone || null,
+          email: vendorProfile.email || null,
+          website: vendorProfile.website || null,
           contract_value: contract.total_value,
           status: 'Ativo'
-        });
+        };
+
+        if (existingVendor) {
+          await supabase
+            .from('vendors')
+            .update(vendorPayload)
+            .eq('id', existingVendor.id);
+        } else {
+          await supabase
+            .from('vendors')
+            .insert(vendorPayload);
+        }
 
         // Sync with budgets table
         const { data: existingBudget } = await supabase
