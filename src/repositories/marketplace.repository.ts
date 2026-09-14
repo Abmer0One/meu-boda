@@ -11,7 +11,27 @@ export const VendorProfileRepository = {
 
     if (error) {
       console.error('Error fetching vendor profile:', error);
+      if (error.code === 'PGRST205') {
+        console.warn("Tabela 'vendor_profiles' não encontrada no Supabase. Execute a migração SQL.");
+      }
       return null;
+    }
+    return data as VendorProfile;
+  },
+
+  async upsert(profile: Partial<VendorProfile> & { id: string }): Promise<VendorProfile | null> {
+    const { data, error } = await supabase
+      .from('vendor_profiles')
+      .upsert(profile, { onConflict: 'id' })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error upserting vendor profile:', error);
+      if (error.code === 'PGRST205') {
+        throw new Error("A tabela 'vendor_profiles' não foi encontrada na base de dados do Supabase. Por favor execute a migração SQL no SQL Editor do Supabase.");
+      }
+      throw new Error(error.message || 'Erro ao guardar dados do perfil.');
     }
     return data as VendorProfile;
   },
@@ -26,7 +46,10 @@ export const VendorProfileRepository = {
 
     if (error) {
       console.error('Error updating vendor profile:', error);
-      return null;
+      if (error.code === 'PGRST205') {
+        throw new Error("A tabela 'vendor_profiles' não foi encontrada no Supabase. Execute a migração SQL.");
+      }
+      throw new Error(error.message || 'Erro ao atualizar perfil.');
     }
     return data as VendorProfile;
   },
@@ -40,7 +63,10 @@ export const VendorProfileRepository = {
 
     if (error) {
       console.error('Error creating vendor profile:', error);
-      return null;
+      if (error.code === 'PGRST205') {
+        throw new Error("A tabela 'vendor_profiles' não foi encontrada no Supabase. Execute a migração SQL.");
+      }
+      throw new Error(error.message || 'Erro ao criar perfil.');
     }
     return data as VendorProfile;
   },
@@ -84,7 +110,10 @@ export const VendorServiceRepository = {
 
     if (error) {
       console.error('Error creating vendor service:', error);
-      return null;
+      if (error.code === 'PGRST205') {
+        throw new Error("A tabela 'vendor_services' não foi encontrada no Supabase. Execute a migração SQL.");
+      }
+      throw new Error(error.message || 'Erro ao criar serviço.');
     }
     return data as VendorService;
   },
@@ -99,7 +128,10 @@ export const VendorServiceRepository = {
 
     if (error) {
       console.error('Error updating vendor service:', error);
-      return null;
+      if (error.code === 'PGRST205') {
+        throw new Error("A tabela 'vendor_services' não foi encontrada no Supabase. Execute a migração SQL.");
+      }
+      throw new Error(error.message || 'Erro ao atualizar serviço.');
     }
     return data as VendorService;
   },
@@ -112,7 +144,10 @@ export const VendorServiceRepository = {
 
     if (error) {
       console.error('Error deleting vendor service:', error);
-      return false;
+      if (error.code === 'PGRST205') {
+        throw new Error("A tabela 'vendor_services' não foi encontrada no Supabase. Execute a migração SQL.");
+      }
+      throw new Error(error.message || 'Erro ao eliminar serviço.');
     }
     return true;
   }

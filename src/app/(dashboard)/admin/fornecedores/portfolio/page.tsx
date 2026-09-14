@@ -40,6 +40,8 @@ export default function VendorPortfolioPage() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [serviceToDelete, setServiceToDelete] = useState<VendorService | null>(null);
 
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
   const {
     register,
     handleSubmit,
@@ -52,16 +54,17 @@ export default function VendorPortfolioPage() {
   const loadData = async () => {
     if (!user) return;
     setLoading(true);
+    setErrorMessage(null);
     try {
-      // Get profile
       const prof = await VendorProfileRepository.get(user.id);
       if (prof) {
         setProfile(prof);
-        const fetchedServices = await VendorServiceRepository.getAll(prof.id);
-        setServices(fetchedServices);
       }
-    } catch (err) {
-      console.error(err);
+      const fetchedServices = await VendorServiceRepository.getAll(user.id);
+      setServices(fetchedServices);
+    } catch (err: any) {
+      console.error('Error loading portfolio:', err);
+      setErrorMessage(err?.message || 'Erro ao carregar serviços.');
     } finally {
       setLoading(false);
     }
@@ -93,10 +96,12 @@ export default function VendorPortfolioPage() {
   };
 
   const handleFormSubmit = async (data: any) => {
-    if (!profile) return;
+    if (!user) return;
+    setErrorMessage(null);
 
+    const vendorId = profile?.id || user.id;
     const payload = {
-      vendor_id: profile.id,
+      vendor_id: vendorId,
       title: data.title,
       description: data.description,
       price: Number(data.price),
@@ -111,8 +116,9 @@ export default function VendorPortfolioPage() {
       }
       setServiceModalOpen(false);
       loadData();
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      console.error('Error submitting service:', err);
+      setErrorMessage(err?.message || 'Erro ao guardar serviço.');
     }
   };
 
@@ -123,13 +129,15 @@ export default function VendorPortfolioPage() {
 
   const confirmDelete = async () => {
     if (!serviceToDelete) return;
+    setErrorMessage(null);
     try {
       await VendorServiceRepository.delete(serviceToDelete.id);
       setDeleteConfirmOpen(false);
       setServiceToDelete(null);
       loadData();
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      console.error('Error deleting service:', err);
+      setErrorMessage(err?.message || 'Erro ao eliminar serviço.');
     }
   };
 
@@ -143,6 +151,12 @@ export default function VendorPortfolioPage() {
 
   return (
     <div className="space-y-6">
+      {errorMessage && (
+        <div className="p-4 rounded-xl text-xs font-semibold flex items-center gap-2 border bg-error/10 border-error/20 text-error">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <span>{errorMessage}</span>
+        </div>
+      )}
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>

@@ -47,34 +47,21 @@ export default function VendorProfilePage() {
         if (fetched) {
           setProfile(fetched);
           setCompanyName(fetched.company_name);
-          setCategory(fetched.category);
+          setCategory(fetched.category || 'Fotografia');
           setNif(fetched.nif || '');
           setIban(fetched.iban || '');
           setDescription(fetched.description || '');
           setDailyLimit(fetched.daily_limit || 1);
           setBlockedDates(fetched.blocked_dates || []);
         } else {
-          // Create default profile
-          const defaultProf = await VendorProfileRepository.create({
-            id: user.id,
-            company_name: 'Minha Empresa de Serviços',
-            category: 'Fotografia',
-            nif: null,
-            iban: null,
-            logo_url: null,
-            description: null,
-            daily_limit: 1,
-            blocked_dates: [],
-            status: 'Aprovado'
-          });
-          if (defaultProf) {
-            setProfile(defaultProf);
-            setCompanyName(defaultProf.company_name);
-            setCategory(defaultProf.category);
-          }
+          // Initialize defaults in form state without failing
+          setCompanyName(user.user_metadata?.full_name || 'Minha Empresa de Serviços');
+          setCategory('Fotografia');
+          setDailyLimit(1);
+          setBlockedDates([]);
         }
       } catch (err) {
-        console.error(err);
+        console.error('Error fetching profile:', err);
       } finally {
         setLoading(false);
       }
@@ -85,28 +72,36 @@ export default function VendorProfilePage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!profile) return;
+    if (!user) {
+      setMessage({ type: 'error', text: 'Sessão inválida. Por favor volte a iniciar sessão.' });
+      return;
+    }
 
     setSaving(true);
     setMessage(null);
     try {
-      const updated = await VendorProfileRepository.update(profile.id, {
-        company_name: companyName,
-        category,
+      const saved = await VendorProfileRepository.upsert({
+        id: user.id,
+        company_name: companyName || 'Minha Empresa de Serviços',
+        category: category || 'Outro',
         nif: nif || null,
         iban: iban || null,
         description: description || null,
-        daily_limit: Number(dailyLimit),
-        blocked_dates: blockedDates
+        daily_limit: Number(dailyLimit) || 1,
+        blocked_dates: blockedDates,
+        status: profile?.status || 'Aprovado',
       });
 
-      if (updated) {
-        setProfile(updated);
-        setMessage({ type: 'success', text: 'Perfil comercial atualizado com sucesso!' });
+      if (saved) {
+        setProfile(saved);
+        setMessage({ type: 'success', text: 'Perfil comercial guardado com sucesso!' });
       }
-    } catch (err) {
-      console.error(err);
-      setMessage({ type: 'error', text: 'Erro ao guardar dados do perfil.' });
+    } catch (err: any) {
+      console.error('Erro ao guardar perfil:', err);
+      setMessage({ 
+        type: 'error', 
+        text: err?.message || 'Erro ao guardar dados do perfil.' 
+      });
     } finally {
       setSaving(false);
     }
