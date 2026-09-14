@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 import { ChatRoom, ChatMessage, VendorContract, Event, VendorProfile } from '@/types';
 import { ChatRepository, ContractRepository } from '@/repositories/marketplace.repository';
 import { Card, CardContent } from '@/components/ui/Card';
@@ -17,7 +18,12 @@ import {
   DollarSign, 
   Calendar,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  Building2,
+  Heart,
+  Clock,
+  CheckCircle2,
+  XCircle
 } from 'lucide-react';
 
 interface ChatTabProps {
@@ -35,6 +41,9 @@ export default function ChatTab({
   preselectedRoomId,
   onRoomSelected
 }: ChatTabProps) {
+  const { user } = useAuth();
+  const currentUserId = user?.id || (userRole === 'vendor' ? vendorId : null);
+
   const [rooms, setRooms] = useState<ChatRoom[]>([]);
   const [activeRoom, setActiveRoom] = useState<ChatRoom | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -49,7 +58,26 @@ export default function ChatTab({
   const [isSendingProposal, setIsSendingProposal] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const senderId = userRole === 'client' ? (eventId ? rooms[0]?.event?.user_id : null) : vendorId;
+
+  const formatTime = (isoString?: string) => {
+    if (!isoString) return '';
+    try {
+      const date = new Date(isoString);
+      return date.toLocaleTimeString('pt-AO', { hour: '2-digit', minute: '2-digit' });
+    } catch {
+      return '';
+    }
+  };
+
+  const formatDate = (isoString?: string) => {
+    if (!isoString) return '';
+    try {
+      const date = new Date(isoString);
+      return date.toLocaleDateString('pt-AO');
+    } catch {
+      return '';
+    }
+  };
 
   // Scroll to bottom
   const scrollToBottom = () => {
@@ -169,12 +197,14 @@ export default function ChatTab({
     if (e) e.preventDefault();
     if (!activeRoom || !newMessage.trim()) return;
 
-    const myUid = (await supabase.auth.getUser()).data.user?.id;
+    const myUid = currentUserId || (await supabase.auth.getUser()).data.user?.id;
     if (!myUid) return;
 
-    const msg = await ChatRepository.sendMessage(activeRoom.id, myUid, newMessage);
-    if (msg) {
-      setNewMessage('');
+    const contentToSend = newMessage.trim();
+    setNewMessage('');
+    const msg = await ChatRepository.sendMessage(activeRoom.id, myUid, contentToSend);
+    if (!msg) {
+      setNewMessage(contentToSend);
     }
   };
 
@@ -187,12 +217,13 @@ export default function ChatTab({
 
   const handleSendProposal = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activeRoom || !proposalTitle || proposalValue <= 0 || !vendorId) return;
+    if (!activeRoom || !proposalTitle || proposalValue <= 0) return;
 
     setIsSendingProposal(true);
     try {
-      const myUid = (await supabase.auth.getUser()).data.user?.id;
+      const myUid = currentUserId || (await supabase.auth.getUser()).data.user?.id;
       if (!myUid) return;
+      const vId = vendorId || activeRoom.vendor_id;
 
       // Get event date
       const { data: eventData } = await supabase
@@ -206,7 +237,7 @@ export default function ChatTab({
       // Create contract record
       const contract = await ContractRepository.create({
         room_id: activeRoom.id,
-        vendor_id: vendorId,
+        vendor_id: vId,
         event_id: activeRoom.event_id,
         service_title: proposalTitle,
         total_value: proposalValue,
@@ -240,7 +271,7 @@ export default function ChatTab({
   const handleApproveProposal = async (contract: VendorContract) => {
     if (!activeRoom) return;
     try {
-      const myUid = (await supabase.auth.getUser()).data.user?.id;
+      const myUid = currentUserId || (await supabase.auth.getUser()).data.user?.id;
       if (!myUid) return;
 
       // 1. Update contract status to Active
@@ -305,7 +336,7 @@ export default function ChatTab({
   const handleDeclineProposal = async (contract: VendorContract) => {
     if (!activeRoom) return;
     try {
-      const myUid = (await supabase.auth.getUser()).data.user?.id;
+      const myUid = currentUserId || (await supabase.auth.getUser()).data.user?.id;
       if (!myUid) return;
 
       await ContractRepository.updateStatus(contract.id, 'Recusado');
@@ -343,7 +374,7 @@ export default function ChatTab({
                 ? room.vendor_profile?.company_name || 'Fornecedor'
                 : room.event?.title || 'Casamento';
               const category = userRole === 'client' 
-                ? room.vendor_profile?.category 
+                ? room.vendor_profile?.category || 'Serviço'
                 : 'Casamento';
 
               return (
@@ -353,11 +384,18 @@ export default function ChatTab({
                     setActiveRoom(room);
                     if (onRoomSelected) onRoomSelected(room.id);
                   }}
-                  className={`w-full text-left p-4 border-b border-border-custom transition-all flex items-center justify-between cursor-pointer ${
+                  className={`w-full text-left p-3.5 border-b border-border-custom transition-all flex items-center gap-3 cursor-pointer ${
                     isSelected ? 'bg-primary/10 border-l-4 border-l-primary' : 'hover:bg-secondary/20'
                   }`}
                 >
-                  <div className="truncate pr-2">
+                  <div className={`h-9 w-9 rounded-full shrink-0 flex items-center justify-center font-bold text-xs ${
+                    isSelected ? 'bg-primary text-white' : 'bg-secondary/40 text-foreground/70'
+                  }`}>
+                    {userRole === 'client' 
+                      ? (room.vendor_profile?.company_name?.[0]?.toUpperCase() || 'F')
+                      : (room.event?.title?.[0]?.toUpperCase() || 'C')}
+                  </div>
+                  <div className="truncate flex-1">
                     <h4 className="font-bold text-sm truncate text-foreground">{title}</h4>
                     <span className="text-[10px] text-foreground/50 uppercase tracking-wider font-semibold">
                       {category}
@@ -380,15 +418,38 @@ export default function ChatTab({
           <>
             {/* Active Header */}
             <div className="p-4 border-b border-border-custom flex items-center justify-between bg-card-bg">
-              <div>
-                <h4 className="font-bold text-sm text-foreground">
+              <div className="flex items-center gap-3">
+                <div className="h-9 w-9 rounded-full bg-primary/15 flex items-center justify-center text-primary font-bold text-sm">
                   {userRole === 'client' 
-                    ? activeRoom.vendor_profile?.company_name 
-                    : activeRoom.event?.title}
-                </h4>
-                <p className="text-[10px] text-foreground/50">
-                  {userRole === 'client' ? activeRoom.vendor_profile?.category : 'Cliente'}
-                </p>
+                    ? (activeRoom.vendor_profile?.company_name?.[0]?.toUpperCase() || 'F')
+                    : (activeRoom.event?.title?.[0]?.toUpperCase() || 'C')}
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm text-foreground">
+                    {userRole === 'client' 
+                      ? activeRoom.vendor_profile?.company_name || 'Fornecedor'
+                      : activeRoom.event?.title || 'Casamento'}
+                  </h4>
+                  <p className="text-[11px] text-foreground/50 flex items-center gap-1.5">
+                    {userRole === 'client' ? (
+                      <>
+                        <span className="font-medium text-primary">{activeRoom.vendor_profile?.category || 'Serviço'}</span>
+                        <span>•</span>
+                        <span>Fornecedor</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="font-medium text-rose-600 dark:text-rose-400">Noivos / Cliente</span>
+                        {activeRoom.event?.date && (
+                          <>
+                            <span>•</span>
+                            <span>{new Date(activeRoom.event.date).toLocaleDateString('pt-AO')}</span>
+                          </>
+                        )}
+                      </>
+                    )}
+                  </p>
+                </div>
               </div>
 
               {/* Vendor Contract Actions */}
@@ -398,7 +459,7 @@ export default function ChatTab({
                   leftIcon={<FileText className="h-3.5 w-3.5" />} 
                   onClick={handleOpenProposalModal}
                 >
-                  Proposta
+                  Criar Proposta
                 </Button>
               )}
             </div>
@@ -411,8 +472,9 @@ export default function ChatTab({
                 </div>
               ) : messages.length > 0 ? (
                 messages.map((msg) => {
-                  const isMe = msg.sender_id === senderId;
+                  const isMe = Boolean(currentUserId && msg.sender_id === currentUserId);
                   const isProposal = msg.proposal_id !== null && msg.proposal;
+                  const isVendorSender = msg.sender_id === activeRoom.vendor_id;
 
                   return (
                     <div 
@@ -421,72 +483,150 @@ export default function ChatTab({
                     >
                       {/* Standard text message */}
                       {!isProposal ? (
-                        <div 
-                          className={`max-w-[75%] px-4 py-2.5 rounded-2xl text-xs leading-relaxed ${
-                            isMe 
-                              ? 'bg-primary text-white rounded-tr-none' 
-                              : 'bg-secondary/20 text-foreground rounded-tl-none border border-border-custom/50'
-                          }`}
-                        >
-                          {msg.content}
+                        <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[80%] sm:max-w-[70%]`}>
+                          {/* Sender identification label */}
+                          <div className="flex items-center gap-1.5 mb-1 px-1">
+                            {isMe ? (
+                              <span className="text-[10px] font-semibold text-foreground/50">Você</span>
+                            ) : isVendorSender ? (
+                              <div className="flex items-center gap-1 text-[11px] font-semibold text-primary">
+                                <Building2 className="h-3 w-3" />
+                                <span>{activeRoom.vendor_profile?.company_name || 'Fornecedor'}</span>
+                                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary uppercase font-bold tracking-wider">
+                                  {activeRoom.vendor_profile?.category || 'Fornecedor'}
+                                </span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1 text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+                                <Heart className="h-3 w-3 fill-current" />
+                                <span>{activeRoom.event?.title || 'Cliente / Noivos'}</span>
+                                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400 uppercase font-bold tracking-wider">
+                                  Noivos
+                                </span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Message bubble */}
+                          <div 
+                            className={`px-4 py-2.5 rounded-2xl text-xs leading-relaxed shadow-sm break-words ${
+                              isMe 
+                                ? 'bg-primary text-white rounded-tr-none' 
+                                : 'bg-card text-foreground rounded-tl-none border border-border-custom'
+                            }`}
+                          >
+                            <p className="whitespace-pre-wrap">{msg.content}</p>
+                            <div className={`flex items-center justify-end gap-1 mt-1 text-[9px] ${isMe ? 'text-white/70' : 'text-foreground/40'}`}>
+                              <Clock className="h-2.5 w-2.5" />
+                              <span>{formatTime(msg.created_at)}</span>
+                            </div>
+                          </div>
                         </div>
                       ) : (
                         /* Contract Proposal Card UI */
-                        <Card className="border border-primary/30 max-w-[85%] bg-card-bg shadow-sm overflow-hidden">
-                          <div className="bg-primary/5 px-4 py-3 border-b border-primary/20 flex items-center gap-2">
-                            <Briefcase className="h-4 w-4 text-primary" />
-                            <h5 className="font-bold text-xs text-primary">Proposta Comercial Oficial</h5>
+                        <div className={`w-full max-w-[85%] sm:max-w-[75%] flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
+                          <div className="flex items-center gap-1.5 mb-1 px-1">
+                            {isMe ? (
+                              <span className="text-[10px] font-semibold text-foreground/50">Você (Proposta Comercial)</span>
+                            ) : (
+                              <div className="flex items-center gap-1 text-[11px] font-semibold text-primary">
+                                <Building2 className="h-3 w-3" />
+                                <span>{activeRoom.vendor_profile?.company_name || 'Fornecedor'}</span>
+                              </div>
+                            )}
                           </div>
-                          <CardContent className="p-4 space-y-3 text-xs">
-                            <div>
-                              <p className="font-bold text-foreground">{msg.proposal?.service_title}</p>
-                              <p className="text-[10px] text-foreground/50 mt-0.5">Criada em {new Date(msg.proposal?.created_at || '').toLocaleDateString('pt-AO')}</p>
-                            </div>
 
-                            <div className="flex justify-between items-center bg-secondary/15 p-2 rounded-lg border border-border-custom/50">
-                              <span className="text-[10px] text-foreground/60 uppercase font-semibold">Valor Total</span>
-                              <span className="font-bold text-primary text-sm">
-                                {msg.proposal?.total_value.toLocaleString('pt-AO')} Kz
+                          <Card className={`w-full overflow-hidden shadow-sm transition-all ${
+                            isMe 
+                              ? 'border border-primary/30 bg-card-bg rounded-2xl rounded-tr-none' 
+                              : 'border-2 border-primary/40 bg-card-bg shadow-md rounded-2xl rounded-tl-none'
+                          }`}>
+                            <div className={`px-4 py-3 flex items-center justify-between border-b ${
+                              isMe 
+                                ? 'bg-primary/10 border-primary/20 text-primary' 
+                                : 'bg-primary text-white border-primary/20'
+                            }`}>
+                              <div className="flex items-center gap-2">
+                                <Briefcase className={`h-4 w-4 ${isMe ? 'text-primary' : 'text-white'}`} />
+                                <h5 className="font-bold text-xs">
+                                  {isMe ? 'Sua Proposta Comercial Oficial' : 'Proposta Comercial Recebida'}
+                                </h5>
+                              </div>
+                              <span className={`text-[10px] uppercase font-extrabold px-2.5 py-0.5 rounded-full ${
+                                msg.proposal?.status === 'Ativo' 
+                                  ? isMe ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-emerald-500 text-white'
+                                  : msg.proposal?.status === 'Recusado' 
+                                  ? isMe ? 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300' : 'bg-red-500 text-white'
+                                  : isMe ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300' : 'bg-white/20 text-white border border-white/30'
+                              }`}>
+                                {msg.proposal?.status}
                               </span>
                             </div>
 
-                            {/* Status and Action Buttons */}
-                            <div className="pt-2 flex items-center justify-between border-t border-border-custom/50">
-                              <span className="text-[10px] uppercase font-bold tracking-wider">
-                                Estado: {' '}
-                                <span className={`font-extrabold ${
-                                  msg.proposal?.status === 'Ativo' 
-                                    ? 'text-success' 
-                                    : msg.proposal?.status === 'Recusado' 
-                                    ? 'text-error' 
-                                    : 'text-warning'
-                                }`}>
-                                  {msg.proposal?.status}
+                            <CardContent className="p-4 space-y-3 text-xs">
+                              <div>
+                                <p className="font-bold text-foreground text-sm">{msg.proposal?.service_title}</p>
+                                <p className="text-[10px] text-foreground/50 mt-0.5">
+                                  {isMe ? 'Criada em' : 'Recebida em'} {formatDate(msg.proposal?.created_at)}
+                                </p>
+                              </div>
+
+                              <div className="flex justify-between items-center bg-primary/5 p-3 rounded-xl border border-primary/20">
+                                <div>
+                                  <span className="text-[10px] text-foreground/60 uppercase font-semibold block">Valor do Contrato</span>
+                                  <span className="text-[10px] text-foreground/50">Pagamento faseado (50% / 50%)</span>
+                                </div>
+                                <span className="font-extrabold text-primary text-base sm:text-lg">
+                                  {msg.proposal?.total_value.toLocaleString('pt-AO')} Kz
                                 </span>
-                              </span>
+                              </div>
 
-                              {/* Client Action Triggers */}
+                              <div className="text-[10px] text-foreground/60 bg-secondary/10 p-2.5 rounded-lg space-y-1">
+                                <p className="font-semibold text-foreground/75 mb-0.5">Plano de Pagamentos:</p>
+                                <p>• 50% Sinal: {((msg.proposal?.total_value || 0) * 0.5).toLocaleString('pt-AO')} Kz</p>
+                                <p>• 50% Final: {((msg.proposal?.total_value || 0) * 0.5).toLocaleString('pt-AO')} Kz</p>
+                              </div>
+
+                              {msg.proposal?.status === 'Ativo' && (
+                                <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 text-xs font-semibold flex items-center gap-2">
+                                  <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+                                  <span>
+                                    {isMe 
+                                      ? 'Proposta aceite pelos noivos! Contrato ativo e sincronizado.' 
+                                      : 'Contrato aprovado! O serviço foi adicionado ao orçamento do casamento.'}
+                                  </span>
+                                </div>
+                              )}
+
+                              {msg.proposal?.status === 'Recusado' && (
+                                <div className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-700 dark:text-red-400 text-xs font-semibold flex items-center gap-2">
+                                  <XCircle className="h-4 w-4 shrink-0 text-red-600" />
+                                  <span>{isMe ? 'Proposta recusada pelo cliente.' : 'Proposta recusada por você.'}</span>
+                                </div>
+                              )}
+
                               {userRole === 'client' && msg.proposal?.status === 'Pendente' && (
-                                <div className="flex gap-2">
+                                <div className="pt-2 flex flex-col sm:flex-row items-center justify-end gap-2 border-t border-border-custom/50">
                                   <Button 
                                     size="sm" 
                                     variant="outline" 
-                                    className="text-error hover:bg-error/10 border-error/20"
+                                    className="w-full sm:w-auto text-error hover:bg-error/10 border-error/30 text-xs"
                                     onClick={() => handleDeclineProposal(msg.proposal!)}
                                   >
-                                    <X className="h-3 w-3" /> Recusar
+                                    <X className="h-3.5 w-3.5 mr-1" /> Recusar Proposta
                                   </Button>
                                   <Button 
                                     size="sm" 
+                                    className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold"
                                     onClick={() => handleApproveProposal(msg.proposal!)}
                                   >
-                                    <Check className="h-3 w-3" /> Aceitar
+                                    <Check className="h-3.5 w-3.5 mr-1" /> Aceitar e Contratar
                                   </Button>
                                 </div>
                               )}
-                            </div>
-                          </CardContent>
-                        </Card>
+                            </CardContent>
+                          </Card>
+                        </div>
                       )}
                     </div>
                   );

@@ -157,7 +157,7 @@ export const ChatRepository = {
   async getRoomsForEvent(eventId: string): Promise<ChatRoom[]> {
     const { data, error } = await supabase
       .from('chat_rooms')
-      .select('*, vendor_profile:vendor_profiles(*)')
+      .select('*, vendor_profile:vendor_profiles(*), event:events(*)')
       .eq('event_id', eventId);
 
     if (error) {
@@ -170,7 +170,7 @@ export const ChatRepository = {
   async getRoomsForVendor(vendorId: string): Promise<ChatRoom[]> {
     const { data, error } = await supabase
       .from('chat_rooms')
-      .select('*, event:events(*)')
+      .select('*, vendor_profile:vendor_profiles(*), event:events(*)')
       .eq('vendor_id', vendorId);
 
     if (error) {
@@ -184,7 +184,7 @@ export const ChatRepository = {
     // Check if room exists
     const { data: existing, error: findError } = await supabase
       .from('chat_rooms')
-      .select('*, vendor_profile:vendor_profiles(*)')
+      .select('*, vendor_profile:vendor_profiles(*), event:events(*)')
       .eq('event_id', eventId)
       .eq('vendor_id', vendorId)
       .maybeSingle();
@@ -201,7 +201,7 @@ export const ChatRepository = {
     const { data: created, error: createError } = await supabase
       .from('chat_rooms')
       .insert({ event_id: eventId, vendor_id: vendorId })
-      .select('*, vendor_profile:vendor_profiles(*)')
+      .select('*, vendor_profile:vendor_profiles(*), event:events(*)')
       .single();
 
     if (createError) {
