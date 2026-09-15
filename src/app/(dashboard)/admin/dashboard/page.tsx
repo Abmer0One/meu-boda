@@ -362,8 +362,8 @@ export default function AdminDashboardPage() {
                     <YAxis tick={{ fontSize: 10 }} />
                     <Tooltip formatter={(value) => `${Number(value).toLocaleString()} Kz`} />
                     <Legend wrapperStyle={{ fontSize: 11 }} />
-                    <Bar dataKey="Orçado" fill="#D8A7B1" name="Estimativa" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="Pago" fill="#B76E79" name="Valor Pago" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="Orçado" fill="#4D2046" name="Estimativa" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="Pago" fill="#E86C64" name="Valor Pago" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>

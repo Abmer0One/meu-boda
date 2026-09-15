@@ -220,7 +220,7 @@ export default function PublicRSVPPage({ params }: RSVPPageProps) {
       particleCount: 100,
       spread: 70,
       origin: { y: 0.6 },
-      colors: ['#B76E79', '#D8A7B1', '#F8EDEB', '#22C55E'],
+      colors: ['#E86C64', '#4D2046', '#F8EDEF', '#10B981'],
     });
   };
 
