@@ -162,14 +162,17 @@ export default function LandingPage() {
         onMouseLeave={() => setActiveDropdown(null)}
       >
         <div className="mx-auto max-w-7xl px-6 h-full flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 cursor-pointer active:scale-95 transition-all">
+          <Link href="/" className="flex items-center gap-3 cursor-pointer active:scale-95 transition-all">
             <img 
-              src="/meu_boda_hybrid-removebg-preview.png" 
+              src="/logo_meu_boda.png" 
               alt="Meu Boda" 
               className={`w-auto object-contain transition-all duration-500 ${
-                isScrolled ? 'h-16' : 'h-24'
+                isScrolled ? 'h-10' : 'h-12'
               }`}
             />
+            <span className="font-serif font-extrabold text-2xl tracking-tight text-foreground">
+              Meu Boda
+            </span>
           </Link>
 
           {/* Desktop Nav Links & Dropdowns */}
@@ -1482,11 +1485,16 @@ export default function LandingPage() {
             
             {/* Brand Column */}
             <div className="space-y-4">
-              <img 
-                src="/meu_boda_hybrid-removebg-preview.png" 
-                alt="Meu Boda" 
-                className="h-36 w-auto object-contain"
-              />
+              <div className="flex items-center gap-3">
+                <img 
+                  src="/logo_meu_boda.png" 
+                  alt="Meu Boda" 
+                  className="h-12 w-auto object-contain"
+                />
+                <span className="font-serif font-extrabold text-2xl tracking-tight text-foreground">
+                  Meu Boda
+                </span>
+              </div>
               <p className="text-xs text-foreground/50 leading-relaxed font-semibold max-w-xs">
                 O Sistema Operacional de Casamentos em Angola. Planeie com precisão tecnológica e celebre com tranquilidade.
               </p>

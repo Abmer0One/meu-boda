@@ -52,8 +52,9 @@ export default function LoginPage() {
         <FadeInUp>
           <div className="text-center mb-6 flex flex-col items-center">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/meu_boda_hybrid-removebg-preview.png" alt="Logo Meu Boda" className="h-32 w-auto object-contain" />
-            <p className="text-sm text-foreground/60 mt-3 font-semibold">Painel de Organização de Eventos</p>
+            <img src="/logo_meu_boda.png" alt="Logo Meu Boda" className="h-20 w-auto object-contain" />
+            <h1 className="text-2xl font-serif font-extrabold text-foreground tracking-tight mt-3">Meu Boda</h1>
+            <p className="text-xs text-foreground/60 mt-1 font-semibold">Painel de Organização de Eventos</p>
           </div>
 
           <Card className="shadow-lg p-6 bg-card-bg">

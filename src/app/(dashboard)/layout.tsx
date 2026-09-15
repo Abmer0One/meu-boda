@@ -196,10 +196,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* DESKTOP SIDEBAR */}
       <aside className="hidden md:flex md:w-64 md:flex-col md:border-r md:border-border-custom md:bg-card-bg">
         {/* LOGO */}
-        <div className="flex h-20 items-center justify-center px-6 border-b border-border-custom bg-card-bg/50">
-          <Link href="/admin/dashboard" className="flex items-center justify-center w-full">
+        <div className="flex h-20 items-center justify-start px-6 border-b border-border-custom bg-card-bg/50">
+          <Link href="/admin/dashboard" className="flex items-center gap-2.5">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/meu_boda_hybrid-removebg-preview.png" alt="Logo Meu Boda" className="h-14 w-auto object-contain" />
+            <img src="/logo_meu_boda.png" alt="Logo Meu Boda" className="h-9 w-auto object-contain" />
+            <span className="font-serif font-extrabold text-lg tracking-tight text-foreground">
+              Meu Boda
+            </span>
           </Link>
         </div>
 
@@ -272,9 +275,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* MOBILE HEADER & CONTENT CONTAINER */}
       <div className="flex flex-1 flex-col overflow-hidden">
         <header className="flex h-16 shrink-0 items-center justify-between border-b border-border-custom bg-card-bg px-4 md:hidden">
-          <Link href={isAdmin ? '/admin/super' : '/admin/dashboard'} className="flex items-center">
+          <Link href={isAdmin ? '/admin/super' : '/admin/dashboard'} className="flex items-center gap-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/meu_boda_hybrid-removebg-preview.png" alt="Logo Meu Boda" className="h-10 w-auto object-contain" />
+            <img src="/logo_meu_boda.png" alt="Logo Meu Boda" className="h-8 w-auto object-contain" />
+            <span className="font-serif font-bold text-base tracking-tight text-foreground">
+              Meu Boda
+            </span>
           </Link>
 
           <div className="flex items-center gap-2">
