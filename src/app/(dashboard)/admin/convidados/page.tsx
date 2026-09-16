@@ -79,30 +79,42 @@ export default function ConvidadosPage() {
   };
 
   useEffect(() => {
+    if (!currentEvent?.id) return;
     loadData();
 
-    // Subscribe to realtime updates for guests of this event
-    const channel = supabase
-      .channel('convidados-guests-realtime')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'guests',
-          filter: `event_id=eq.${currentEvent?.id}`,
-        },
-        () => {
-          loadData();
-        }
-      )
-      .subscribe();
+    // Unique channel identifier per component instance
+    const channelId = `convidados-guests-${currentEvent.id}-${Math.random().toString(36).substring(2, 9)}`;
+    let channel: any = null;
+
+    try {
+      channel = supabase
+        .channel(channelId)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'guests',
+            filter: `event_id=eq.${currentEvent.id}`,
+          },
+          () => {
+            loadData();
+          }
+        )
+        .subscribe();
+    } catch (err) {
+      console.warn('Realtime subscription not available on convidados:', err);
+    }
 
     return () => {
-      supabase.removeChannel(channel);
+      if (channel) {
+        try {
+          supabase.removeChannel(channel);
+        } catch {}
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentEvent]);
+  }, [currentEvent?.id]);
 
   // Open modal for creating a new guest
   const handleNewGuestClick = () => {

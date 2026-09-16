@@ -71,10 +71,10 @@ export default function AdminDashboardPage() {
           CheckInRepository.getAll(currentEvent.id),
         ]);
 
-        setStats(fetchedStats);
-        setTasks(fetchedTasks.slice(0, 5)); // show top 5 tasks
-        setBudgets(fetchedBudgets);
-        setCheckins(fetchedCheckins.slice(0, 5)); // show last 5 checkins
+        setStats(fetchedStats || null);
+        setTasks(Array.isArray(fetchedTasks) ? fetchedTasks.slice(0, 5) : []);
+        setBudgets(Array.isArray(fetchedBudgets) ? fetchedBudgets : []);
+        setCheckins(Array.isArray(fetchedCheckins) ? fetchedCheckins.slice(0, 5) : []);
       } catch (err) {
         console.error('Error fetching dashboard data:', err);
       } finally {
@@ -84,25 +84,36 @@ export default function AdminDashboardPage() {
 
     loadData();
 
-    // Subscribe to realtime updates for guests of this event
-    const channel = supabase
-      .channel('dashboard-guests-realtime')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'guests',
-          filter: `event_id=eq.${currentEvent.id}`,
-        },
-        () => {
-          loadData();
-        }
-      )
-      .subscribe();
+    // Unique channel identifier per component instance
+    const channelId = `dashboard-guests-${currentEvent.id}-${Math.random().toString(36).substring(2, 9)}`;
+    let channel: any = null;
+
+    try {
+      channel = supabase
+        .channel(channelId)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'guests',
+            filter: `event_id=eq.${currentEvent.id}`,
+          },
+          () => {
+            loadData();
+          }
+        )
+        .subscribe();
+    } catch (err) {
+      console.warn('Realtime subscription not available on dashboard:', err);
+    }
 
     return () => {
-      supabase.removeChannel(channel);
+      if (channel) {
+        try {
+          supabase.removeChannel(channel);
+        } catch {}
+      }
     };
   }, [currentEvent]);
 
@@ -400,7 +411,9 @@ export default function AdminDashboardPage() {
                   <div>
                     <p className="text-sm font-semibold">{task.title}</p>
                     <p className="text-xs text-foreground/50">
-                      {task.due_date ? `Vence a: ${new Date(task.due_date).toLocaleDateString('pt-PT')}` : 'Sem data de vencimento'}
+                      {task.due_date && !isNaN(new Date(task.due_date).getTime())
+                        ? `Vence a: ${new Date(task.due_date).toLocaleDateString('pt-PT')}`
+                        : 'Sem data de vencimento'}
                     </p>
                   </div>
                   <div className="flex gap-2">
@@ -445,7 +458,9 @@ export default function AdminDashboardPage() {
                     </p>
                   </div>
                   <span className="text-xs font-semibold text-success bg-success/15 px-2.5 py-1 rounded-full">
-                    {new Date(ci.checked_at).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
+                    {ci.checked_at && !isNaN(new Date(ci.checked_at).getTime())
+                      ? new Date(ci.checked_at).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })
+                      : '--:--'}
                   </span>
                 </div>
               ))

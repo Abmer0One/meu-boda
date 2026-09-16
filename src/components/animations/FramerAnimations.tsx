@@ -157,15 +157,15 @@ export const AnimatedCounter: React.FC<{ value: number; duration?: number; prefi
   const [count, setCount] = useState(0);
 
   useEffect(() => {
+    const end = typeof value === 'number' && !isNaN(value) ? Math.round(value) : 0;
     let start = 0;
-    const end = value;
-    if (start === end) {
+    if (start === end || end <= 0) {
       setCount(end);
       return;
     }
 
-    const totalMiliseconds = duration * 1000;
-    const incrementTime = Math.max(Math.floor(totalMiliseconds / end), 20);
+    const totalMiliseconds = (duration || 1.5) * 1000;
+    const incrementTime = Math.max(Math.floor(totalMiliseconds / Math.max(end, 1)), 20);
     
     const timer = setInterval(() => {
       start += Math.ceil((end - start) / 10);

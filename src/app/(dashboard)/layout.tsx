@@ -258,7 +258,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* FOOTER USER / LOGOUT */}
         <div className="border-t border-border-custom p-4 flex items-center justify-between gap-3 bg-secondary/20">
           <div className="truncate flex-1">
-            <p className="text-xs font-semibold truncate">{user.email}</p>
+            <p className="text-xs font-semibold truncate">{user?.email || 'Minha Conta'}</p>
             <p className="text-[10px] text-foreground/50">
               {isAdmin ? 'Administrador' : isVendor ? 'Fornecedor' : 'Organizador'}
             </p>
@@ -287,7 +287,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 ? currentEvent.title
                 : 'Meu Boda'}
             </span>
-            {currentEvent && !isAdmin && !isVendor && (
+            {currentEvent?.date && !isNaN(new Date(currentEvent.date).getTime()) && !isAdmin && !isVendor && (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-secondary text-primary border border-border-custom/50">
                 <Heart className="h-3 w-3 fill-primary text-primary" />
                 {new Date(currentEvent.date).toLocaleDateString('pt-AO', {
@@ -307,9 +307,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               className="flex items-center gap-2 text-xs font-semibold text-foreground/75 hover:text-primary transition-colors"
             >
               <div className="h-8 w-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-bold">
-                {user.email ? user.email.charAt(0).toUpperCase() : 'U'}
+                {user?.email ? user.email.charAt(0).toUpperCase() : 'U'}
               </div>
-              <span className="hidden lg:inline">{user.email}</span>
+              <span className="hidden lg:inline">{user?.email || 'Minha Conta'}</span>
             </Link>
           </div>
         </header>

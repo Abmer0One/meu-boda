@@ -49,51 +49,62 @@ export default function PublicLiveGalleryPage({ params }: LiveGalleryProps) {
   useEffect(() => {
     if (!event) return;
 
-    const channel = supabase
-      .channel(`live-gallery-${event.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'event_media',
-        },
-        (payload) => {
-          // Handle inserts, updates, and deletes in real-time
-          if (payload.eventType === 'INSERT') {
-            const newMedia = payload.new as EventMedia;
-            if (newMedia.event_id === event.id && newMedia.status === 'approved') {
-              setMediaList((prev) => {
-                // Prevent duplicate entries
-                if (prev.some((m) => m.id === newMedia.id)) return prev;
-                return [newMedia, ...prev];
-              });
-            }
-          } else if (payload.eventType === 'UPDATE') {
-            const updated = payload.new as EventMedia;
-            if (updated.event_id === event.id) {
-              if (updated.status === 'approved') {
+    const channelId = `live-gallery-${event.id}-${Math.random().toString(36).substring(2, 9)}`;
+    let channel: any = null;
+
+    try {
+      channel = supabase
+        .channel(channelId)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'event_media',
+          },
+          (payload) => {
+            // Handle inserts, updates, and deletes in real-time
+            if (payload.eventType === 'INSERT') {
+              const newMedia = payload.new as EventMedia;
+              if (newMedia.event_id === event.id && newMedia.status === 'approved') {
                 setMediaList((prev) => {
-                  if (prev.some((m) => m.id === updated.id)) {
-                    return prev.map((m) => (m.id === updated.id ? updated : m));
-                  }
-                  return [updated, ...prev];
+                  // Prevent duplicate entries
+                  if (prev.some((m) => m.id === newMedia.id)) return prev;
+                  return [newMedia, ...prev];
                 });
-              } else {
-                // If status was changed from approved to something else
-                setMediaList((prev) => prev.filter((m) => m.id !== updated.id));
               }
+            } else if (payload.eventType === 'UPDATE') {
+              const updated = payload.new as EventMedia;
+              if (updated.event_id === event.id) {
+                if (updated.status === 'approved') {
+                  setMediaList((prev) => {
+                    if (prev.some((m) => m.id === updated.id)) {
+                      return prev.map((m) => (m.id === updated.id ? updated : m));
+                    }
+                    return [updated, ...prev];
+                  });
+                } else {
+                  // If status was changed from approved to something else
+                  setMediaList((prev) => prev.filter((m) => m.id !== updated.id));
+                }
+              }
+            } else if (payload.eventType === 'DELETE') {
+              const oldId = payload.old.id;
+              setMediaList((prev) => prev.filter((m) => m.id !== oldId));
             }
-          } else if (payload.eventType === 'DELETE') {
-            const oldId = payload.old.id;
-            setMediaList((prev) => prev.filter((m) => m.id !== oldId));
           }
-        }
-      )
-      .subscribe();
+        )
+        .subscribe();
+    } catch (err) {
+      console.warn('Realtime live gallery not available:', err);
+    }
 
     return () => {
-      supabase.removeChannel(channel);
+      if (channel) {
+        try {
+          supabase.removeChannel(channel);
+        } catch {}
+      }
     };
   }, [event]);
 

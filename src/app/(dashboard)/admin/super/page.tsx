@@ -83,32 +83,43 @@ export default function SuperAdminPage() {
     if (!isAdmin) return;
 
     // Listen to changes across all tables to update stats in real-time
-    const channel = supabase
-      .channel('super-admin-realtime-channel')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'events' },
-        () => { loadData(); }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'guests' },
-        () => { loadData(); }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'checkins' },
-        () => { loadData(); }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'tasks' },
-        () => { loadData(); }
-      )
-      .subscribe();
+    const channelId = `super-admin-realtime-${Math.random().toString(36).substring(2, 9)}`;
+    let channel: any = null;
+
+    try {
+      channel = supabase
+        .channel(channelId)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'events' },
+          () => { loadData(); }
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'guests' },
+          () => { loadData(); }
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'checkins' },
+          () => { loadData(); }
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'tasks' },
+          () => { loadData(); }
+        )
+        .subscribe();
+    } catch (err) {
+      console.warn('Realtime subscription not available in admin console:', err);
+    }
 
     return () => {
-      supabase.removeChannel(channel);
+      if (channel) {
+        try {
+          supabase.removeChannel(channel);
+        } catch {}
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);

@@ -28,45 +28,62 @@ export default function NotificationBell() {
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const fetchNotifications = async () => {
-    if (!user) return;
+    if (!user?.id) return;
     try {
       const [list, count] = await Promise.all([
         NotificationRepository.getAll(user.id),
         NotificationRepository.getUnreadCount(user.id),
       ]);
-      setNotifications(list);
-      setUnreadCount(count);
+      setNotifications(Array.isArray(list) ? list : []);
+      setUnreadCount(typeof count === 'number' ? count : 0);
     } catch (err) {
-      console.error('Error loading notifications:', err);
+      console.warn('Error loading notifications:', err);
+      setNotifications([]);
+      setUnreadCount(0);
     }
   };
 
   useEffect(() => {
-    if (!user) return;
+    if (!user?.id) return;
     fetchNotifications();
 
-    // Supabase Realtime subscription for instant alert
-    const channel = supabase
-      .channel(`user-notifications-${user.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'notifications',
-          filter: `user_id=eq.${user.id}`,
-        },
-        () => {
-          fetchNotifications();
-        }
-      )
-      .subscribe();
+    // Unique channel identifier prevents collision if multiple instances mount simultaneously
+    const channelId = `user-notifs-${user.id}-${Math.random().toString(36).substring(2, 9)}`;
+    let channel: any = null;
+
+    try {
+      channel = supabase
+        .channel(channelId)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'notifications',
+            filter: `user_id=eq.${user.id}`,
+          },
+          () => {
+            fetchNotifications();
+          }
+        )
+        .subscribe((status) => {
+          if (status === 'CHANNEL_ERROR') {
+            console.warn('Notification realtime channel error (table may not be published yet)');
+          }
+        });
+    } catch (e) {
+      console.warn('Failed to start notification realtime channel:', e);
+    }
 
     return () => {
-      supabase.removeChannel(channel);
+      if (channel) {
+        try {
+          supabase.removeChannel(channel);
+        } catch {}
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user?.id]);
 
   // Handle outside click to close dropdown
   useEffect(() => {
@@ -84,7 +101,7 @@ export default function NotificationBell() {
     setLoading(true);
     try {
       await NotificationRepository.markAllAsRead(user.id);
-      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+      setNotifications((prev) => (Array.isArray(prev) ? prev.map((n) => ({ ...n, read: true })) : []));
       setUnreadCount(0);
     } catch (err) {
       console.error(err);
@@ -94,10 +111,11 @@ export default function NotificationBell() {
   };
 
   const handleClickItem = async (notif: AppNotification) => {
+    if (!notif) return;
     if (!notif.read) {
       await NotificationRepository.markAsRead(notif.id);
       setNotifications((prev) =>
-        prev.map((n) => (n.id === notif.id ? { ...n, read: true } : n))
+        Array.isArray(prev) ? prev.map((n) => (n.id === notif.id ? { ...n, read: true } : n)) : []
       );
       setUnreadCount((prev) => Math.max(0, prev - 1));
     }
@@ -107,16 +125,23 @@ export default function NotificationBell() {
     }
   };
 
-  const formatTimeAgo = (dateStr: string) => {
-    const diff = Date.now() - new Date(dateStr).getTime();
-    const minutes = Math.floor(diff / 60000);
-    if (minutes < 1) return 'Agora mesmo';
-    if (minutes < 60) return `Há ${minutes} min`;
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `Há ${hours} h`;
-    const days = Math.floor(hours / 24);
-    if (days === 1) return 'Ontem';
-    return `Há ${days} dias`;
+  const formatTimeAgo = (dateStr?: string | null) => {
+    if (!dateStr) return 'Agora mesmo';
+    try {
+      const timestamp = new Date(dateStr).getTime();
+      if (isNaN(timestamp)) return 'Agora mesmo';
+      const diff = Date.now() - timestamp;
+      const minutes = Math.floor(diff / 60000);
+      if (minutes < 1) return 'Agora mesmo';
+      if (minutes < 60) return `Há ${minutes} min`;
+      const hours = Math.floor(minutes / 60);
+      if (hours < 24) return `Há ${hours} h`;
+      const days = Math.floor(hours / 24);
+      if (days === 1) return 'Ontem';
+      return `Há ${days} dias`;
+    } catch {
+      return 'Recentemente';
+    }
   };
 
   const getNotificationIcon = (type: string) => {

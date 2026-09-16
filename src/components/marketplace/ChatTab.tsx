@@ -167,48 +167,63 @@ export default function ChatTab({
     if (!activeRoom) return;
 
     // Realtime subscription for messages
-    const channel = supabase
-      .channel(`room-${activeRoom.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'chat_messages',
-          filter: `room_id=eq.${activeRoom.id}`
-        },
-        async (payload) => {
-          // If the message has a proposal, fetch it with full join
-          const msgId = payload.new.id;
-          const { data, error } = await supabase
-            .from('chat_messages')
-            .select('*, proposal:vendor_contracts(*)')
-            .eq('id', msgId)
-            .single();
-          
-          if (!error && data) {
-            setMessages((prev) => [...prev, data as ChatMessage]);
-          } else {
-            setMessages((prev) => [...prev, payload.new as ChatMessage]);
+    const channelId = `room-${activeRoom.id}-${Math.random().toString(36).substring(2, 9)}`;
+    let channel: any = null;
+
+    try {
+      channel = supabase
+        .channel(channelId)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'chat_messages',
+            filter: `room_id=eq.${activeRoom.id}`
+          },
+          async (payload) => {
+            try {
+              // If the message has a proposal, fetch it with full join
+              const msgId = payload.new.id;
+              const { data, error } = await supabase
+                .from('chat_messages')
+                .select('*, proposal:vendor_contracts(*)')
+                .eq('id', msgId)
+                .single();
+              
+              if (!error && data) {
+                setMessages((prev) => [...prev, data as ChatMessage]);
+              } else {
+                setMessages((prev) => [...prev, payload.new as ChatMessage]);
+              }
+            } catch {
+              setMessages((prev) => [...prev, payload.new as ChatMessage]);
+            }
           }
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'vendor_contracts'
-        },
-        () => {
-          // If contract status updates, reload all messages to refresh proposal card UI
-          loadMessages();
-        }
-      )
-      .subscribe();
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'vendor_contracts'
+          },
+          () => {
+            // If contract status updates, reload all messages to refresh proposal card UI
+            loadMessages();
+          }
+        )
+        .subscribe();
+    } catch (err) {
+      console.warn('Realtime chat not available:', err);
+    }
 
     return () => {
-      channel.unsubscribe();
+      if (channel) {
+        try {
+          supabase.removeChannel(channel);
+        } catch {}
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeRoom]);
