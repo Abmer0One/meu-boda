@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { VendorProfile, VendorService, ChatRoom, ChatMessage, VendorContract, PaymentInstallment } from '@/types';
 import { BudgetRepository } from '@/repositories/budget.repository';
+import { NotificationRepository } from '@/repositories/notification.repository';
 
 export const VendorProfileRepository = {
   async get(id: string): Promise<VendorProfile | null> {
@@ -242,6 +243,37 @@ export const ChatRepository = {
       console.error('Error sending message:', error);
       return null;
     }
+
+    // Trigger notification to the recipient in background
+    (async () => {
+      try {
+        const { data: r } = await supabase
+          .from('chat_rooms')
+          .select('vendor_id, event:events(user_id)')
+          .eq('id', roomId)
+          .maybeSingle();
+
+        if (r) {
+          const clientUserId = (r.event as any)?.user_id;
+          const vendorUserId = r.vendor_id;
+          const recipientId = senderId === vendorUserId ? clientUserId : vendorUserId;
+          const isSenderVendor = senderId === vendorUserId;
+
+          if (recipientId && recipientId !== senderId) {
+            await NotificationRepository.create({
+              user_id: recipientId,
+              title: isSenderVendor ? 'Nova Mensagem do Fornecedor' : 'Nova Mensagem do Cliente',
+              message: content.length > 80 ? content.substring(0, 77) + '...' : content,
+              type: 'chat',
+              link: isSenderVendor ? '/admin/fornecedores' : '/admin/fornecedores/mensagens',
+            });
+          }
+        }
+      } catch (err) {
+        console.error('Failed to notify message recipient:', err);
+      }
+    })();
+
     return data as ChatMessage;
   }
 };
@@ -258,6 +290,30 @@ export const ContractRepository = {
       console.error('Error creating vendor contract:', error);
       return null;
     }
+
+    // Trigger notification to the client
+    (async () => {
+      try {
+        const { data: eventData } = await supabase
+          .from('events')
+          .select('user_id')
+          .eq('id', contract.event_id)
+          .maybeSingle();
+
+        if (eventData?.user_id) {
+          await NotificationRepository.create({
+            user_id: eventData.user_id,
+            title: 'Nova Proposta Recebida',
+            message: `Recebeu uma proposta de orçamento para o serviço: "${contract.service_title}".`,
+            type: 'proposal',
+            link: '/admin/fornecedores',
+          });
+        }
+      } catch (err) {
+        console.error('Failed to notify client about contract proposal:', err);
+      }
+    })();
+
     return data as VendorContract;
   },
 
@@ -273,6 +329,34 @@ export const ContractRepository = {
       console.error('Error updating contract status:', error);
       return null;
     }
+
+    // Trigger notification to the vendor when proposal accepted or declined
+    (async () => {
+      try {
+        if (data?.vendor_id) {
+          if (status === 'Ativo') {
+            await NotificationRepository.create({
+              user_id: data.vendor_id,
+              title: 'Proposta Aceite pelo Cliente! 🎉',
+              message: `A sua proposta para "${data.service_title}" foi aprovada e o contrato foi gerado.`,
+              type: 'proposal',
+              link: '/admin/fornecedores/contratos',
+            });
+          } else if (status === 'Recusado') {
+            await NotificationRepository.create({
+              user_id: data.vendor_id,
+              title: 'Proposta Recusada',
+              message: `A proposta para "${data.service_title}" não foi aceite pelo cliente.`,
+              type: 'proposal',
+              link: '/admin/fornecedores/contratos',
+            });
+          }
+        }
+      } catch (err) {
+        console.error('Failed to notify vendor about proposal status update:', err);
+      }
+    })();
+
     return data as VendorContract;
   },
 
@@ -363,7 +447,24 @@ export const ContractRepository = {
       notes: notes || installments[installmentIndex].notes || null,
     };
 
-    return this.updateInstallments(contractId, installments);
+    const updated = await this.updateInstallments(contractId, installments);
+
+    // Notify vendor about receipt submission
+    (async () => {
+      try {
+        await NotificationRepository.create({
+          user_id: contract.vendor_id,
+          title: 'Comprovativo de Pagamento Submetido',
+          message: `O cliente submeteu o comprovativo da parcela #${installmentIndex + 1} (${contract.service_title || 'Serviço'}).`,
+          type: 'payment',
+          link: '/admin/fornecedores/contratos',
+        });
+      } catch (err) {
+        console.error('Failed to notify vendor about receipt:', err);
+      }
+    })();
+
+    return updated;
   },
 
   async confirmPayment(
@@ -412,6 +513,29 @@ export const ContractRepository = {
         targetCategory || 'Serviços', 
         installments[installmentIndex].amount
       );
+
+      // Notify the couple/client that payment was confirmed
+      (async () => {
+        try {
+          const { data: eventData } = await supabase
+            .from('events')
+            .select('user_id')
+            .eq('id', eventId)
+            .maybeSingle();
+
+          if (eventData?.user_id) {
+            await NotificationRepository.create({
+              user_id: eventData.user_id,
+              title: 'Pagamento Confirmado pelo Fornecedor! ✅',
+              message: `O fornecedor confirmou o recebimento da parcela #${installmentIndex + 1} (${installments[installmentIndex].amount.toLocaleString('pt-AO')} Kz).`,
+              type: 'payment',
+              link: '/admin/fornecedores',
+            });
+          }
+        } catch (err) {
+          console.error('Failed to notify client about payment confirmation:', err);
+        }
+      })();
     }
     return updated;
   },
@@ -441,7 +565,34 @@ export const ContractRepository = {
       rejection_reason: reason,
     };
 
-    return this.updateInstallments(contractId, installments);
+    const updated = await this.updateInstallments(contractId, installments);
+
+    // Notify client about rejection
+    (async () => {
+      try {
+        if (contract.event_id) {
+          const { data: eventData } = await supabase
+            .from('events')
+            .select('user_id')
+            .eq('id', contract.event_id)
+            .maybeSingle();
+
+          if (eventData?.user_id) {
+            await NotificationRepository.create({
+              user_id: eventData.user_id,
+              title: 'Comprovativo Rejeitado pelo Fornecedor',
+              message: `O fornecedor rejeitou o comprovativo da parcela #${installmentIndex + 1}: "${reason}".`,
+              type: 'payment',
+              link: '/admin/fornecedores',
+            });
+          }
+        }
+      } catch (err) {
+        console.error('Failed to notify client about receipt rejection:', err);
+      }
+    })();
+
+    return updated;
   },
 
   async recordDirectPayment(
@@ -496,6 +647,29 @@ export const ContractRepository = {
         targetCategory || 'Serviços', 
         installments[installmentIndex].amount
       );
+
+      // Notify the couple/client
+      (async () => {
+        try {
+          const { data: eventData } = await supabase
+            .from('events')
+            .select('user_id')
+            .eq('id', eventId)
+            .maybeSingle();
+
+          if (eventData?.user_id) {
+            await NotificationRepository.create({
+              user_id: eventData.user_id,
+              title: 'Pagamento Registado pelo Fornecedor',
+              message: `O fornecedor registou o pagamento da parcela #${installmentIndex + 1} (${installments[installmentIndex].amount.toLocaleString('pt-AO')} Kz).`,
+              type: 'payment',
+              link: '/admin/fornecedores',
+            });
+          }
+        } catch (err) {
+          console.error('Failed to notify client about recorded payment:', err);
+        }
+      })();
     }
     return updated;
   }

@@ -27,6 +27,10 @@ import {
   Download,
   AlertCircle,
   Loader2,
+  MessageCircle,
+  BellRing,
+  Copy,
+  Check,
 } from 'lucide-react';
 
 export default function ConvidadosPage() {
@@ -45,6 +49,8 @@ export default function ConvidadosPage() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [guestToDelete, setGuestToDelete] = useState<Guest | null>(null);
   const [importingExcel, setImportingExcel] = useState(false);
+  const [rsvpModalOpen, setRsvpModalOpen] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const {
     register,
@@ -238,6 +244,77 @@ export default function ConvidadosPage() {
     return foundTable ? foundTable.name : 'Mesa eliminada';
   };
 
+  const buildWhatsAppLink = (phone: string, text: string) => {
+    const cleanPhone = phone.replace(/[\s\(\)\-\+]/g, '');
+    const finalPhone = cleanPhone.length === 9 ? '244' + cleanPhone : cleanPhone;
+    return `https://api.whatsapp.com/send?phone=${finalPhone}&text=${encodeURIComponent(text)}`;
+  };
+
+  const getGuestInviteLink = (guest: Guest) => {
+    if (typeof window === 'undefined') return '';
+    return `${window.location.origin}/convite/${guest.qr_token || guest.id}`;
+  };
+
+  const getInviteText = (guest: Guest) => {
+    if (!currentEvent) return '';
+    const dateStr = new Date(currentEvent.date).toLocaleDateString('pt-AO', {
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric',
+    });
+    const link = getGuestInviteLink(guest);
+
+    return `Olá ${guest.name}! ❤️\n\nConvidamos-te com muito carinho para celebrar connosco: *${currentEvent.title}*.\n\n📅 Data: ${dateStr}\n💒 Cerimónia: ${currentEvent.ceremony_location || 'A definir'}\n🎉 Recepção: ${currentEvent.party_location || 'A definir'}\n\nPor favor clica no link abaixo para acederes ao teu convite oficial, confirmares a tua presença (RSVP) e descarregares o teu passe de entrada com código QR:\n👉 ${link}\n\nContamos muito contigo!`;
+  };
+
+  const getReminderText = (guest: Guest) => {
+    if (!currentEvent) return '';
+    const link = getGuestInviteLink(guest);
+    const dateStr = new Date(currentEvent.date).toLocaleDateString('pt-AO', {
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric',
+    });
+
+    return `Olá ${guest.name}! ❤️\n\nEsperamos que estejas bem. Estamos na reta final da organização do nosso evento *${currentEvent.title}* (📅 ${dateStr}) e gostaríamos muito de saber se poderás celebrar este momento especial connosco!\n\nPor favor, confirma a tua presença através deste link direto:\n👉 ${link}\n\nMuito obrigado pelo carinho!`;
+  };
+
+  const handleSendWhatsAppInvite = async (guest: Guest) => {
+    const text = getInviteText(guest);
+    if (guest.phone) {
+      window.open(buildWhatsAppLink(guest.phone, text), '_blank');
+      // Mark as sent in DB
+      if (!guest.invitation_sent) {
+        await GuestRepository.update(guest.id, { invitation_sent: true });
+        setGuests((prev) =>
+          prev.map((g) => (g.id === guest.id ? { ...g, invitation_sent: true } : g))
+        );
+      }
+    } else {
+      navigator.clipboard.writeText(text);
+      setCopiedId(guest.id);
+      setTimeout(() => setCopiedId(null), 3000);
+      alert(`O convidado "${guest.name}" não tem número de telefone registado. O texto do convite e o link de acesso foram copiados para a sua área de transferência.`);
+    }
+  };
+
+  const handleSendWhatsAppReminder = async (guest: Guest) => {
+    const text = getReminderText(guest);
+    if (guest.phone) {
+      window.open(buildWhatsAppLink(guest.phone, text), '_blank');
+    } else {
+      navigator.clipboard.writeText(text);
+      setCopiedId(guest.id);
+      setTimeout(() => setCopiedId(null), 3000);
+      alert(`O convidado "${guest.name}" não tem número de telefone registado. O texto do lembrete e o link foram copiados para a sua área de transferência.`);
+    }
+  };
+
+  const pendingGuests = guests.filter((g) => {
+    const s = g.status?.toLowerCase() || '';
+    return s !== 'confirmed' && s !== 'confirmado' && s !== 'sim' && s !== 'yes' && s !== 'declined' && s !== 'recusado';
+  });
+
   if (!currentEvent) {
     return (
       <div className="flex h-[50vh] items-center justify-center text-center">
@@ -260,6 +337,18 @@ export default function ConvidadosPage() {
         </div>
 
         <div className="flex flex-wrap gap-2">
+          {/* Lembretes RSVP */}
+          <Button
+            variant="outline"
+            size="sm"
+            leftIcon={<BellRing className="h-4 w-4 text-amber-500" />}
+            onClick={() => setRsvpModalOpen(true)}
+            disabled={pendingGuests.length === 0}
+            title="Enviar lembretes aos convidados com estado pendente"
+          >
+            Lembretes RSVP ({pendingGuests.length})
+          </Button>
+
           {/* Export to Excel */}
           <Button
             variant="outline"
@@ -376,6 +465,33 @@ export default function ConvidadosPage() {
                     </td>
                     <td className="p-3.5 text-center">
                       <div className="flex items-center justify-center gap-1">
+                        {/* WhatsApp Invite Button */}
+                        <button
+                          onClick={() => handleSendWhatsAppInvite(guest)}
+                          className="p-1.5 rounded-lg text-[#25D366] hover:bg-[#25D366]/15 transition-all cursor-pointer"
+                          title="Enviar Convite com Link RSVP via WhatsApp"
+                        >
+                          <MessageCircle className="h-4 w-4" />
+                        </button>
+
+                        {/* WhatsApp RSVP Reminder for Pending Guests */}
+                        {(() => {
+                          const s = guest.status?.toLowerCase() || '';
+                          const isPending = s !== 'confirmed' && s !== 'confirmado' && s !== 'sim' && s !== 'yes' && s !== 'declined' && s !== 'recusado';
+                          if (isPending) {
+                            return (
+                              <button
+                                onClick={() => handleSendWhatsAppReminder(guest)}
+                                className="p-1.5 rounded-lg text-amber-500 hover:bg-amber-500/15 transition-all cursor-pointer"
+                                title="Enviar Lembrete RSVP via WhatsApp"
+                              >
+                                <BellRing className="h-4 w-4" />
+                              </button>
+                            );
+                          }
+                          return null;
+                        })()}
+
                         <button
                           onClick={() => handleEditGuestClick(guest)}
                           className="p-1.5 rounded-lg text-foreground/50 hover:bg-secondary hover:text-primary transition-all cursor-pointer"
@@ -487,6 +603,76 @@ export default function ConvidadosPage() {
             </Button>
             <Button variant="danger" onClick={confirmDelete}>
               Eliminar Convidado
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+
+      {/* RSVP REMINDER MODAL */}
+      <Dialog
+        isOpen={rsvpModalOpen}
+        onClose={() => setRsvpModalOpen(false)}
+        title={`Disparo de Lembretes de Presença (RSVP) • ${pendingGuests.length} Pendente(s)`}
+      >
+        <div className="space-y-4">
+          <p className="text-xs text-foreground/65 leading-relaxed">
+            Envie mensagens de lembrete com 1 clique via WhatsApp para os convidados que ainda não confirmaram a presença no casamento.
+          </p>
+
+          <div className="max-h-[360px] overflow-y-auto divide-y divide-border-custom rounded-xl border border-border-custom bg-card-bg">
+            {pendingGuests.length > 0 ? (
+              pendingGuests.map((guest) => (
+                <div
+                  key={guest.id}
+                  className="p-3.5 flex items-center justify-between gap-3 hover:bg-secondary/15 transition-colors"
+                >
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-foreground truncate">{guest.name}</p>
+                    <p className="text-[11px] text-foreground/50 truncate">
+                      {guest.phone || <span className="italic text-error">Sem telefone</span>}
+                      {guest.companions > 0 && ` • +${guest.companions} acompanhante(s)`}
+                      {guest.family_group && ` • ${guest.family_group}`}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-xs py-1 px-3 h-8 border-[#25D366]/40 hover:bg-[#25D366]/10 text-[#25D366]"
+                      leftIcon={<MessageCircle className="h-3.5 w-3.5" />}
+                      onClick={() => handleSendWhatsAppReminder(guest)}
+                    >
+                      WhatsApp
+                    </Button>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(getReminderText(guest));
+                        setCopiedId(guest.id);
+                        setTimeout(() => setCopiedId(null), 2000);
+                      }}
+                      className="p-1.5 rounded-lg text-foreground/50 hover:bg-secondary hover:text-foreground transition-colors cursor-pointer"
+                      title="Copiar texto do lembrete"
+                    >
+                      {copiedId === guest.id ? (
+                        <Check className="h-4 w-4 text-success" />
+                      ) : (
+                        <Copy className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="p-8 text-center text-xs text-foreground/50">
+                🎉 Parabéns! Todos os convidados já responderam ao RSVP.
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <Button variant="outline" onClick={() => setRsvpModalOpen(false)}>
+              Fechar
             </Button>
           </div>
         </div>

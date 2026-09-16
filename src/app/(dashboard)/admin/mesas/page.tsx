@@ -24,6 +24,11 @@ import {
   CheckCircle,
   Edit2,
   Download,
+  Map,
+  LayoutGrid,
+  Sparkles,
+  UserMinus,
+  X,
 } from 'lucide-react';
 
 export default function MesasPage() {
@@ -31,6 +36,8 @@ export default function MesasPage() {
   const [tables, setTables] = useState<Table[]>([]);
   const [guests, setGuests] = useState<Guest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<'visual' | 'list'>('visual');
+  const [selectedTableForDetails, setSelectedTableForDetails] = useState<Table | null>(null);
 
   // Modals state
   const [tableModalOpen, setTableModalOpen] = useState(false);
@@ -364,6 +371,24 @@ export default function MesasPage() {
     return getTableGuests(tableId).reduce((sum, g) => sum + 1 + (g.companions || 0), 0);
   };
 
+  const handleUnseatGuest = async (guestId: string) => {
+    try {
+      await GuestRepository.update(guestId, { table_id: null });
+      setGuests((prev) =>
+        prev.map((g) => (g.id === guestId ? { ...g, table_id: null } : g))
+      );
+    } catch (err) {
+      console.error('Error unseating guest:', err);
+    }
+  };
+
+  const totalCapacity = tables.reduce((sum, t) => sum + t.capacity, 0);
+  const totalSeated = guests
+    .filter((g) => g.table_id !== null)
+    .reduce((sum, g) => sum + 1 + (g.companions || 0), 0);
+  const occupancyPercentage =
+    totalCapacity > 0 ? Math.min(100, Math.round((totalSeated / totalCapacity) * 100)) : 0;
+
   if (!currentEvent) {
     return (
       <div className="flex h-[50vh] items-center justify-center text-center">
@@ -375,17 +400,43 @@ export default function MesasPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
-            <CalendarRange className="h-6 w-6 text-primary" /> Distribuição de Mesas (Seating Chart)
+            <CalendarRange className="h-6 w-6 text-primary" /> Distribuição de Mesas & Planta do Salão
           </h1>
           <p className="text-sm text-foreground/60">
-            Arraste e solte os convidados nas mesas correspondentes para gerenciar a ocupação do salão.
+            Organize os convidados graficamente na planta do salão ou no modo lista detalhado.
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* View Mode Switcher */}
+          <div className="flex border border-border-custom rounded-xl overflow-hidden text-xs bg-card-bg">
+            <button
+              onClick={() => setViewMode('visual')}
+              className={`px-3 py-1.5 font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                viewMode === 'visual'
+                  ? 'bg-primary text-white shadow-sm'
+                  : 'text-foreground/70 hover:bg-secondary/40'
+              }`}
+            >
+              <Map className="h-3.5 w-3.5" />
+              Planta do Salão
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className={`px-3 py-1.5 font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                viewMode === 'list'
+                  ? 'bg-primary text-white shadow-sm'
+                  : 'text-foreground/70 hover:bg-secondary/40'
+              }`}
+            >
+              <LayoutGrid className="h-3.5 w-3.5" />
+              Modo Lista
+            </button>
+          </div>
+
           <Button 
             variant="outline"
             leftIcon={<Download className="h-4 w-4" />} 
@@ -400,6 +451,40 @@ export default function MesasPage() {
         </div>
       </div>
 
+      {/* Salon Floor Statistics Bar */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-card-bg p-3.5 rounded-2xl border border-border-custom text-xs">
+        <div className="space-y-0.5">
+          <span className="text-foreground/50 text-[11px] block">Total de Mesas</span>
+          <span className="text-base font-extrabold text-foreground">{tables.length}</span>
+        </div>
+        <div className="space-y-0.5">
+          <span className="text-foreground/50 text-[11px] block">Lotação Máxima</span>
+          <span className="text-base font-extrabold text-foreground">{totalCapacity} pax</span>
+        </div>
+        <div className="space-y-0.5">
+          <span className="text-foreground/50 text-[11px] block">Convidados Sentados</span>
+          <span className="text-base font-extrabold text-primary">{totalSeated} pax</span>
+        </div>
+        <div className="space-y-0.5">
+          <span className="text-foreground/50 text-[11px] block">Ocupação do Salão</span>
+          <div className="flex items-center gap-2">
+            <span className="text-base font-extrabold text-foreground">{occupancyPercentage}%</span>
+            <div className="flex-1 bg-secondary rounded-full h-2 overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${
+                  occupancyPercentage > 100
+                    ? 'bg-error'
+                    : occupancyPercentage === 100
+                    ? 'bg-amber-500'
+                    : 'bg-emerald-500'
+                }`}
+                style={{ width: `${Math.min(occupancyPercentage, 100)}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
       {loading ? (
         <div className="flex h-40 w-full items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -408,7 +493,7 @@ export default function MesasPage() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           {/* Left panel: Unseated Guests */}
           <Card
-            className="lg:col-span-4 bg-card-bg max-h-[75vh] flex flex-col p-4 border border-border-custom"
+            className="lg:col-span-4 bg-card-bg max-h-[78vh] flex flex-col p-4 border border-border-custom"
             onDragOver={handleDragOver}
             onDrop={handleDropOnUnseated}
           >
@@ -449,90 +534,325 @@ export default function MesasPage() {
             </div>
           </Card>
 
-          {/* Right panel: Tables Grid */}
-          <div className="lg:col-span-8 grid grid-cols-1 md:grid-cols-2 gap-4">
-            {tables.length > 0 ? (
-              tables.map((table) => {
-                const seatedCount = getTableOccupiedCount(table.id);
-                const tableGuests = getTableGuests(table.id);
-                const isOverCap = seatedCount > table.capacity;
+          {/* Right panel: Visual Floor Plan OR List View */}
+          <div className="lg:col-span-8">
+            {viewMode === 'visual' ? (
+              /* 2D VISUAL FLOOR PLAN */
+              <div className="bg-card-bg border border-border-custom rounded-2xl p-6 min-h-[78vh] flex flex-col shadow-sm">
+                {/* Stage Area */}
+                <div className="w-full bg-secondary/35 border border-border-custom/80 rounded-xl py-3 px-4 text-center mb-8 flex items-center justify-center gap-2 shadow-inner">
+                  <Sparkles className="h-4 w-4 text-amber-500" />
+                  <span className="text-xs font-bold uppercase tracking-widest text-foreground/80">
+                    Palco dos Noivos & Pista de Dança
+                  </span>
+                  <Sparkles className="h-4 w-4 text-amber-500" />
+                </div>
 
-                return (
-                  <Card
-                    key={table.id}
-                    onDragOver={handleDragOver}
-                    onDrop={(e) => handleDropOnTable(e, table.id)}
-                    className={`bg-card-bg flex flex-col min-h-[220px] transition-all border ${
-                      isOverCap ? 'border-error/50 bg-error/5' : 'border-border-custom'
-                    }`}
-                  >
-                    {/* Table Header */}
-                    <CardHeader className="mb-2 pb-2 border-b border-border-custom flex flex-row items-center justify-between">
-                      <div>
-                        <CardTitle className="text-sm">{table.name}</CardTitle>
-                        <p className="text-[10px] text-foreground/50 mt-0.5">
-                          Capacidade: <span className="font-semibold">{table.capacity} lugares</span>
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <Badge variant={isOverCap ? 'error' : seatedCount === table.capacity ? 'success' : 'primary'}>
-                          {seatedCount} / {table.capacity}
-                        </Badge>
-                        <button
-                          onClick={() => handleEditTableClick(table)}
-                          className="p-1 rounded-full text-foreground/40 hover:bg-secondary hover:text-primary transition-colors cursor-pointer"
-                          title="Editar Mesa"
-                        >
-                          <Edit2 className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteTableClick(table)}
-                          className="p-1 rounded-full text-foreground/40 hover:bg-error/15 hover:text-error transition-colors cursor-pointer"
-                          title="Remover Mesa"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    </CardHeader>
+                {tables.length > 0 ? (
+                  <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-10 justify-items-center items-center py-4 overflow-y-auto">
+                    {tables.map((table) => {
+                      const tableGuests = getTableGuests(table.id);
+                      const seatedCount = getTableOccupiedCount(table.id);
+                      const isOverCap = seatedCount > table.capacity;
+                      const isFull = seatedCount === table.capacity;
 
-                    {/* Table Content (Seated Guests) */}
-                    <CardContent className="flex-1 overflow-y-auto space-y-1.5 max-h-[160px] pr-1">
-                      {tableGuests.length > 0 ? (
-                        tableGuests.map((guest) => (
+                      // Flatten seats for occupants
+                      const seats: { name: string; isCompanion: boolean; rsvp: string; id: string }[] = [];
+                      tableGuests.forEach((g) => {
+                        seats.push({ name: g.name, isCompanion: false, rsvp: g.status, id: g.id });
+                        for (let c = 0; c < (g.companions || 0); c++) {
+                          seats.push({
+                            name: `${g.name} (Acomp. ${c + 1})`,
+                            isCompanion: true,
+                            rsvp: g.status,
+                            id: g.id,
+                          });
+                        }
+                      });
+
+                      const displayCapacity = Math.max(table.capacity, seats.length);
+
+                      return (
+                        <div
+                          key={table.id}
+                          onDragOver={handleDragOver}
+                          onDrop={(e) => handleDropOnTable(e, table.id)}
+                          className="relative w-64 h-64 flex items-center justify-center select-none"
+                        >
+                          {/* Perimeter Chairs */}
+                          {Array.from({ length: displayCapacity }).map((_, i) => {
+                            const angle = (2 * Math.PI * i) / displayCapacity - Math.PI / 2;
+                            const radius = 86; // px distance from table center
+                            const x = 128 + radius * Math.cos(angle) - 14;
+                            const y = 128 + radius * Math.sin(angle) - 14;
+                            const seat = seats[i];
+
+                            return (
+                              <div
+                                key={i}
+                                style={{ left: `${x}px`, top: `${y}px` }}
+                                className="absolute w-7 h-7 rounded-full transition-all"
+                                title={seat ? `${seat.name} • RSVP: ${seat.rsvp}` : `Lugar ${i + 1} Livre`}
+                              >
+                                {seat ? (
+                                  <div
+                                    draggable
+                                    onDragStart={(e) => handleDragStart(e, seat.id)}
+                                    onClick={() => setSelectedTableForDetails(table)}
+                                    className="w-full h-full rounded-full bg-primary text-white text-[9px] font-bold flex items-center justify-center shadow-md ring-2 ring-background cursor-grab active:cursor-grabbing hover:scale-115 transition-transform"
+                                  >
+                                    {seat.name.substring(0, 2).toUpperCase()}
+                                  </div>
+                                ) : (
+                                  <div className="w-full h-full rounded-full border border-dashed border-border-custom bg-background/70 text-[9px] font-semibold text-foreground/35 flex items-center justify-center">
+                                    {i + 1}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+
+                          {/* Central Circular Table Plate */}
                           <div
-                            key={guest.id}
-                            draggable
-                            onDragStart={(e) => handleDragStart(e, guest.id)}
-                            className="px-2.5 py-1.5 border border-border-custom/50 rounded-lg bg-background/70 hover:border-primary active:scale-[0.98] transition-all cursor-grab flex items-center justify-between text-xs"
+                            onClick={() => setSelectedTableForDetails(table)}
+                            className={`w-36 h-36 rounded-full border-4 shadow-lg flex flex-col items-center justify-center p-3 z-10 cursor-pointer transition-all duration-200 hover:scale-105 text-center ${
+                              isOverCap
+                                ? 'border-error bg-error/10'
+                                : isFull
+                                ? 'border-amber-500 bg-amber-500/10'
+                                : 'border-emerald-500 bg-card-bg'
+                            }`}
                           >
-                            <span className="font-medium truncate max-w-[150px]">{guest.name}</span>
-                            <span className="text-[10px] text-foreground/50 flex items-center gap-1">
-                              {guest.companions > 0 && <span className="font-bold text-primary">+{guest.companions}</span>}
-                              <span>({1 + guest.companions}p)</span>
+                            <span
+                              className="font-bold text-xs text-foreground truncate max-w-[105px]"
+                              title={table.name}
+                            >
+                              {table.name}
+                            </span>
+                            <div className="mt-1 flex items-center gap-1">
+                              <span
+                                className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
+                                  isOverCap
+                                    ? 'bg-error text-white'
+                                    : isFull
+                                    ? 'bg-amber-500 text-white'
+                                    : 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
+                                }`}
+                              >
+                                {seatedCount} / {table.capacity} pax
+                              </span>
+                            </div>
+                            <span className="text-[9px] text-foreground/45 mt-1 hover:text-primary underline">
+                              Ver Lugares
                             </span>
                           </div>
-                        ))
-                      ) : (
-                        <div className="flex h-full items-center justify-center text-center py-6 text-[10px] text-foreground/40 italic">
-                          Mesa vazia. Arraste convidados para aqui.
                         </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                );
-              })
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="flex-1 flex flex-col items-center justify-center text-center py-16 border border-dashed border-border-custom rounded-xl">
+                    <CalendarRange className="h-12 w-12 text-foreground/25 mb-3" />
+                    <p className="text-sm font-semibold text-foreground/75">Nenhuma mesa no salão</p>
+                    <p className="text-xs text-foreground/50 mt-1 max-w-sm">
+                      Clique em &quot;Adicionar Mesa&quot; para desenhar a sua distribuição de lugares.
+                    </p>
+                  </div>
+                )}
+              </div>
             ) : (
-              <div className="col-span-2 flex flex-col items-center justify-center text-center py-12 border border-dashed border-border-custom rounded-xl">
-                <CalendarRange className="h-10 w-10 text-foreground/25 mb-2" />
-                <p className="text-sm font-semibold text-foreground/75">Nenhuma mesa criada</p>
-                <p className="text-xs text-foreground/50 mt-1">
-                  Adicione mesas clicando no botão &quot;Adicionar Mesa&quot; no canto superior.
-                </p>
+              /* LIST VIEW */
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {tables.length > 0 ? (
+                  tables.map((table) => {
+                    const seatedCount = getTableOccupiedCount(table.id);
+                    const tableGuests = getTableGuests(table.id);
+                    const isOverCap = seatedCount > table.capacity;
+
+                    return (
+                      <Card
+                        key={table.id}
+                        onDragOver={handleDragOver}
+                        onDrop={(e) => handleDropOnTable(e, table.id)}
+                        className={`bg-card-bg flex flex-col min-h-[220px] transition-all border ${
+                          isOverCap ? 'border-error/50 bg-error/5' : 'border-border-custom'
+                        }`}
+                      >
+                        {/* Table Header */}
+                        <CardHeader className="mb-2 pb-2 border-b border-border-custom flex flex-row items-center justify-between">
+                          <div>
+                            <CardTitle className="text-sm">{table.name}</CardTitle>
+                            <p className="text-[10px] text-foreground/50 mt-0.5">
+                              Capacidade: <span className="font-semibold">{table.capacity} lugares</span>
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <Badge variant={isOverCap ? 'error' : seatedCount === table.capacity ? 'success' : 'primary'}>
+                              {seatedCount} / {table.capacity}
+                            </Badge>
+                            <button
+                              onClick={() => handleEditTableClick(table)}
+                              className="p-1 rounded-full text-foreground/40 hover:bg-secondary hover:text-primary transition-colors cursor-pointer"
+                              title="Editar Mesa"
+                            >
+                              <Edit2 className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteTableClick(table)}
+                              className="p-1 rounded-full text-foreground/40 hover:bg-error/15 hover:text-error transition-colors cursor-pointer"
+                              title="Remover Mesa"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </CardHeader>
+
+                        {/* Table Content (Seated Guests) */}
+                        <CardContent className="flex-1 overflow-y-auto space-y-1.5 max-h-[160px] pr-1">
+                          {tableGuests.length > 0 ? (
+                            tableGuests.map((guest) => (
+                              <div
+                                key={guest.id}
+                                draggable
+                                onDragStart={(e) => handleDragStart(e, guest.id)}
+                                className="px-2.5 py-1.5 border border-border-custom/50 rounded-lg bg-background/70 hover:border-primary active:scale-[0.98] transition-all cursor-grab flex items-center justify-between text-xs"
+                              >
+                                <span className="font-medium truncate max-w-[150px]">{guest.name}</span>
+                                <span className="text-[10px] text-foreground/50 flex items-center gap-1">
+                                  {guest.companions > 0 && (
+                                    <span className="font-bold text-primary">+{guest.companions}</span>
+                                  )}
+                                  <span>({1 + guest.companions}p)</span>
+                                </span>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="flex h-full items-center justify-center text-center py-6 text-[10px] text-foreground/40 italic">
+                              Mesa vazia. Arraste convidados para aqui.
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    );
+                  })
+                ) : (
+                  <div className="col-span-2 flex flex-col items-center justify-center text-center py-12 border border-dashed border-border-custom rounded-xl">
+                    <CalendarRange className="h-10 w-10 text-foreground/25 mb-2" />
+                    <p className="text-sm font-semibold text-foreground/75">Nenhuma mesa criada</p>
+                    <p className="text-xs text-foreground/50 mt-1">
+                      Adicione mesas clicando no botão &quot;Adicionar Mesa&quot; no canto superior.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>
         </div>
       )}
+
+      {/* TABLE DETAILS & SEATS DIALOG */}
+      <Dialog
+        isOpen={selectedTableForDetails !== null}
+        onClose={() => setSelectedTableForDetails(null)}
+        title={selectedTableForDetails?.name || 'Detalhes da Mesa'}
+      >
+        {selectedTableForDetails && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between bg-secondary/20 p-3 rounded-xl border border-border-custom/60 text-xs">
+              <div>
+                <span className="text-foreground/50 text-[10px] block uppercase font-bold">Capacidade</span>
+                <span className="font-extrabold text-foreground">
+                  {getTableOccupiedCount(selectedTableForDetails.id)} de {selectedTableForDetails.capacity} lugares ocupados
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  leftIcon={<Edit2 className="h-3.5 w-3.5" />}
+                  className="text-xs h-7"
+                  onClick={() => {
+                    handleEditTableClick(selectedTableForDetails);
+                    setSelectedTableForDetails(null);
+                  }}
+                >
+                  Editar
+                </Button>
+                <Button
+                  size="sm"
+                  variant="danger"
+                  className="text-xs h-7 px-2"
+                  onClick={() => {
+                    handleDeleteTableClick(selectedTableForDetails);
+                    setSelectedTableForDetails(null);
+                  }}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <h4 className="text-xs font-bold text-foreground/60 uppercase tracking-wider">
+                Convidados Alocados a esta Mesa
+              </h4>
+              <div className="max-h-[300px] overflow-y-auto divide-y divide-border-custom rounded-xl border border-border-custom bg-card-bg">
+                {getTableGuests(selectedTableForDetails.id).length > 0 ? (
+                  getTableGuests(selectedTableForDetails.id).map((guest) => (
+                    <div
+                      key={guest.id}
+                      className="p-3 flex items-center justify-between gap-3 hover:bg-secondary/15 transition-colors"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-foreground truncate">{guest.name}</p>
+                        <p className="text-[10px] text-foreground/50">
+                          {guest.family_group ? `Grupo: ${guest.family_group}` : 'Individual'}
+                          {guest.companions > 0 && ` • +${guest.companions} acompanhante(s)`}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Badge
+                          variant={
+                            guest.status === 'Confirmed'
+                              ? 'success'
+                              : guest.status === 'Declined'
+                              ? 'error'
+                              : 'warning'
+                          }
+                        >
+                          {guest.status === 'Confirmed'
+                            ? 'Confirmado'
+                            : guest.status === 'Declined'
+                            ? 'Recusado'
+                            : 'Pendente'}
+                        </Badge>
+                        <button
+                          onClick={() => handleUnseatGuest(guest.id)}
+                          className="p-1.5 rounded-lg text-foreground/50 hover:bg-error/10 hover:text-error transition-colors cursor-pointer"
+                          title="Tirar convidado desta mesa"
+                        >
+                          <UserMinus className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="p-8 text-center text-xs text-foreground/45 italic">
+                    Nenhum convidado sentado nesta mesa ainda.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <Button variant="outline" onClick={() => setSelectedTableForDetails(null)}>
+                Fechar
+              </Button>
+            </div>
+          </div>
+        )}
+      </Dialog>
 
       {/* CREATE TABLE DIALOG */}
       <Dialog isOpen={tableModalOpen} onClose={() => setTableModalOpen(false)} title={tableToEdit ? "Editar Mesa" : "Adicionar Mesa"}>

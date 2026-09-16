@@ -16,9 +16,11 @@ import { vendorSchema } from '@/validations/schemas';
 import MarketplaceTab from '@/components/marketplace/MarketplaceTab';
 import ChatTab from '@/components/marketplace/ChatTab';
 import { ContractRepository } from '@/repositories/marketplace.repository';
+import { downloadReceiptPDF } from '@/utils/receipt-pdf';
 import { supabase } from '@/lib/supabase';
 import {
   Briefcase,
+  FileText,
   Plus,
   Edit2,
   Trash2,
@@ -522,6 +524,21 @@ export default function FornecedoresPage() {
                                     <p className="text-[10px] text-rose-600 dark:text-rose-400 bg-rose-500/10 p-1 rounded">
                                       <strong>Motivo da recusa:</strong> {inst.rejection_reason}
                                     </p>
+                                  )}
+
+                                  {isPaid && (
+                                    <div className="flex justify-end pt-1">
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="text-[10px] h-6 px-2 text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/10 font-medium"
+                                        onClick={() => downloadReceiptPDF(matchedContract, idx, matchedContract.vendor_profile, currentEvent?.title)}
+                                        title="Descarregar Recibo Oficial de Quitação em PDF"
+                                      >
+                                        <FileText className="h-2.5 w-2.5 mr-1 text-emerald-600" />
+                                        Recibo Oficial (PDF)
+                                      </Button>
+                                    </div>
                                   )}
 
                                   {(isPending || isRejected) && (

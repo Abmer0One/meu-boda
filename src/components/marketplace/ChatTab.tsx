@@ -9,6 +9,7 @@ import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Dialog } from '@/components/ui/Dialog';
+import { downloadReceiptPDF } from '@/utils/receipt-pdf';
 import { 
   Send, 
   FileText, 
@@ -886,6 +887,20 @@ export default function ChatTab({
 
                                           {/* Action buttons */}
                                           <div className="mt-2.5 flex flex-wrap gap-1.5 justify-end pt-1.5 border-t border-border-custom/30">
+                                            {/* Official Liquidation PDF Receipt */}
+                                            {isPaid && (
+                                              <Button
+                                                size="sm"
+                                                variant="outline"
+                                                className="text-[10px] h-7 px-2.5 border-emerald-500/40 text-emerald-600 hover:bg-emerald-500/10 font-medium"
+                                                onClick={() => downloadReceiptPDF(msg.proposal!, idx, activeRoom?.vendor_profile, activeRoom?.event?.title)}
+                                                title="Descarregar Recibo Oficial de Quitação em PDF"
+                                              >
+                                                <FileText className="h-3 w-3 mr-1 text-emerald-600" />
+                                                Recibo Oficial (PDF)
+                                              </Button>
+                                            )}
+
                                             {/* Client Action: Upload / Re-upload Receipt */}
                                             {userRole === 'client' && (isPending || isRejected) && (
                                               <Button

@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { Dialog } from '@/components/ui/Dialog';
 import { Input } from '@/components/ui/Input';
 import { EventRepository } from '@/repositories/event.repository';
+import NotificationBell from '@/components/notifications/NotificationBell';
 import {
   LayoutDashboard,
   Heart,
@@ -272,8 +273,48 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
       </aside>
 
-      {/* MOBILE HEADER & CONTENT CONTAINER */}
+      {/* CONTENT CONTAINER WITH TOPBAR */}
       <div className="flex flex-1 flex-col overflow-hidden">
+        {/* DESKTOP TOPBAR */}
+        <header className="hidden md:flex h-16 shrink-0 items-center justify-between border-b border-border-custom bg-card-bg/70 backdrop-blur-md px-8 z-20">
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-semibold text-foreground/60">
+              {isAdmin
+                ? 'Consola de Super Administrador'
+                : isVendor
+                ? 'Painel do Fornecedor Credenciado'
+                : currentEvent
+                ? currentEvent.title
+                : 'Meu Boda'}
+            </span>
+            {currentEvent && !isAdmin && !isVendor && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-secondary text-primary border border-border-custom/50">
+                <Heart className="h-3 w-3 fill-primary text-primary" />
+                {new Date(currentEvent.date).toLocaleDateString('pt-AO', {
+                  day: 'numeric',
+                  month: 'short',
+                  year: 'numeric',
+                })}
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-3">
+            <NotificationBell />
+            <div className="h-5 w-px bg-border-custom" />
+            <Link
+              href={isVendor ? '/admin/fornecedores/perfil' : '/admin/perfil'}
+              className="flex items-center gap-2 text-xs font-semibold text-foreground/75 hover:text-primary transition-colors"
+            >
+              <div className="h-8 w-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-bold">
+                {user.email ? user.email.charAt(0).toUpperCase() : 'U'}
+              </div>
+              <span className="hidden lg:inline">{user.email}</span>
+            </Link>
+          </div>
+        </header>
+
+        {/* MOBILE HEADER */}
         <header className="flex h-16 shrink-0 items-center justify-between border-b border-border-custom bg-card-bg px-4 md:hidden">
           <Link href={isAdmin ? '/admin/super' : '/admin/dashboard'} className="flex items-center gap-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -283,16 +324,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </span>
           </Link>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            <NotificationBell />
             <button
               onClick={() => signOut().then(() => router.push('/login'))}
               className="rounded-full p-2 text-foreground/50 hover:text-error cursor-pointer"
+              title="Terminar Sessão"
             >
               <LogOut className="h-4 w-4" />
             </button>
             <button
               onClick={() => setMobileMenuOpen(true)}
               className="rounded-full p-2 text-foreground/50 hover:bg-secondary cursor-pointer"
+              title="Menu"
             >
               <Menu className="h-5 w-5" />
             </button>

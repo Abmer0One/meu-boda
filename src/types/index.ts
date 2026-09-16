@@ -150,9 +150,32 @@ export interface VendorProfile {
   phone?: string | null;
   email?: string | null;
   website?: string | null;
+  province?: string | null;
   daily_limit: number;
   blocked_dates: string[];
   status: 'Pendente' | 'Aprovado' | 'Suspenso';
+  created_at: string;
+}
+
+export interface AppNotification {
+  id: string;
+  user_id: string;
+  title: string;
+  message: string;
+  type: 'info' | 'payment' | 'proposal' | 'chat' | 'rsvp';
+  link?: string | null;
+  read: boolean;
+  created_at: string;
+}
+
+export interface VendorReview {
+  id: string;
+  vendor_id: string;
+  client_id: string;
+  event_id?: string | null;
+  rating: number;
+  comment?: string | null;
+  client_name: string;
   created_at: string;
 }
 

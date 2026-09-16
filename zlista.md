@@ -3,16 +3,16 @@ GM e Mama Lando
 Salomão e Namorada
 josy e Esposa
 
-foller
-elidio
-eliandro
-Isabel
-bacia
-boss Menezes
+foller e esposa
+elidio e esposa
+eliandro e esposa
+Isabel e esposa
+bacia 
+boss Menezes e esposa
 Boss Pain
 Boss Amelia
-Director
-Mavungo
+Director e esposa
+Mavungo e esposa
 
 Jacob e Cristovão
 Ari e esposa
@@ -26,6 +26,7 @@ Olga e Esposo
 Esperança e Esposo
 Elizeth e Esposo
 Syria e Esposo
+
 
 Madre Veronique e Padre Nicodemos
 The One e Esposa

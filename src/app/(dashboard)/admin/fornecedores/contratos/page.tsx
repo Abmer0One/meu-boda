@@ -8,6 +8,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Dialog } from '@/components/ui/Dialog';
+import { downloadReceiptPDF } from '@/utils/receipt-pdf';
 import { 
   FileText, 
   Calendar, 
@@ -321,6 +322,19 @@ export default function VendorContractsPage() {
 
                             {/* Action Buttons */}
                             <div className="pt-2 border-t border-border-custom/40 flex items-center justify-end gap-2">
+                              {/* Official Liquidation PDF Receipt */}
+                              {isPaid && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-xs h-7 px-2.5 border-emerald-500/40 text-emerald-600 hover:bg-emerald-500/10 font-medium"
+                                  onClick={() => downloadReceiptPDF(contract, idx, contract.vendor_profile, contract.room?.event?.title)}
+                                  title="Descarregar Recibo Oficial de Quitação em PDF"
+                                >
+                                  <FileText className="h-3 w-3 mr-1 text-emerald-600" />
+                                  Recibo Oficial (PDF)
+                                </Button>
+                              )}
                               {/* Under Review: Confirm or Reject */}
                               {isUnderReview && (
                                 <>
