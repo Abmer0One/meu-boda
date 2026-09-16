@@ -454,18 +454,9 @@ export default function LandingPage() {
         {/* Swirling interactive tornado particle background */}
         <TornadoBackground />
 
-        {/* Living Cinematic background video loop */}
+        {/* Living Cinematic background ambient tone */}
         <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
-          <video 
-            src="https://assets.mixkit.co/videos/preview/mixkit-bride-and-groom-holding-hands-44249-large.mp4"
-            autoPlay
-            loop
-            muted
-            playsInline
-            className="w-full h-full object-cover opacity-[0.14] scale-105 filter blur-[2px]"
-          />
-          {/* Dense luxury overlays to protect content visibility */}
-          <div className="absolute inset-0 bg-gradient-to-b from-background via-transparent to-background" />
+          <div className="w-full h-full bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/10 via-background to-background" />
         </div>
 
         {/* Glow ambient lights */}
@@ -566,22 +557,18 @@ export default function LandingPage() {
               className="relative w-full max-w-md p-4 rounded-[32px] border border-border-custom/80 bg-card-bg/50 backdrop-blur shadow-2xl hover:shadow-primary/10 hover:border-primary/20 transition-all cursor-pointer group"
             >
               <div className="rounded-2xl overflow-hidden border border-border-custom bg-background/95 relative aspect-[4/3] flex items-center justify-center">
-                <video 
-                  src="https://assets.mixkit.co/videos/preview/mixkit-wedding-rings-and-flowers-close-up-44256-large.mp4"
-                  autoPlay
-                  loop
-                  muted
-                  playsInline
-                  className="w-full h-full object-cover"
+                <img 
+                  src="https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=800&q=80"
+                  alt="A Experiência Meu Boda"
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                 />
                 
                 {/* Floating UI overlay for video control style */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-black/40 p-5 flex flex-col justify-between pointer-events-none">
                   <div className="flex items-center justify-between">
                     <span className="rounded-full bg-primary/95 text-white text-[9px] font-black uppercase px-2.5 py-1 tracking-wider flex items-center gap-1.5 shadow-md shadow-primary/20">
-                      <Sparkles className="h-3 w-3 animate-spin" /> Vídeo Promocional
+                      <Sparkles className="h-3 w-3 animate-spin" /> Destaques do Grande Dia
                     </span>
-                    <span className="text-[9px] font-extrabold text-white/90 bg-black/40 px-2 py-0.5 rounded-md backdrop-blur-sm">0:14</span>
                   </div>
 
                   <div className="space-y-2">
