@@ -327,36 +327,42 @@ export default function ModernTicketTemplate({
       </div>
 
       {/* Info Blocks (Dress code, rules) */}
-      {(event.dress_code_style || event.kids_restriction_note || event.gift_suggestions || event.instagram_host_1 || infoBlocks.length > 0) && (
-        <div className="mt-8 p-6 rounded-3xl border border-border-custom/50 bg-[#121215] space-y-6">
-          <h3 className="font-extrabold text-sm uppercase text-white border-b border-border-custom/50 pb-2">Informações Gerais</h3>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {(event.dress_code_style || event.dress_code_colors) && (
-              <div className="p-4 rounded-2xl bg-[#1c1c21] border border-white/5 space-y-2">
-                <h4 className="font-bold text-xs text-[#3b82f6] uppercase tracking-wider">👗 Dress Code</h4>
-                {event.dress_code_style && (
-                  <p className="text-xs text-white/90">
-                    <span className="font-semibold text-zinc-400">Estilo:</span> {event.dress_code_style}
-                  </p>
-                )}
-                {event.dress_code_colors && (
-                  <p className="text-xs text-white/90">
-                    <span className="font-semibold text-zinc-400">Cores sugeridas:</span> {event.dress_code_colors}
-                  </p>
-                )}
-              </div>
-            )}
+      {(() => {
+        const visibleInfoBlocks = infoBlocks.filter((b) => !b.title.startsWith('__'));
+        const hasGeneralInfo = event.dress_code_style || event.kids_restriction_note || event.gift_suggestions || event.instagram_host_1 || visibleInfoBlocks.length > 0;
+        if (!hasGeneralInfo) return null;
 
-            {infoBlocks.map((block) => (
-              <div key={block.id} className="p-4 rounded-2xl bg-[#1c1c21] border border-white/5 space-y-1.5">
-                <h4 className="font-bold text-xs text-[#a855f7] uppercase tracking-wider">{block.title}</h4>
-                <p className="text-xs text-white/90 leading-relaxed">{block.content}</p>
-              </div>
-            ))}
+        return (
+          <div className="mt-8 p-6 rounded-3xl border border-border-custom/50 bg-[#121215] space-y-6">
+            <h3 className="font-extrabold text-sm uppercase text-white border-b border-border-custom/50 pb-2">Informações Gerais</h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {(event.dress_code_style || event.dress_code_colors) && (
+                <div className="p-4 rounded-2xl bg-[#1c1c21] border border-white/5 space-y-2">
+                  <h4 className="font-bold text-xs text-[#3b82f6] uppercase tracking-wider">👗 Dress Code</h4>
+                  {event.dress_code_style && (
+                    <p className="text-xs text-white/90">
+                      <span className="font-semibold text-zinc-400">Estilo:</span> {event.dress_code_style}
+                    </p>
+                  )}
+                  {event.dress_code_colors && (
+                    <p className="text-xs text-white/90">
+                      <span className="font-semibold text-zinc-400">Cores sugeridas:</span> {event.dress_code_colors}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {visibleInfoBlocks.map((block) => (
+                <div key={block.id} className="p-4 rounded-2xl bg-[#1c1c21] border border-white/5 space-y-1.5">
+                  <h4 className="font-bold text-xs text-[#a855f7] uppercase tracking-wider">{block.title}</h4>
+                  <p className="text-xs text-white/90 leading-relaxed">{block.content}</p>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {children}
 

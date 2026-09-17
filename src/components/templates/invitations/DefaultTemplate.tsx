@@ -761,21 +761,29 @@ export default function DefaultTemplate({
             )}
 
             {/* Custom Info Blocks */}
-            {infoBlocks.length > 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {infoBlocks.map((block) => (
-                  <Card key={block.id} className="bg-[#121215]/90 border border-[#d4af37]/20 shadow-xl backdrop-blur-md relative overflow-hidden">
-                    <div className="absolute inset-3 border border-[#d4af37]/5 rounded-[20px] pointer-events-none" />
-                    <CardHeader className="border-b border-[#d4af37]/15 relative z-10">
-                      <CardTitle className="font-cinzel font-bold text-xs tracking-[2px] text-[#f3e0aa]">{block.title}</CardTitle>
-                    </CardHeader>
-                    <CardContent className="py-4 text-xs text-white/90 leading-relaxed text-left relative z-10">
-                      {block.content}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
+            {(() => {
+              const visibleInfoBlocks = infoBlocks.filter((b) => !b.title.startsWith('__'));
+              if (visibleInfoBlocks.length === 0) return null;
+              return (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {visibleInfoBlocks.map((block) => (
+                    <div 
+                      key={block.id} 
+                      className="rounded-3xl border border-[#d4af37]/25 shadow-xl backdrop-blur-md relative overflow-hidden p-6 text-left"
+                      style={{ backgroundColor: '#121215', color: '#ffffff' }}
+                    >
+                      <div className="absolute inset-3 border border-[#d4af37]/10 rounded-[20px] pointer-events-none" />
+                      <h4 className="font-cinzel font-bold text-xs tracking-[2px] text-[#f3e0aa] uppercase border-b border-[#d4af37]/15 pb-2.5 mb-3.5 relative z-10">
+                        {block.title}
+                      </h4>
+                      <p className="text-xs text-white/90 leading-relaxed relative z-10">
+                        {block.content}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
 
             {/* Injected collaborative gallery wall children */}
             {children}

@@ -489,43 +489,52 @@ export default function RoyalParisienneTemplate({
             </div>
 
             {/* Informações Importantes Card */}
-            {(event.dress_code_style || event.kids_restriction_note || event.gift_suggestions || event.instagram_host_1 || infoBlocks.length > 0) && (
-              <Card className="bg-[#121214] border border-[#d4af37]/15 shadow-xl">
-                <CardHeader className="border-b border-[#d4af37]/10">
-                  <CardTitle className="bg-gradient-to-r from-[#b89742] via-[#f3e0aa] to-[#b89742] bg-clip-text text-transparent font-serif tracking-wide text-lg">
-                    ✨ Informações Importantes
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-5 py-6">
-                  {/* Dress Code */}
-                  {(event.dress_code_style || event.dress_code_colors) && (
-                    <div className="p-4 rounded-2xl border border-[#d4af37]/10 bg-[#18181b]/50 space-y-2">
-                      <h4 className="font-bold text-sm text-[#d4af37] flex items-center gap-2">
-                        👗 Dress Code
-                      </h4>
-                      {event.dress_code_style && (
-                        <p className="text-xs text-white/90">
-                          <span className="font-semibold text-[#f3e0aa]">Estilo:</span> {event.dress_code_style}
-                        </p>
-                      )}
-                      {event.dress_code_colors && (
-                        <p className="text-xs text-white/90">
-                          <span className="font-semibold text-[#f3e0aa]">Sugestões de Cores:</span> {event.dress_code_colors}
-                        </p>
-                      )}
-                    </div>
-                  )}
+            {(() => {
+              const visibleInfoBlocks = infoBlocks.filter((b) => !b.title.startsWith('__'));
+              const hasImportantInfo = event.dress_code_style || event.kids_restriction_note || event.gift_suggestions || event.instagram_host_1 || visibleInfoBlocks.length > 0;
+              if (!hasImportantInfo) return null;
 
-                  {/* Outros blocos adicionais de info */}
-                  {infoBlocks.map((block) => (
-                    <div key={block.id} className="p-4 rounded-2xl border border-[#d4af37]/10 bg-[#18181b]/50 space-y-1.5">
-                      <h4 className="font-bold text-sm text-[#d4af37]">{block.title}</h4>
-                      <p className="text-xs text-white/90 leading-relaxed">{block.content}</p>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            )}
+              return (
+                <div 
+                  className="rounded-3xl border border-[#d4af37]/20 shadow-xl overflow-hidden text-left"
+                  style={{ backgroundColor: '#121214', color: '#ffffff' }}
+                >
+                  <div className="p-6 border-b border-[#d4af37]/15">
+                    <h3 className="bg-gradient-to-r from-[#b89742] via-[#f3e0aa] to-[#b89742] bg-clip-text text-transparent font-serif tracking-wide text-lg font-bold">
+                      ✨ Informações Importantes
+                    </h3>
+                  </div>
+                  <div className="space-y-5 p-6">
+                    {/* Dress Code */}
+                    {(event.dress_code_style || event.dress_code_colors) && (
+                      <div className="p-4 rounded-2xl border border-[#d4af37]/15 bg-[#18181b]/50 space-y-2">
+                        <h4 className="font-bold text-sm text-[#d4af37] flex items-center gap-2">
+                          👗 Dress Code
+                        </h4>
+                        {event.dress_code_style && (
+                          <p className="text-xs text-white/90">
+                            <span className="font-semibold text-[#f3e0aa]">Estilo:</span> {event.dress_code_style}
+                          </p>
+                        )}
+                        {event.dress_code_colors && (
+                          <p className="text-xs text-white/90">
+                            <span className="font-semibold text-[#f3e0aa]">Sugestões de Cores:</span> {event.dress_code_colors}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Outros blocos adicionais de info */}
+                    {visibleInfoBlocks.map((block) => (
+                      <div key={block.id} className="p-4 rounded-2xl border border-[#d4af37]/15 bg-[#18181b]/50 space-y-1.5">
+                        <h4 className="font-bold text-sm text-[#d4af37]">{block.title}</h4>
+                        <p className="text-xs text-white/90 leading-relaxed">{block.content}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
             
             {children}
             
