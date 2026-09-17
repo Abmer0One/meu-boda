@@ -92,11 +92,11 @@ export default function ModernTicketTemplate({
             <div className="space-y-4">
               <div className="flex items-center justify-between border-b border-border-custom/50 pb-2">
                 <h3 className="font-extrabold text-sm uppercase text-[#a855f7] tracking-wider">Especificações do Evento</h3>
-                <span className="text-[10px] text-foreground/50 font-bold uppercase">{eventLabels.title}</span>
+                <span className="text-[10px] text-zinc-400 font-bold uppercase">{eventLabels.title}</span>
               </div>
               
               {event.description && (
-                <p className="text-xs text-foreground/70 leading-relaxed font-semibold italic border-l-2 border-[#3b82f6] pl-3 py-1 bg-secondary/5 rounded-r-lg">
+                <p className="text-xs text-white/80 leading-relaxed font-semibold italic border-l-2 border-[#3b82f6] pl-3 py-1 bg-secondary/5 rounded-r-lg">
                   &quot;{event.description}&quot;
                 </p>
               )}
@@ -105,8 +105,8 @@ export default function ModernTicketTemplate({
                 <div className="p-4 rounded-2xl bg-[#1c1c21] border border-border-custom/60 flex items-start gap-3">
                   <Calendar className="h-5 w-5 text-[#3b82f6] shrink-0 mt-0.5" />
                   <div>
-                    <h4 className="font-bold text-[10px] text-foreground/45 uppercase tracking-wider">Data / Hora</h4>
-                    <p className="font-bold text-xs mt-1 text-foreground">
+                    <h4 className="font-bold text-[10px] text-zinc-400 uppercase tracking-wider">Data / Hora</h4>
+                    <p className="font-bold text-xs mt-1 text-white">
                       {new Date(event.date).toLocaleDateString('pt-PT', {
                         weekday: 'long',
                         day: '2-digit',
@@ -122,8 +122,8 @@ export default function ModernTicketTemplate({
                   <div className="p-4 rounded-2xl bg-[#1c1c21] border border-border-custom/60 flex items-start gap-3">
                     <Calendar className="h-5 w-5 text-[#a855f7] shrink-0 mt-0.5" />
                     <div>
-                      <h4 className="font-bold text-[10px] text-foreground/45 uppercase tracking-wider">{eventLabels.theme}</h4>
-                      <p className="font-bold text-xs mt-1 text-foreground">{event.theme}</p>
+                      <h4 className="font-bold text-[10px] text-zinc-400 uppercase tracking-wider">{eventLabels.theme}</h4>
+                      <p className="font-bold text-xs mt-1 text-white">{event.theme}</p>
                     </div>
                   </div>
                 )}
@@ -135,8 +135,8 @@ export default function ModernTicketTemplate({
                     <div className="flex items-start gap-3">
                       <MapPin className="h-5 w-5 text-[#3b82f6] shrink-0 mt-0.5" />
                       <div>
-                        <h4 className="font-bold text-[10px] text-foreground/45 uppercase tracking-wider">Local do Evento</h4>
-                        <p className="font-bold text-xs mt-0.5 text-foreground">{event.ceremony_location}</p>
+                        <h4 className="font-bold text-[10px] text-zinc-400 uppercase tracking-wider">Local do Evento</h4>
+                        <p className="font-bold text-xs mt-0.5 text-white">{event.ceremony_location}</p>
                       </div>
                     </div>
                     {getGoogleMapsLink(event.ceremony_location, event.ceremony_maps_url) && (
@@ -159,8 +159,8 @@ export default function ModernTicketTemplate({
                     <div className="flex items-start gap-3">
                       <MapPin className="h-5 w-5 text-[#a855f7] shrink-0 mt-0.5" />
                       <div>
-                        <h4 className="font-bold text-[10px] text-foreground/45 uppercase tracking-wider">Local da Recepção</h4>
-                        <p className="font-bold text-xs mt-0.5 text-foreground">{event.party_location}</p>
+                        <h4 className="font-bold text-[10px] text-zinc-400 uppercase tracking-wider">Local da Recepção</h4>
+                        <p className="font-bold text-xs mt-0.5 text-white">{event.party_location}</p>
                       </div>
                     </div>
                     {getGoogleMapsLink(event.party_location, event.party_maps_url) && (
@@ -196,8 +196,8 @@ export default function ModernTicketTemplate({
                       </span>
                       <div className="space-y-0.5">
                         <span className="text-[10px] font-black text-[#3b82f6] uppercase tracking-wider">{sched.time}</span>
-                        <h4 className="text-xs font-bold text-foreground">{sched.title}</h4>
-                        {sched.location && <p className="text-[10px] text-foreground/50">{sched.location}</p>}
+                        <h4 className="text-xs font-bold text-white">{sched.title}</h4>
+                        {sched.location && <p className="text-[10px] text-zinc-400">{sched.location}</p>}
                       </div>
                     </div>
                   ))}
@@ -212,8 +212,8 @@ export default function ModernTicketTemplate({
             {/* RSVP Form */}
             <div className="p-5 rounded-2xl bg-[#1c1c21] border border-border-custom/60 space-y-4">
               <div className="text-center space-y-1">
-                <h3 className="font-extrabold text-sm uppercase text-foreground">Responder Convite (RSVP)</h3>
-                <p className="text-xs text-foreground/50">
+                <h3 className="font-extrabold text-sm uppercase text-white">Responder Convite (RSVP)</h3>
+                <p className="text-xs text-zinc-300">
                   Olá <span className="font-bold text-[#3b82f6]">{guest.name}</span>, indique a sua presença no painel.
                 </p>
                 {event.rsvp_deadline && (
@@ -231,7 +231,7 @@ export default function ModernTicketTemplate({
                   className={`flex items-center justify-center gap-1.5 py-3 px-2 border rounded-xl font-bold text-xs cursor-pointer transition-all ${
                     isConfirmed
                       ? 'border-success bg-success/10 text-success'
-                      : 'border-white/10 hover:bg-[#27272a] text-foreground/75'
+                      : 'border-white/10 hover:bg-[#27272a] text-zinc-300'
                   }`}
                 >
                   <CheckCircle className="h-4 w-4" /> Comparecer
@@ -244,7 +244,7 @@ export default function ModernTicketTemplate({
                   className={`flex items-center justify-center gap-1.5 py-3 px-2 border rounded-xl font-bold text-xs cursor-pointer transition-all ${
                     isDeclined
                       ? 'border-error bg-error/10 text-error'
-                      : 'border-white/10 hover:bg-[#27272a] text-foreground/75'
+                      : 'border-white/10 hover:bg-[#27272a] text-zinc-300'
                   }`}
                 >
                   <XCircle className="h-4 w-4" /> Recusar
@@ -255,21 +255,21 @@ export default function ModernTicketTemplate({
                 <div className="space-y-4 pt-1">
                   {guest.companions > 0 && (
                     <div className="flex flex-col gap-1">
-                      <label className="text-[10px] font-bold text-foreground/50 uppercase tracking-wider">Acompanhantes Autorizados</label>
-                      <div className="rounded-xl border border-white/5 bg-[#121215] px-3.5 py-2.5 text-xs font-bold">
+                      <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Acompanhantes Autorizados</label>
+                      <div className="rounded-xl border border-white/5 bg-[#121215] px-3.5 py-2.5 text-xs font-bold text-white">
                         {guest.companions} {guest.companions === 1 ? 'Acompanhante autorizado' : 'Acompanhantes autorizados'}
                       </div>
                     </div>
                   )}
 
                   <div className="flex flex-col gap-1">
-                    <label className="text-[10px] font-bold text-foreground/50 uppercase tracking-wider">Alergias ou Observações</label>
+                    <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Alergias ou Observações</label>
                     <textarea
                       rows={2}
                       placeholder="Vegetariano, alergias alimentares..."
                       value={notes}
                       onChange={(e) => setNotes(e.target.value)}
-                      className="w-full rounded-xl border border-white/10 bg-[#0c0c0e] px-3.5 py-2 text-xs focus:border-[#3b82f6] focus:outline-none transition-all text-foreground"
+                      className="w-full rounded-xl border border-white/10 bg-[#0c0c0e] px-3.5 py-2 text-xs focus:border-[#3b82f6] focus:outline-none transition-all text-white placeholder:text-zinc-500"
                     />
                   </div>
                 </div>
@@ -282,7 +282,7 @@ export default function ModernTicketTemplate({
                 <CheckCircle className="h-5 w-5 text-success shrink-0" />
                 <div>
                   <h4 className="font-bold text-[9px] text-success uppercase tracking-wider">Mesa Reservada</h4>
-                  <p className="text-xs font-extrabold text-foreground">{table.name}</p>
+                  <p className="text-xs font-extrabold text-white">{table.name}</p>
                 </div>
               </div>
             )}
@@ -292,19 +292,19 @@ export default function ModernTicketTemplate({
               <div className="p-5 rounded-2xl bg-[#1c1c21] border border-border-custom/60 space-y-4">
                 <div className="w-full bg-[#121215] rounded-xl p-4 text-xs space-y-2 border border-white/5">
                   <div className="flex justify-between items-center">
-                    <span className="text-foreground/45">Titular:</span>
-                    <span className="font-bold text-foreground">{guest.name}</span>
+                    <span className="text-zinc-400">Titular:</span>
+                    <span className="font-bold text-white">{guest.name}</span>
                   </div>
                   {table && (
                     <div className="flex justify-between items-center">
-                      <span className="text-foreground/45">Mesa / Lugar:</span>
+                      <span className="text-zinc-400">Mesa / Lugar:</span>
                       <span className="font-bold text-[#3b82f6]">{table.name}</span>
                     </div>
                   )}
                   {guest.companions > 0 && (
                     <div className="flex justify-between items-center">
-                      <span className="text-foreground/45">Acompanhantes:</span>
-                      <span className="font-bold text-foreground">+{guest.companions}</span>
+                      <span className="text-zinc-400">Acompanhantes:</span>
+                      <span className="font-bold text-white">+{guest.companions}</span>
                     </div>
                   )}
                 </div>
@@ -329,20 +329,20 @@ export default function ModernTicketTemplate({
       {/* Info Blocks (Dress code, rules) */}
       {(event.dress_code_style || event.kids_restriction_note || event.gift_suggestions || event.instagram_host_1 || infoBlocks.length > 0) && (
         <div className="mt-8 p-6 rounded-3xl border border-border-custom/50 bg-[#121215] space-y-6">
-          <h3 className="font-extrabold text-sm uppercase text-foreground border-b border-border-custom/50 pb-2">Informações Gerais</h3>
+          <h3 className="font-extrabold text-sm uppercase text-white border-b border-border-custom/50 pb-2">Informações Gerais</h3>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {(event.dress_code_style || event.dress_code_colors) && (
               <div className="p-4 rounded-2xl bg-[#1c1c21] border border-white/5 space-y-2">
                 <h4 className="font-bold text-xs text-[#3b82f6] uppercase tracking-wider">👗 Dress Code</h4>
                 {event.dress_code_style && (
-                  <p className="text-xs text-foreground/85">
-                    <span className="font-semibold text-foreground/50">Estilo:</span> {event.dress_code_style}
+                  <p className="text-xs text-white/90">
+                    <span className="font-semibold text-zinc-400">Estilo:</span> {event.dress_code_style}
                   </p>
                 )}
                 {event.dress_code_colors && (
-                  <p className="text-xs text-foreground/85">
-                    <span className="font-semibold text-foreground/50">Cores sugeridas:</span> {event.dress_code_colors}
+                  <p className="text-xs text-white/90">
+                    <span className="font-semibold text-zinc-400">Cores sugeridas:</span> {event.dress_code_colors}
                   </p>
                 )}
               </div>
@@ -351,7 +351,7 @@ export default function ModernTicketTemplate({
             {infoBlocks.map((block) => (
               <div key={block.id} className="p-4 rounded-2xl bg-[#1c1c21] border border-white/5 space-y-1.5">
                 <h4 className="font-bold text-xs text-[#a855f7] uppercase tracking-wider">{block.title}</h4>
-                <p className="text-xs text-foreground/80 leading-relaxed">{block.content}</p>
+                <p className="text-xs text-white/90 leading-relaxed">{block.content}</p>
               </div>
             ))}
           </div>
@@ -361,7 +361,7 @@ export default function ModernTicketTemplate({
       {children}
 
       {/* Footer copyright */}
-      <div className="text-center py-8 text-[10px] text-foreground/30 font-bold uppercase tracking-widest mt-8">
+      <div className="text-center py-8 text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-8">
         &copy; {new Date().getFullYear()} Meu Boda. Todos os direitos reservados.
       </div>
       

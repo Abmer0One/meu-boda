@@ -32,6 +32,8 @@ import {
 } from 'lucide-react';
 
 import DefaultTemplate from '@/components/templates/invitations/DefaultTemplate';
+import ModernTicketTemplate from '@/components/templates/invitations/ModernTicketTemplate';
+import RoyalParisienneTemplate from '@/components/templates/invitations/RoyalParisienneTemplate';
 
 interface RSVPPageProps {
   params: Promise<{ token: string }>;
@@ -318,21 +320,22 @@ export default function PublicRSVPPage({ params }: RSVPPageProps) {
     const templateId = event.template_id || 'default';
 
     const galleryChildren = (
-      <Card className="mt-8 bg-card-bg border border-border-custom shadow-md text-left">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg font-bold">
-            <Camera className="h-5 w-5 text-primary" />
+      <Card className="mt-8 bg-[#121215]/90 border border-[#d4af37]/20 shadow-xl rounded-3xl text-left text-white overflow-hidden relative backdrop-blur-md">
+        <div className="absolute inset-3 border border-[#d4af37]/5 rounded-[20px] pointer-events-none" />
+        <CardHeader className="border-b border-[#d4af37]/15 relative z-10">
+          <CardTitle className="flex items-center gap-2 text-lg font-bold text-white font-cinzel tracking-wider">
+            <Camera className="h-5 w-5 text-[#d4af37]" />
             Galeria Colaborativa (Meu Boda Live)
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-6 text-foreground">
-          <p className="text-sm text-foreground/75">
+        <CardContent className="space-y-6 text-white/90 relative z-10 p-6">
+          <p className="text-sm text-white/80 leading-relaxed">
             Partilhe as suas fotos e vídeos em tempo real! Os ficheiros enviados serão exibidos no projetor do evento e partilhados na galeria.
           </p>
 
-          <div className="flex flex-col md:flex-row items-stretch md:items-end gap-4 max-w-2xl bg-secondary/10 p-4 rounded-2xl border border-border-custom/50">
+          <div className="flex flex-col md:flex-row items-stretch md:items-end gap-4 max-w-2xl bg-white/5 p-4 rounded-2xl border border-white/10">
             <div className="flex-1 flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-foreground/75 tracking-wide">
+              <label className="text-xs font-semibold text-[#f3e0aa] tracking-wide">
                 Legenda da Foto/Vídeo (opcional)
               </label>
               <input
@@ -340,13 +343,13 @@ export default function PublicRSVPPage({ params }: RSVPPageProps) {
                 placeholder="Escreva uma mensagem ou legenda..."
                 value={mediaCaption}
                 onChange={(e) => setMediaCaption(e.target.value)}
-                className="w-full rounded-xl border border-border-custom bg-card-bg px-3.5 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all text-foreground"
+                className="w-full rounded-xl border border-white/20 bg-[#0d0d0f] px-3.5 py-2 text-sm focus:border-[#d4af37] focus:outline-none transition-all text-white placeholder:text-zinc-500"
                 disabled={uploadingMedia}
               />
             </div>
             
             <div className="shrink-0 flex items-center">
-              <label className="relative w-full md:w-auto flex items-center justify-center gap-2 px-5 py-2.5 bg-primary text-white rounded-xl font-bold text-sm cursor-pointer hover:bg-primary-hover active:scale-95 transition-all shadow-md shadow-primary/20">
+              <label className="relative w-full md:w-auto flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-[#b89742] to-[#d4af37] text-[#0d0d0f] rounded-xl font-bold text-sm cursor-pointer hover:brightness-110 active:scale-95 transition-all shadow-md">
                 {uploadingMedia ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -371,15 +374,15 @@ export default function PublicRSVPPage({ params }: RSVPPageProps) {
 
           {/* Media list */}
           <div className="space-y-3">
-            <h4 className="text-xs font-bold text-foreground/50 uppercase tracking-wider">
+            <h4 className="text-xs font-bold text-[#f3e0aa] uppercase tracking-wider">
               Fotos do Evento ({galleryList.length})
             </h4>
 
             {galleryList.length === 0 ? (
-              <div className="flex flex-col items-center justify-center text-center py-12 border border-dashed border-border-custom rounded-2xl bg-secondary/5">
-                <Camera className="h-10 w-10 text-foreground/20 mb-2" />
-                <p className="text-xs font-medium text-foreground/60">Ainda nenhuma foto foi publicada.</p>
-                <p className="text-[10px] text-foreground/40 mt-0.5">Seja o primeiro a enviar uma recordação!</p>
+              <div className="flex flex-col items-center justify-center text-center py-12 border border-dashed border-white/15 rounded-2xl bg-white/5">
+                <Camera className="h-10 w-10 text-[#d4af37]/40 mb-2" />
+                <p className="text-xs font-medium text-white/80">Ainda nenhuma foto foi publicada.</p>
+                <p className="text-[10px] text-zinc-400 mt-0.5">Seja o primeiro a enviar uma recordação!</p>
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
@@ -420,6 +423,12 @@ export default function PublicRSVPPage({ params }: RSVPPageProps) {
       </Card>
     );
 
+    if (templateId === 'royal_parisienne' || templateId === 'royal') {
+      return <RoyalParisienneTemplate {...templateProps}>{galleryChildren}</RoyalParisienneTemplate>;
+    }
+    if (templateId === 'modern_ticket' || templateId === 'ticket') {
+      return <ModernTicketTemplate {...templateProps}>{galleryChildren}</ModernTicketTemplate>;
+    }
     return <DefaultTemplate {...templateProps}>{galleryChildren}</DefaultTemplate>;
   };
 

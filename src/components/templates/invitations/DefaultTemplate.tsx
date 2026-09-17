@@ -503,22 +503,22 @@ export default function DefaultTemplate({
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
               
               {/* LEFT COLUMN: Details / Important Info Panel */}
-              <div className="bg-[#121215]/80 border border-[#d4af37]/15 rounded-3xl p-6 md:p-8 flex flex-col justify-between shadow-xl relative backdrop-blur-md">
+              <div className="bg-[#121215]/90 border border-[#d4af37]/20 rounded-3xl p-6 md:p-8 flex flex-col justify-between shadow-xl relative backdrop-blur-md">
                 <div className="absolute inset-3 border border-[#d4af37]/5 rounded-[20px] pointer-events-none" />
                 
                 <div className="space-y-6 relative z-10">
-                  <div className="text-center space-y-2 border-b border-[#d4af37]/10 pb-4">
+                  <div className="text-center space-y-2 border-b border-[#d4af37]/15 pb-4">
                     <h3 className="font-cinzel font-bold text-sm tracking-[3px] gold-foil-text">
                       DETALHES
                     </h3>
                   </div>
 
-                  <div className="space-y-4 text-xs leading-relaxed text-foreground/80">
-                    <div className="flex items-start gap-3 p-3 bg-white/5 rounded-xl border border-white/5">
-                      <Calendar className="h-4.5 w-4.5 text-[#d4af37] shrink-0" />
+                  <div className="space-y-4 text-xs leading-relaxed text-white/90">
+                    <div className="flex items-start gap-3 p-3.5 bg-white/5 rounded-xl border border-white/10">
+                      <Calendar className="h-5 w-5 text-[#d4af37] shrink-0 mt-0.5" />
                       <div>
-                        <h4 className="font-bold text-[9px] uppercase tracking-wider text-[#d4af37]">Data e Hora</h4>
-                        <p className="font-semibold text-foreground mt-0.5">
+                        <h4 className="font-bold text-[10px] uppercase tracking-wider text-[#f3e0aa]">Data e Hora</h4>
+                        <p className="font-semibold text-white text-sm mt-0.5">
                           {new Date(event.date).toLocaleDateString('pt-PT', {
                             weekday: 'long',
                             day: '2-digit',
@@ -531,24 +531,24 @@ export default function DefaultTemplate({
                     </div>
 
                     {event.ceremony_location && (
-                      <div className="flex items-start gap-3 p-3 bg-white/5 rounded-xl border border-white/5">
-                        <MapPin className="h-4.5 w-4.5 text-[#d4af37] shrink-0" />
+                      <div className="flex items-start gap-3 p-3.5 bg-white/5 rounded-xl border border-white/10">
+                        <MapPin className="h-5 w-5 text-[#d4af37] shrink-0 mt-0.5" />
                         <div className="flex-1">
-                          <h4 className="font-bold text-[9px] uppercase tracking-wider text-[#d4af37]">
+                          <h4 className="font-bold text-[10px] uppercase tracking-wider text-[#f3e0aa]">
                             {event.type === 'casamento' ? 'Cerimónia' : 'Local'}
                           </h4>
-                          <p className="font-semibold text-foreground mt-0.5">{event.ceremony_location}</p>
+                          <p className="font-semibold text-white text-sm mt-0.5">{event.ceremony_location}</p>
                           {event.ceremony_time && (
-                            <p className="text-[10px] text-foreground/50">Hora: {event.ceremony_time}</p>
+                            <p className="text-xs text-zinc-300 mt-0.5">Hora: {event.ceremony_time}</p>
                           )}
                           {getGoogleMapsLink(event.ceremony_location, event.ceremony_maps_url) && (
                             <a
                               href={getGoogleMapsLink(event.ceremony_location, event.ceremony_maps_url)!}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-[9px] font-bold text-[#d4af37] mt-1.5 hover:underline"
+                              className="inline-flex items-center gap-1.5 text-xs font-bold text-[#d4af37] hover:text-[#f3e0aa] mt-2 transition-colors"
                             >
-                              <Map className="h-3 w-3" /> Ver no mapa
+                              <Map className="h-3.5 w-3.5" /> Ver localização no mapa
                             </a>
                           )}
                         </div>
@@ -556,24 +556,24 @@ export default function DefaultTemplate({
                     )}
 
                     {event.party_location && (
-                      <div className="flex items-start gap-3 p-3 bg-white/5 rounded-xl border border-white/5">
-                        <MapPin className="h-4.5 w-4.5 text-[#d4af37] shrink-0" />
+                      <div className="flex items-start gap-3 p-3.5 bg-white/5 rounded-xl border border-white/10">
+                        <MapPin className="h-5 w-5 text-[#d4af37] shrink-0 mt-0.5" />
                         <div className="flex-1">
-                          <h4 className="font-bold text-[9px] uppercase tracking-wider text-[#d4af37]">
+                          <h4 className="font-bold text-[10px] uppercase tracking-wider text-[#f3e0aa]">
                             {event.type === 'casamento' ? 'Copo d\'Água' : 'Recepção'}
                           </h4>
-                          <p className="font-semibold text-foreground mt-0.5">{event.party_location}</p>
+                          <p className="font-semibold text-white text-sm mt-0.5">{event.party_location}</p>
                           {event.party_time && (
-                            <p className="text-[10px] text-foreground/50">Hora: {event.party_time}</p>
+                            <p className="text-xs text-zinc-300 mt-0.5">Hora: {event.party_time}</p>
                           )}
                           {getGoogleMapsLink(event.party_location, event.party_maps_url) && (
                             <a
                               href={getGoogleMapsLink(event.party_location, event.party_maps_url)!}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-[9px] font-bold text-[#d4af37] mt-1.5 hover:underline"
+                              className="inline-flex items-center gap-1.5 text-xs font-bold text-[#d4af37] hover:text-[#f3e0aa] mt-2 transition-colors"
                             >
-                              <Map className="h-3 w-3" /> Ver no mapa
+                              <Map className="h-3.5 w-3.5" /> Ver localização no mapa
                             </a>
                           )}
                         </div>
@@ -583,14 +583,35 @@ export default function DefaultTemplate({
                 </div>
 
                 {/* Info Blocks / Dress code under details */}
-                <div className="space-y-4 relative z-10 pt-6">
+                <div className="space-y-3 relative z-10 pt-4">
                   {(event.dress_code_style || event.dress_code_colors) && (
-                    <div className="p-3 border border-[#d4af37]/10 bg-white/5 rounded-xl text-xs space-y-1">
-                      <h4 className="font-bold text-[10px] uppercase tracking-wider text-[#d4af37]">👗 Dress Code</h4>
-                      {event.dress_code_style && <p className="text-foreground/80">{event.dress_code_style}</p>}
+                    <div className="p-3.5 border border-[#d4af37]/20 bg-white/5 rounded-xl text-xs space-y-1">
+                      <h4 className="font-bold text-[10px] uppercase tracking-wider text-[#f3e0aa]">👗 Dress Code</h4>
+                      {event.dress_code_style && <p className="text-white font-medium text-xs mt-0.5">{event.dress_code_style}</p>}
                       {event.dress_code_colors && (
-                        <p className="text-[10px] text-foreground/50">Sugerido: {event.dress_code_colors}</p>
+                        <p className="text-xs text-zinc-300">Sugerido: {event.dress_code_colors}</p>
                       )}
+                    </div>
+                  )}
+
+                  {event.gift_suggestions && (
+                    <div className="p-3.5 border border-[#d4af37]/20 bg-white/5 rounded-xl text-xs space-y-1">
+                      <h4 className="font-bold text-[10px] uppercase tracking-wider text-[#f3e0aa]">🎁 Sugestões de Presentes</h4>
+                      <p className="text-white/90 text-xs mt-0.5">{event.gift_suggestions}</p>
+                    </div>
+                  )}
+
+                  {event.kids_restriction_note && (
+                    <div className="p-3.5 border border-[#d4af37]/20 bg-white/5 rounded-xl text-xs space-y-1">
+                      <h4 className="font-bold text-[10px] uppercase tracking-wider text-[#f3e0aa]">ℹ️ Nota Importante</h4>
+                      <p className="text-white/90 text-xs mt-0.5">{event.kids_restriction_note}</p>
+                    </div>
+                  )}
+
+                  {event.rsvp_deadline && (
+                    <div className="p-3.5 border border-[#d4af37]/20 bg-white/5 rounded-xl text-xs space-y-1">
+                      <h4 className="font-bold text-[10px] uppercase tracking-wider text-[#f3e0aa]">⏰ Confirmação Até</h4>
+                      <p className="text-white/90 text-xs mt-0.5">{event.rsvp_deadline}</p>
                     </div>
                   )}
                 </div>
@@ -617,35 +638,35 @@ export default function DefaultTemplate({
 
                 {/* Hosts / Main Text */}
                 <div className="space-y-6 relative z-10 py-6 my-auto">
-                  <h1 className="text-3xl md:text-5xl font-alex tracking-wide text-foreground px-2 py-1 leading-tight gold-foil-text font-medium">
+                  <h1 className="text-3xl md:text-5xl font-alex tracking-wide text-white px-2 py-1 leading-tight gold-foil-text font-medium">
                     {event.title}
                   </h1>
 
-                  <p className="text-xs font-playfair italic max-w-sm mx-auto leading-relaxed text-foreground/75 px-4">
+                  <p className="text-xs md:text-sm font-playfair italic max-w-sm mx-auto leading-relaxed text-white/90 px-4">
                     {phrases.intro}
                   </p>
                   
                   {event.description && (
-                    <p className="text-[11px] font-playfair italic text-[#f3e0aa]/75 mt-4">
+                    <p className="text-xs font-playfair italic text-[#f3e0aa] mt-4">
                       &quot;{event.description}&quot;
                     </p>
                   )}
                 </div>
 
                 {/* Footer Monogram Date */}
-                <div className="space-y-1 relative z-10 w-full pt-4 border-t border-[#d4af37]/10">
-                  <p className="text-[10px] font-cinzel tracking-[3px] text-[#d4af37] uppercase">
+                <div className="space-y-1 relative z-10 w-full pt-4 border-t border-[#d4af37]/15">
+                  <p className="text-[10px] font-cinzel tracking-[3px] text-[#f3e0aa] uppercase">
                     {new Date(event.date).toLocaleDateString('pt-PT', { month: 'long', year: 'numeric' })}
                   </p>
                 </div>
               </div>
 
               {/* RIGHT COLUMN: Ticket access & RSVP Panel */}
-              <div className="bg-[#121215]/80 border border-[#d4af37]/15 rounded-3xl p-6 md:p-8 flex flex-col justify-between shadow-xl relative backdrop-blur-md">
+              <div className="bg-[#121215]/90 border border-[#d4af37]/20 rounded-3xl p-6 md:p-8 flex flex-col justify-between shadow-xl relative backdrop-blur-md">
                 <div className="absolute inset-3 border border-[#d4af37]/5 rounded-[20px] pointer-events-none" />
                 
                 <div className="space-y-6 relative z-10">
-                  <div className="text-center space-y-2 border-b border-[#d4af37]/10 pb-4">
+                  <div className="text-center space-y-2 border-b border-[#d4af37]/15 pb-4">
                     <h3 className="font-cinzel font-bold text-sm tracking-[3px] gold-foil-text">
                       RSVP / PASSE
                     </h3>
@@ -653,18 +674,18 @@ export default function DefaultTemplate({
 
                   {/* Access QR Ticket */}
                   {isConfirmed && qrCodeUrl ? (
-                    <div className="bg-white/5 border border-[#d4af37]/10 rounded-2xl p-4 flex flex-col items-center gap-3.5 relative overflow-hidden">
+                    <div className="bg-white/5 border border-[#d4af37]/20 rounded-2xl p-4 flex flex-col items-center gap-3.5 relative overflow-hidden">
                       {/* Ticket header label */}
-                      <span className="text-[8px] font-black tracking-[3px] text-[#d4af37] uppercase">PASSE DIGITAL INDIVIDUAL</span>
+                      <span className="text-[9px] font-black tracking-[3px] text-[#f3e0aa] uppercase">PASSE DIGITAL INDIVIDUAL</span>
                       
-                      <div className="bg-white p-2.5 rounded-xl border-2 border-[#d4af37]/20 shadow-md">
+                      <div className="bg-white p-2.5 rounded-xl border-2 border-[#d4af37]/30 shadow-md">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={qrCodeUrl} alt="Acesso QR" className="w-32 h-32 object-contain" />
                       </div>
 
                       <div className="text-center space-y-1 text-xs">
-                        <p className="font-bold text-foreground">{guest.name}</p>
-                        <p className="text-[10.5px] text-[#f3e0aa]">
+                        <p className="font-bold text-white text-sm">{guest.name}</p>
+                        <p className="text-xs text-[#f3e0aa] font-semibold">
                           {table ? `Mesa: ${table.name}` : 'Mesa: Confirmada'}
                         </p>
                       </div>
@@ -672,7 +693,7 @@ export default function DefaultTemplate({
                       <Button
                         onClick={handleDownloadInvite}
                         disabled={downloading}
-                        className="w-full justify-center rounded-xl border border-[#d4af37]/30 text-[#d4af37] bg-transparent hover:bg-[#d4af37]/5 font-bold py-2 text-xs tracking-wider uppercase transition-colors"
+                        className="w-full justify-center rounded-xl border border-[#d4af37]/40 text-[#f3e0aa] bg-[#d4af37]/10 hover:bg-[#d4af37]/20 font-bold py-2.5 text-xs tracking-wider uppercase transition-all"
                         leftIcon={downloading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
                       >
                         Baixar PDF
@@ -681,8 +702,8 @@ export default function DefaultTemplate({
                   ) : (
                     /* RSVP selection buttons */
                     <div className="space-y-4">
-                      <p className="text-xs text-center text-foreground/70 px-2">
-                        Olá <span className="font-bold text-[#d4af37]">{guest.name}</span>, confirme a sua presença no evento abaixo:
+                      <p className="text-xs text-center text-white/90 px-2 leading-relaxed">
+                        Olá <span className="font-bold text-[#f3e0aa]">{guest.name}</span>, confirme a sua presença no evento abaixo:
                       </p>
 
                       <div className="grid grid-cols-2 gap-3">
@@ -690,41 +711,41 @@ export default function DefaultTemplate({
                           type="button"
                           onClick={() => handleRSVPSubmit('Confirmed')}
                           disabled={saving}
-                          className={`flex flex-col items-center justify-center p-3 border rounded-xl cursor-pointer active:scale-95 transition-all gap-1 ${
+                          className={`flex flex-col items-center justify-center p-3 border rounded-xl cursor-pointer active:scale-95 transition-all gap-1.5 ${
                             isConfirmed
-                              ? 'border-success bg-success/15 text-success'
-                              : 'border-[#d4af37]/10 hover:bg-white/5 text-[#f4f4f5]/60'
+                              ? 'border-success bg-success/20 text-success font-bold'
+                              : 'border-[#d4af37]/20 hover:bg-white/10 text-white font-semibold'
                           }`}
                         >
                           <CheckCircle className="h-5 w-5" />
-                          <span className="text-[10px] font-bold">Vou</span>
+                          <span className="text-xs">Vou</span>
                         </button>
 
                         <button
                           type="button"
                           onClick={() => handleRSVPSubmit('Declined')}
                           disabled={saving}
-                          className={`flex flex-col items-center justify-center p-3 border rounded-xl cursor-pointer active:scale-95 transition-all gap-1 ${
+                          className={`flex flex-col items-center justify-center p-3 border rounded-xl cursor-pointer active:scale-95 transition-all gap-1.5 ${
                             isDeclined
-                              ? 'border-error bg-error/15 text-error'
-                              : 'border-[#d4af37]/10 hover:bg-white/5 text-[#f4f4f5]/60'
+                              ? 'border-error bg-error/20 text-error font-bold'
+                              : 'border-[#d4af37]/20 hover:bg-white/10 text-white font-semibold'
                           }`}
                         >
                           <XCircle className="h-5 w-5" />
-                          <span className="text-[10px] font-bold">Não vou</span>
+                          <span className="text-xs">Não vou</span>
                         </button>
                       </div>
 
                       {/* Extra food restriction note input */}
                       {isConfirmed && (
-                        <div className="flex flex-col gap-1 pt-1">
-                          <label className="text-[10px] font-bold text-white/40 uppercase tracking-wide">Observações / Restrições</label>
+                        <div className="flex flex-col gap-1.5 pt-1">
+                          <label className="text-[10px] font-bold text-zinc-300 uppercase tracking-wide">Observações / Restrições</label>
                           <textarea
                             rows={2}
                             placeholder="Vegetariano, alergias..."
                             value={notes}
                             onChange={(e) => setNotes(e.target.value)}
-                            className="w-full rounded-xl border border-white/10 bg-[#0d0d0f] px-3.5 py-1.5 text-xs focus:border-[#d4af37] focus:outline-none transition-all text-foreground"
+                            className="w-full rounded-xl border border-white/20 bg-[#0d0d0f] px-3.5 py-2 text-xs focus:border-[#d4af37] focus:outline-none transition-all text-white placeholder:text-zinc-500"
                           />
                         </div>
                       )}
@@ -732,12 +753,12 @@ export default function DefaultTemplate({
                   )}
                 </div>
 
-                <div className="text-center pt-4 border-t border-[#d4af37]/10 relative z-10">
+                <div className="text-center pt-4 border-t border-[#d4af37]/15 relative z-10">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => setIsOpen(false)}
-                    className="text-[10px] text-white/40 hover:text-foreground border-white/5 hover:border-[#d4af37]/30 rounded-full"
+                    className="text-[11px] text-zinc-300 hover:text-white border-white/10 hover:border-[#d4af37]/40 rounded-full"
                   >
                     Voltar à Capa
                   </Button>
@@ -748,9 +769,9 @@ export default function DefaultTemplate({
 
             {/* Timelines and Schedules below panels */}
             {schedules.length > 0 && (
-              <Card className="bg-[#121215]/80 border border-[#d4af37]/15 shadow-xl backdrop-blur-md relative overflow-hidden">
+              <Card className="bg-[#121215]/90 border border-[#d4af37]/20 shadow-xl backdrop-blur-md relative overflow-hidden">
                 <div className="absolute inset-3 border border-[#d4af37]/5 rounded-[20px] pointer-events-none" />
-                <CardHeader className="border-b border-[#d4af37]/10 relative z-10">
+                <CardHeader className="border-b border-[#d4af37]/15 relative z-10">
                   <CardTitle className="flex items-center gap-2 font-cinzel font-bold text-sm tracking-[3px] gold-foil-text">
                     <Clock className="h-4.5 w-4.5 text-[#d4af37]" /> AGENDA DO DIA
                   </CardTitle>
@@ -763,12 +784,12 @@ export default function DefaultTemplate({
                           <span className="h-1.5 w-1.5 rounded-full bg-[#d4af37]" />
                         </span>
                         <div className="space-y-1 text-left">
-                          <span className="inline-flex items-center gap-1 text-[10px] font-black text-[#d4af37] uppercase tracking-wider">
+                          <span className="inline-flex items-center gap-1 text-[10px] font-black text-[#f3e0aa] uppercase tracking-wider">
                             <Clock className="h-3 w-3" /> {sched.time}
                           </span>
-                          <h4 className="text-sm font-semibold text-foreground">{sched.title}</h4>
+                          <h4 className="text-sm font-semibold text-white">{sched.title}</h4>
                           {sched.location && (
-                            <span className="text-xs text-foreground/60 flex items-center gap-1">
+                            <span className="text-xs text-zinc-300 flex items-center gap-1">
                               <MapPin className="h-3.5 w-3.5 opacity-70" /> {sched.location}
                             </span>
                           )}
@@ -784,12 +805,12 @@ export default function DefaultTemplate({
             {infoBlocks.length > 0 && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {infoBlocks.map((block) => (
-                  <Card key={block.id} className="bg-[#121215]/80 border border-[#d4af37]/15 shadow-xl backdrop-blur-md relative overflow-hidden">
+                  <Card key={block.id} className="bg-[#121215]/90 border border-[#d4af37]/20 shadow-xl backdrop-blur-md relative overflow-hidden">
                     <div className="absolute inset-3 border border-[#d4af37]/5 rounded-[20px] pointer-events-none" />
-                    <CardHeader className="border-b border-[#d4af37]/10 relative z-10">
-                      <CardTitle className="font-cinzel font-bold text-xs tracking-[2px] text-[#d4af37]">{block.title}</CardTitle>
+                    <CardHeader className="border-b border-[#d4af37]/15 relative z-10">
+                      <CardTitle className="font-cinzel font-bold text-xs tracking-[2px] text-[#f3e0aa]">{block.title}</CardTitle>
                     </CardHeader>
-                    <CardContent className="py-4 text-xs text-foreground/80 leading-relaxed text-left relative z-10">
+                    <CardContent className="py-4 text-xs text-white/90 leading-relaxed text-left relative z-10">
                       {block.content}
                     </CardContent>
                   </Card>

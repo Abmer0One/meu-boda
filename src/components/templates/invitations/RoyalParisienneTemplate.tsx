@@ -53,6 +53,41 @@ export default function RoyalParisienneTemplate({
     return title.substring(0, 3).toUpperCase();
   };
 
+  // Dynamic Intro and Ending Phrases
+  const getPhrases = () => {
+    switch (event.type) {
+      case 'casamento':
+        return {
+          intro: 'Com a bênção de Deus e de nossas famílias, convidamo-vos para partilhar connosco este dia.',
+          outro: 'A vossa presença tornará o nosso dia ainda mais inesquecível e feliz.',
+        };
+      case 'aniversario':
+        return {
+          intro: 'A vida é uma dádiva e celebrá-la ao lado de pessoas queridas é a maior das alegrias.',
+          outro: 'Espero por si para partilhar abraços, sorrisos e brindes a este novo ciclo.',
+        };
+      case 'alambamento':
+        return {
+          intro: 'Em união com as nossas tradições e as nossas famílias, convidamo-vos para o nosso Alambamento.',
+          outro: 'Vem testemunhar o início do nosso compromisso e celebrar o amor familiar.',
+        };
+      case 'cha_panela':
+        return {
+          intro: 'O meu casamento está a chegar! Vem divertir-te comigo e celebrar no meu Chá de Panela.',
+          outro: 'A tua presença e energia positiva são os maiores presentes.',
+        };
+      case 'palestra':
+      case 'outro':
+      default:
+        return {
+          intro: 'Temos o enorme prazer de convidar-vos para participar no nosso evento especial.',
+          outro: 'A vossa presença é fundamental para o sucesso e enriquecimento do nosso encontro.',
+        };
+    }
+  };
+
+  const phrases = getPhrases();
+
   return (
     <div className="min-h-screen bg-[#09090b] text-[#f4f4f5] py-8 px-4 flex flex-col justify-between max-w-5xl mx-auto font-sans relative overflow-hidden select-none">
       
@@ -105,7 +140,7 @@ export default function RoyalParisienneTemplate({
 
               <div className="text-center space-y-6 z-10 pb-8 w-full">
                 <div className="space-y-1">
-                  <h2 className="text-sm font-semibold tracking-wide text-foreground/80">
+                  <h2 className="text-sm font-semibold tracking-wide text-zinc-300">
                     Convidado de Honra:
                   </h2>
                   <p className="text-base font-bold text-[#d4af37] font-serif">
@@ -139,23 +174,21 @@ export default function RoyalParisienneTemplate({
               <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#09090b]/80 to-[#09090b]" />
 
               <div className="relative z-10 space-y-4">
-                <Badge className="bg-[#d4af37]/15 text-[#d4af37] border border-[#d4af37]/30 uppercase tracking-widest text-[9px] px-3.5 py-1">
+                <span className="inline-flex items-center gap-1.5 border border-[#d4af37]/30 bg-[#d4af37]/10 px-4 py-1 rounded-full text-[10px] font-bold tracking-[3px] text-[#f3e0aa] uppercase">
                   {eventLabels.invitation}
-                </Badge>
-                
-                <h1 className="text-3xl md:text-5xl font-serif font-black tracking-wide bg-gradient-to-r from-[#b89742] via-[#f3e0aa] to-[#b89742] bg-clip-text text-transparent py-2">
+                </span>
+
+                <h1 className="text-3xl md:text-5xl font-serif font-black tracking-tight text-white px-2 py-1 leading-tight bg-gradient-to-r from-[#b89742] via-[#f3e0aa] to-[#b89742] bg-clip-text text-transparent">
                   {event.title}
                 </h1>
-                
-                <div className="h-[1px] w-24 bg-gradient-to-r from-transparent via-[#d4af37]/50 to-transparent mx-auto my-4" />
-                
-                <p className="text-sm tracking-[2px] uppercase text-[#f3e0aa]">
-                  {new Date(event.date).toLocaleDateString('pt-PT', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+
+                <p className="text-xs max-w-lg mx-auto font-serif italic text-white/80 leading-relaxed px-4">
+                  {phrases.intro}
                 </p>
               </div>
             </div>
 
-            {/* Main content grid */}
+            {/* Two Column Layout for Opened Card */}
             <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
               
               {/* Left Column: Details */}
@@ -170,15 +203,15 @@ export default function RoyalParisienneTemplate({
                   </CardHeader>
                   <CardContent className="space-y-6 py-6 text-sm text-[#f4f4f5]/80">
                     {event.description && (
-                      <p className="italic text-center text-[#f3e0aa]/70 my-2 font-serif text-base">&quot;{event.description}&quot;</p>
+                      <p className="italic text-center text-[#f3e0aa]/80 my-2 font-serif text-base">&quot;{event.description}&quot;</p>
                     )}
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="flex items-start gap-3 p-4 border border-[#d4af37]/10 rounded-xl bg-[#18181b]/60">
                         <Calendar className="h-5 w-5 text-[#d4af37] shrink-0 mt-0.5" />
                         <div>
-                          <h4 className="font-bold text-xs text-[#d4af37]/60 uppercase tracking-wider">Data e Hora</h4>
-                          <p className="font-semibold text-xs mt-1 text-foreground">
+                          <h4 className="font-bold text-xs text-[#f3e0aa] uppercase tracking-wider">Data e Hora</h4>
+                          <p className="font-semibold text-xs mt-1 text-white">
                             {new Date(event.date).toLocaleDateString('pt-PT', {
                               weekday: 'long',
                               day: '2-digit',
@@ -194,8 +227,8 @@ export default function RoyalParisienneTemplate({
                         <div className="flex items-start gap-3 p-4 border border-[#d4af37]/10 rounded-xl bg-[#18181b]/60">
                           <Palette className="h-5 w-5 text-[#d4af37] shrink-0 mt-0.5" />
                           <div>
-                            <h4 className="font-bold text-xs text-[#d4af37]/60 uppercase tracking-wider">{eventLabels.theme}</h4>
-                            <p className="font-semibold text-xs mt-1 text-foreground">{event.theme}</p>
+                            <h4 className="font-bold text-xs text-[#f3e0aa] uppercase tracking-wider">{eventLabels.theme}</h4>
+                            <p className="font-semibold text-xs mt-1 text-white">{event.theme}</p>
                           </div>
                         </div>
                       )}
@@ -207,10 +240,10 @@ export default function RoyalParisienneTemplate({
                           <div className="flex items-start gap-3">
                             <MapPin className="h-5 w-5 text-[#d4af37] shrink-0 mt-0.5" />
                             <div>
-                              <h4 className="font-bold text-xs text-[#d4af37]/60 uppercase tracking-wider">Local / Espaço</h4>
-                              <p className="font-semibold text-xs mt-1 text-foreground">{event.ceremony_location}</p>
+                              <h4 className="font-bold text-xs text-[#f3e0aa] uppercase tracking-wider">Local / Espaço</h4>
+                              <p className="font-semibold text-xs mt-1 text-white">{event.ceremony_location}</p>
                               {event.ceremony_time && (
-                                <p className="text-xs text-foreground/60 mt-0.5 font-medium">Hora: {event.ceremony_time}</p>
+                                <p className="text-xs text-zinc-300 mt-0.5 font-medium">Hora: {event.ceremony_time}</p>
                               )}
                             </div>
                           </div>
@@ -234,10 +267,10 @@ export default function RoyalParisienneTemplate({
                           <div className="flex items-start gap-3">
                             <Utensils className="h-5 w-5 text-[#d4af37] shrink-0 mt-0.5" />
                             <div>
-                              <h4 className="font-bold text-xs text-[#d4af37]/60 uppercase tracking-wider">Recepção / Banquete</h4>
-                              <p className="font-semibold text-xs mt-1 text-foreground">{event.party_location}</p>
+                              <h4 className="font-bold text-xs text-[#f3e0aa] uppercase tracking-wider">Recepção / Banquete</h4>
+                              <p className="font-semibold text-xs mt-1 text-white">{event.party_location}</p>
                               {event.party_time && (
-                                <p className="text-xs text-foreground/60 mt-0.5 font-medium">Hora: {event.party_time}</p>
+                                <p className="text-xs text-zinc-300 mt-0.5 font-medium">Hora: {event.party_time}</p>
                               )}
                             </div>
                           </div>
@@ -278,9 +311,9 @@ export default function RoyalParisienneTemplate({
                               <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#d4af37] uppercase tracking-wider">
                                 <Clock className="h-3 w-3" /> {sched.time}
                               </span>
-                              <h4 className="text-sm font-semibold text-foreground">{sched.title}</h4>
+                              <h4 className="text-sm font-semibold text-white">{sched.title}</h4>
                               {sched.location && (
-                                <span className="text-xs text-foreground/60 flex items-center gap-1">
+                                <span className="text-xs text-zinc-300 flex items-center gap-1">
                                   <MapPin className="h-3.5 w-3.5 opacity-70" /> {sched.location}
                                 </span>
                               )}
@@ -301,7 +334,7 @@ export default function RoyalParisienneTemplate({
                   </CardHeader>
                   <CardContent className="space-y-6 py-6">
                     <div className="text-center py-2">
-                      <p className="text-xs text-foreground/75">
+                      <p className="text-xs text-white/90 leading-relaxed">
                         Olá <span className="font-bold text-[#d4af37]">{guest.name}</span>, por favor informe-nos se poderá comparecer ao nosso {eventLabels.title.toLowerCase()}.
                       </p>
                       {event.rsvp_deadline && (
@@ -321,12 +354,12 @@ export default function RoyalParisienneTemplate({
                         disabled={saving}
                         className={`flex flex-col items-center justify-center p-4 border rounded-2xl cursor-pointer active:scale-[0.98] transition-all gap-1.5 ${
                           isConfirmed
-                            ? 'border-success bg-success/10 text-success'
-                            : 'border-[#d4af37]/10 hover:bg-[#18181b] text-[#f4f4f5]/70'
+                            ? 'border-success bg-success/20 text-success font-bold'
+                            : 'border-[#d4af37]/20 hover:bg-[#18181b] text-white font-semibold'
                         }`}
                       >
                         <CheckCircle className="h-6 w-6" />
-                        <span className="text-xs font-bold">Vou Comparecer</span>
+                        <span className="text-xs">Vou Comparecer</span>
                       </button>
 
                       <button
@@ -335,12 +368,12 @@ export default function RoyalParisienneTemplate({
                         disabled={saving}
                         className={`flex flex-col items-center justify-center p-4 border rounded-2xl cursor-pointer active:scale-[0.98] transition-all gap-1.5 ${
                           isDeclined
-                            ? 'border-error bg-error/10 text-error'
-                            : 'border-[#d4af37]/10 hover:bg-[#18181b] text-[#f4f4f5]/70'
+                            ? 'border-error bg-error/20 text-error font-bold'
+                            : 'border-[#d4af37]/20 hover:bg-[#18181b] text-white font-semibold'
                         }`}
                       >
                         <XCircle className="h-6 w-6" />
-                        <span className="text-xs font-bold">Não poderei ir</span>
+                        <span className="text-xs">Não poderei ir</span>
                       </button>
                     </div>
 
@@ -348,17 +381,17 @@ export default function RoyalParisienneTemplate({
                       <div className="space-y-4 pt-2">
                         {guest.companions > 0 && (
                           <div className="flex flex-col gap-1.5">
-                            <label className="text-xs font-semibold text-foreground/75 tracking-wide flex items-center gap-1">
+                            <label className="text-xs font-semibold text-zinc-300 tracking-wide flex items-center gap-1">
                               <Users className="h-4 w-4 text-[#d4af37]" /> Acompanhantes Extra
                             </label>
-                            <div className="rounded-xl border border-[#d4af37]/10 bg-[#18181b] px-3.5 py-2.5 text-sm font-semibold text-foreground">
+                            <div className="rounded-xl border border-[#d4af37]/10 bg-[#18181b] px-3.5 py-2.5 text-sm font-semibold text-white">
                               {guest.companions} {guest.companions === 1 ? 'acompanhante autorizado' : 'acompanhantes autorizados'}
                             </div>
                           </div>
                         )}
 
                         <div className="flex flex-col gap-1.5">
-                          <label className="text-xs font-semibold text-foreground/75 tracking-wide">
+                          <label className="text-xs font-semibold text-zinc-300 tracking-wide">
                             Alergias ou Restrições Alimentares
                           </label>
                           <textarea
@@ -366,7 +399,7 @@ export default function RoyalParisienneTemplate({
                             placeholder="Vegetariano, alergia a frutos secos..."
                             value={notes}
                             onChange={(e) => setNotes(e.target.value)}
-                            className="w-full rounded-xl border border-[#d4af37]/10 bg-[#09090b] px-3.5 py-2 text-sm focus:border-[#d4af37] focus:outline-none focus:ring-2 focus:ring-[#d4af37]/20 transition-all text-foreground"
+                            className="w-full rounded-xl border border-[#d4af37]/20 bg-[#09090b] px-3.5 py-2 text-sm focus:border-[#d4af37] focus:outline-none transition-all text-white placeholder:text-zinc-500"
                           />
                         </div>
                       </div>
@@ -386,8 +419,8 @@ export default function RoyalParisienneTemplate({
                         <CheckCircle className="h-5 w-5" />
                       </div>
                       <div>
-                        <h4 className="font-bold text-xs text-foreground/50 uppercase tracking-wide">Sua Mesa</h4>
-                        <p className="text-sm font-semibold">{table.name}</p>
+                        <h4 className="font-bold text-xs text-zinc-400 uppercase tracking-wide">Sua Mesa</h4>
+                        <p className="text-sm font-semibold text-white">{table.name}</p>
                       </div>
                     </CardContent>
                   </Card>
@@ -406,7 +439,7 @@ export default function RoyalParisienneTemplate({
                       <div className="w-full bg-[#18181b] rounded-xl p-4 text-left space-y-2 border border-[#d4af37]/10">
                         <div className="flex justify-between items-center text-xs">
                           <span className="text-[#f4f4f5]/50">Titular:</span>
-                          <span className="font-bold text-foreground">{guest.name}</span>
+                          <span className="font-bold text-white">{guest.name}</span>
                         </div>
                         <div className="flex justify-between items-center text-xs">
                           <span className="text-[#f4f4f5]/50">Mesa / Lugar:</span>
@@ -415,12 +448,12 @@ export default function RoyalParisienneTemplate({
                         {guest.companions > 0 && (
                           <div className="flex justify-between items-center text-xs">
                             <span className="text-[#f4f4f5]/50">Acompanhantes:</span>
-                            <span className="font-bold text-foreground">+{guest.companions}</span>
+                            <span className="font-bold text-white">+{guest.companions}</span>
                           </div>
                         )}
                         <div className="flex justify-between items-center text-xs border-t border-[#d4af37]/10 pt-2.5 mt-1">
                           <span className="text-[#f4f4f5]/50">Data do Evento:</span>
-                          <span className="font-semibold text-foreground">
+                          <span className="font-semibold text-white">
                             {new Date(event.date).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric' })}
                           </span>
                         </div>
@@ -440,8 +473,8 @@ export default function RoyalParisienneTemplate({
                       </div>
 
                       <div className="space-y-1 text-center">
-                        <p className="text-xs font-semibold text-foreground">Apresente este código na entrada.</p>
-                        <p className="text-[10px] text-foreground/40 max-w-[220px] mx-auto leading-normal">
+                        <p className="text-xs font-semibold text-white">Apresente este código na entrada.</p>
+                        <p className="text-[10px] text-zinc-400 max-w-[220px] mx-auto leading-normal">
                           Descarregue o PDF de alta resolução no botão abaixo para impressão ou suporte offline.
                         </p>
                       </div>
@@ -476,13 +509,13 @@ export default function RoyalParisienneTemplate({
                         👗 Dress Code
                       </h4>
                       {event.dress_code_style && (
-                        <p className="text-xs text-foreground/85">
-                          <span className="font-semibold text-foreground">Estilo:</span> {event.dress_code_style}
+                        <p className="text-xs text-white/90">
+                          <span className="font-semibold text-[#f3e0aa]">Estilo:</span> {event.dress_code_style}
                         </p>
                       )}
                       {event.dress_code_colors && (
-                        <p className="text-xs text-foreground/85">
-                          <span className="font-semibold text-foreground">Sugestões de Cores:</span> {event.dress_code_colors}
+                        <p className="text-xs text-white/90">
+                          <span className="font-semibold text-[#f3e0aa]">Sugestões de Cores:</span> {event.dress_code_colors}
                         </p>
                       )}
                     </div>
@@ -492,7 +525,7 @@ export default function RoyalParisienneTemplate({
                   {infoBlocks.map((block) => (
                     <div key={block.id} className="p-4 rounded-2xl border border-[#d4af37]/10 bg-[#18181b]/50 space-y-1.5">
                       <h4 className="font-bold text-sm text-[#d4af37]">{block.title}</h4>
-                      <p className="text-xs text-foreground/80 leading-relaxed">{block.content}</p>
+                      <p className="text-xs text-white/90 leading-relaxed">{block.content}</p>
                     </div>
                   ))}
                 </CardContent>
@@ -506,7 +539,7 @@ export default function RoyalParisienneTemplate({
                 variant="outline"
                 size="sm"
                 onClick={() => setIsOpen(false)}
-                className="text-xs text-foreground/40 hover:text-foreground border-[#d4af37]/10 hover:border-[#d4af37]/30"
+                className="text-xs text-zinc-400 hover:text-white border-[#d4af37]/10 hover:border-[#d4af37]/30"
               >
                 Voltar à Capa
               </Button>
