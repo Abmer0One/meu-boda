@@ -31,6 +31,9 @@ import {
   Camera,
   User,
   ShieldAlert,
+  AlertCircle,
+  AlertTriangle,
+  CheckCircle2,
 } from 'lucide-react';
 
 interface SidebarItem {
@@ -109,6 +112,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [eventType, setEventType] = useState<'casamento' | 'aniversario' | 'pedido' | 'outro'>('casamento');
   const [eventDate, setEventDate] = useState('');
   const [isCreatingEvent, setIsCreatingEvent] = useState(false);
+  const [slugStatus, setSlugStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
+  const [formError, setFormError] = useState<string | null>(null);
 
   // Authentication guard redirect
   useEffect(() => {
@@ -122,6 +127,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       }
     }
   }, [user, authLoading, router, isAdmin, isVendor, pathname]);
+
+  // Real-time slug availability check with debounce
+  useEffect(() => {
+    const cleanSlug = eventSlug.trim().toLowerCase();
+    if (!cleanSlug || cleanSlug.length < 2) {
+      setSlugStatus('idle');
+      return;
+    }
+
+    setSlugStatus('checking');
+    const timer = setTimeout(async () => {
+      const isAvail = await EventRepository.isSlugAvailable(cleanSlug);
+      setSlugStatus(isAvail ? 'available' : 'taken');
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [eventSlug]);
 
   // Sync slug on title change
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -147,9 +169,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       return;
     }
 
+    setFormError(null);
+
+    // If marked as taken, prevent submit with explicit alert message
+    if (slugStatus === 'taken') {
+      setFormError(`O link "${eventSlug}" já existe na base de dados. Por favor, escolha outro link antes de continuar.`);
+      return;
+    }
+
     setIsCreatingEvent(true);
     try {
-      const newEvent = await EventRepository.create({
+      // Re-verify right before inserting to guarantee no race condition
+      const isAvail = await EventRepository.isSlugAvailable(eventSlug);
+      if (!isAvail) {
+        setSlugStatus('taken');
+        setFormError(`O link "${eventSlug}" já existe na base de dados. Por favor, escolha outro link.`);
+        setIsCreatingEvent(false);
+        return;
+      }
+
+      const { event: newEvent, error } = await EventRepository.create({
         user_id: user.id,
         title: eventTitle,
         slug: eventSlug,
@@ -162,6 +201,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         cover_image: null,
       });
 
+      if (error) {
+        setFormError(error);
+        if (error.includes('já existe') || error.includes('em uso')) {
+          setSlugStatus('taken');
+        }
+        return;
+      }
+
       if (newEvent) {
         await refreshEvents();
         setCurrentEvent(newEvent);
@@ -171,9 +218,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         setEventSlug('');
         setEventType('casamento');
         setEventDate('');
+        setSlugStatus('idle');
+        setFormError(null);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      setFormError(err.message || 'Ocorreu um erro ao criar o evento.');
     } finally {
       setIsCreatingEvent(false);
     }
@@ -437,8 +487,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </Dialog>
 
       {/* NEW EVENT DIALOG */}
-      <Dialog isOpen={newEventModalOpen} onClose={() => setNewEventModalOpen(false)} title={`Novo Evento - ${eventType.charAt(0).toUpperCase() + eventType.slice(1)}`}>
+      <Dialog
+        isOpen={newEventModalOpen}
+        onClose={() => {
+          setNewEventModalOpen(false);
+          setFormError(null);
+          setSlugStatus('idle');
+        }}
+        title={`Novo Evento - ${eventType.charAt(0).toUpperCase() + eventType.slice(1)}`}
+      >
         <form onSubmit={handleCreateEvent} className="space-y-4">
+          {formError && (
+            <div className="rounded-xl bg-error/10 border border-error/25 p-3.5 text-xs text-error flex items-start gap-2.5 animate-in fade-in">
+              <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5 text-error" />
+              <div className="flex-1">
+                <p className="font-bold">Aviso de Validação</p>
+                <p className="mt-0.5 text-[11px] leading-relaxed">{formError}</p>
+              </div>
+            </div>
+          )}
+
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-semibold text-foreground/75 tracking-wide">Tipo de Evento</label>
             <select
@@ -476,13 +544,42 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             }
             required
           />
-          <Input
-            label="Slug da Rota Pública (ex: meu-evento)"
-            value={eventSlug}
-            onChange={(e) => setEventSlug(e.target.value.toLowerCase().replace(/\s+/g, '-'))}
-            placeholder="meu-evento"
-            required
-          />
+
+          <div>
+            <Input
+              label="Slug da Rota Pública (Link do Convite)"
+              value={eventSlug}
+              onChange={(e) => setEventSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '').replace(/\s+/g, '-'))}
+              placeholder="ex: meu-casamento-2026"
+              error={slugStatus === 'taken' ? 'Este link já está em uso na base de dados' : undefined}
+              required
+            />
+            {/* Real-time slug availability feedback */}
+            {slugStatus === 'checking' && (
+              <div className="flex items-center gap-1.5 text-xs text-foreground/55 mt-1.5 animate-pulse">
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                <span>A verificar disponibilidade na base de dados...</span>
+              </div>
+            )}
+            {slugStatus === 'taken' && (
+              <div className="rounded-xl bg-error/10 border border-error/25 p-3 mt-1.5 text-xs text-error flex items-start gap-2.5 animate-in fade-in">
+                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-error" />
+                <div className="flex-1">
+                  <p className="font-bold">Link já existente na base de dados</p>
+                  <p className="text-[11px] opacity-90 mt-0.5 leading-relaxed">
+                    O link <strong>"{eventSlug}"</strong> já pertence a outro evento. Por favor, adicione um número, ano ou altere o texto para poder criar o seu evento.
+                  </p>
+                </div>
+              </div>
+            )}
+            {slugStatus === 'available' && eventSlug.length >= 2 && (
+              <div className="rounded-xl bg-success/10 border border-success/25 p-2 mt-1.5 text-xs text-success flex items-center gap-2 animate-in fade-in">
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-success" />
+                <span>Link disponível: <strong>meuboda.ao/convite/{eventSlug}</strong></span>
+              </div>
+            )}
+          </div>
+
           <Input
             label={
               eventType === 'casamento'
@@ -498,11 +595,24 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             onChange={(e) => setEventDate(e.target.value)}
             required
           />
+
           <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" type="button" onClick={() => setNewEventModalOpen(false)}>
+            <Button
+              variant="outline"
+              type="button"
+              onClick={() => {
+                setNewEventModalOpen(false);
+                setFormError(null);
+                setSlugStatus('idle');
+              }}
+            >
               Cancelar
             </Button>
-            <Button type="submit" isLoading={isCreatingEvent}>
+            <Button
+              type="submit"
+              isLoading={isCreatingEvent}
+              disabled={isCreatingEvent || slugStatus === 'taken' || slugStatus === 'checking'}
+            >
               Criar Evento
             </Button>
           </div>

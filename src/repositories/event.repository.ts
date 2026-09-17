@@ -106,7 +106,33 @@ export const EventRepository = {
     return data as Event;
   },
 
-  async create(event: Omit<Event, 'id' | 'created_at' | 'updated_at'>): Promise<Event | null> {
+  async isSlugAvailable(slug: string, excludeEventId?: string): Promise<boolean> {
+    try {
+      const cleanSlug = slug.trim().toLowerCase();
+      if (!cleanSlug || cleanSlug.length < 2) return false;
+
+      let query = supabase
+        .from('events')
+        .select('id')
+        .eq('slug', cleanSlug);
+
+      if (excludeEventId) {
+        query = query.neq('id', excludeEventId);
+      }
+
+      const { data, error } = await query.maybeSingle();
+      if (error) {
+        console.warn('Error checking slug availability:', error.message);
+        return false;
+      }
+      return !data;
+    } catch (err) {
+      console.warn('Exception checking slug availability:', err);
+      return false;
+    }
+  },
+
+  async create(event: Omit<Event, 'id' | 'created_at' | 'updated_at'>): Promise<{ event: Event | null; error: string | null; code?: string }> {
     const { data, error } = await supabase
       .from('events')
       .insert(event)
@@ -115,9 +141,20 @@ export const EventRepository = {
 
     if (error) {
       console.error('Error creating event:', error.message, '| Details:', error.details, '| Hint:', error.hint, '| Code:', error.code);
-      return null;
+      if (error.code === '23505' || error.message?.includes('events_slug_key') || error.message?.includes('duplicate key')) {
+        return {
+          event: null,
+          error: `O link personalizado "${event.slug}" já existe na base de dados. Por favor, escolha outro link.`,
+          code: '23505',
+        };
+      }
+      return {
+        event: null,
+        error: error.message || 'Erro ao criar o evento na base de dados.',
+        code: error.code,
+      };
     }
-    return data as Event;
+    return { event: data as Event, error: null };
   },
 
   async update(id: string, event: Partial<Omit<Event, 'id' | 'user_id' | 'created_at' | 'updated_at'>>): Promise<Event | null> {
@@ -129,6 +166,9 @@ export const EventRepository = {
       .single();
 
     if (error) {
+      if (error.code === '23505' || error.message?.includes('events_slug_key') || error.message?.includes('duplicate key')) {
+        throw new Error(`O link "${event.slug}" já está em uso por outro evento na base de dados.`);
+      }
       if (error.code === 'PGRST204' && (event.template_config !== undefined || event.template_id !== undefined)) {
         const { template_config, template_id, ...safePayload } = event as any;
         const retry = await supabase

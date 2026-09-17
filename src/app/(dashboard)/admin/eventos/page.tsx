@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Dialog } from '@/components/ui/Dialog';
-import { Heart, MapPin, Calendar, Palette, Loader2, Plus, Trash2, Clock, Users, Gift, Link2, Shirt, Info, Pencil, Sparkles, Upload, Sliders, CheckCircle2, RotateCcw, QrCode, FileText } from 'lucide-react';
+import { Heart, MapPin, Calendar, Palette, Loader2, Plus, Trash2, Clock, Users, Gift, Link2, Shirt, Info, Pencil, Sparkles, Upload, Sliders, CheckCircle2, RotateCcw, QrCode, FileText, AlertCircle } from 'lucide-react';
 import { resolveCanvaConfig, persistCanvaConfig, CANVA_CONFIG_BLOCK_TITLE } from '@/utils/canvaConfig';
 
 export default function EventosPage() {
@@ -25,6 +25,7 @@ export default function EventosPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isUploadingBg, setIsUploadingBg] = useState(false);
+  const [slugStatus, setSlugStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
 
   // Canva Template States
   const [pdfMode, setPdfMode] = useState<'double_page' | 'single_page'>('double_page');
@@ -80,6 +81,41 @@ export default function EventosPage() {
 
   const coverImageUrl = watch('cover_image');
   const backgroundImage = watch('background_image');
+  const watchedSlug = watch('slug');
+
+  // Real-time slug availability check with debounce
+  useEffect(() => {
+    if (!watchedSlug || !currentEvent) {
+      setSlugStatus('idle');
+      return;
+    }
+
+    const cleanSlug = watchedSlug
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9-]/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
+
+    // If unchanged from current event's slug, it's valid
+    if (cleanSlug === currentEvent.slug) {
+      setSlugStatus('idle');
+      return;
+    }
+
+    if (cleanSlug.length < 2) {
+      setSlugStatus('idle');
+      return;
+    }
+
+    setSlugStatus('checking');
+    const timer = setTimeout(async () => {
+      const isAvail = await EventRepository.isSlugAvailable(cleanSlug, currentEvent.id);
+      setSlugStatus(isAvail ? 'available' : 'taken');
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [watchedSlug, currentEvent]);
 
   // Reset form when active event changes
   useEffect(() => {
@@ -538,9 +574,32 @@ export default function EventosPage() {
   const onSubmit = async (data: any) => {
     if (!currentEvent) return;
 
-    setIsSaving(true);
     setSuccessMessage(null);
     setErrorMessage(null);
+
+    const cleanSlug = (data.slug || '')
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9-]/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
+
+    // Block if slug is already marked as taken
+    if (slugStatus === 'taken') {
+      setErrorMessage(`O link "${cleanSlug}" já está em uso por outro evento na base de dados. Por favor escolha um link diferente.`);
+      return;
+    }
+
+    if (cleanSlug && cleanSlug !== currentEvent.slug) {
+      const isAvail = await EventRepository.isSlugAvailable(cleanSlug, currentEvent.id);
+      if (!isAvail) {
+        setSlugStatus('taken');
+        setErrorMessage(`O link "${cleanSlug}" já está em uso por outro evento na base de dados. Por favor escolha um link diferente.`);
+        return;
+      }
+    }
+
+    setIsSaving(true);
 
     try {
       const updatedConfig = {
@@ -558,7 +617,7 @@ export default function EventosPage() {
 
       const updatedEvent = await EventRepository.update(currentEvent.id, {
         title: data.title,
-        slug: data.slug,
+        slug: cleanSlug || data.slug,
         date: new Date(data.date).toISOString(),
         ceremony_location: data.ceremony_location || null,
         party_location: data.party_location || null,
@@ -589,7 +648,7 @@ export default function EventosPage() {
           template_config: updatedConfig,
         });
       } else {
-        setErrorMessage('Não foi possível guardar as alterações.');
+        setErrorMessage('Não foi possível guardar as alterações. Verifique se o link da URL já se encontra registado.');
       }
     } catch (err: any) {
       setErrorMessage(err.message || 'Ocorreu um erro ao guardar.');
@@ -644,12 +703,37 @@ export default function EventosPage() {
                     error={errors.title?.message}
                     {...register('title')}
                   />
-                  <Input
-                    label="Slug da URL"
-                    placeholder="ana-pedro"
-                    error={errors.slug?.message}
-                    {...register('slug')}
-                  />
+                  <div>
+                    <Input
+                      label="Slug da URL"
+                      placeholder="ana-pedro"
+                      error={slugStatus === 'taken' ? 'Este link já está em uso na base de dados' : (errors.slug?.message as string | undefined)}
+                      {...register('slug')}
+                    />
+                    {slugStatus === 'checking' && (
+                      <div className="flex items-center gap-1.5 text-xs text-foreground/55 mt-1.5 animate-pulse">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                        <span>A verificar disponibilidade na base de dados...</span>
+                      </div>
+                    )}
+                    {slugStatus === 'taken' && (
+                      <div className="rounded-xl bg-error/10 border border-error/25 p-3 mt-1.5 text-xs text-error flex items-start gap-2.5 animate-in fade-in">
+                        <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-error" />
+                        <div className="flex-1">
+                          <p className="font-bold">Link já existente na base de dados</p>
+                          <p className="text-[11px] opacity-90 mt-0.5 leading-relaxed">
+                            O link <strong>"{watchedSlug}"</strong> já pertence a outro evento. Por favor escolha um link diferente.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    {slugStatus === 'available' && watchedSlug && watchedSlug !== currentEvent.slug && (
+                      <div className="rounded-xl bg-success/10 border border-success/25 p-2 mt-1.5 text-xs text-success flex items-center gap-2 animate-in fade-in">
+                        <CheckCircle2 className="h-4 w-4 shrink-0 text-success" />
+                        <span>Link disponível: <strong>meuboda.ao/convite/{watchedSlug}</strong></span>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -853,7 +937,11 @@ export default function EventosPage() {
                 </div>
 
                 <div className="flex justify-end pt-2">
-                  <Button type="submit" isLoading={isSaving}>
+                  <Button
+                    type="submit"
+                    isLoading={isSaving}
+                    disabled={isSaving || slugStatus === 'taken' || slugStatus === 'checking'}
+                  >
                     Guardar Alterações
                   </Button>
                 </div>
