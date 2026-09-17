@@ -320,44 +320,78 @@ export default function PublicRSVPPage({ params }: RSVPPageProps) {
     const templateId = event.template_id || 'default';
 
     const galleryChildren = (
-      <Card className="mt-8 bg-[#121215]/90 border border-[#d4af37]/20 shadow-xl rounded-3xl text-left text-white overflow-hidden relative backdrop-blur-md">
-        <div className="absolute inset-3 border border-[#d4af37]/5 rounded-[20px] pointer-events-none" />
-        <CardHeader className="border-b border-[#d4af37]/15 relative z-10">
-          <CardTitle className="flex items-center gap-2 text-lg font-bold text-white font-cinzel tracking-wider">
-            <Camera className="h-5 w-5 text-[#d4af37]" />
-            Galeria Colaborativa (Meu Boda Live)
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6 text-white/90 relative z-10 p-6">
-          <p className="text-sm text-white/80 leading-relaxed">
-            Partilhe as suas fotos e vídeos em tempo real! Os ficheiros enviados serão exibidos no projetor do evento e partilhados na galeria.
+      <div 
+        className="mt-10 rounded-3xl border-2 border-[#d4af37]/35 shadow-2xl text-left overflow-hidden relative backdrop-blur-xl"
+        style={{ backgroundColor: '#0c0c10', color: '#ffffff' }}
+      >
+        {/* Luxury inner decorative frame */}
+        <div className="absolute inset-3 border border-[#d4af37]/20 rounded-[20px] pointer-events-none" />
+        
+        {/* Ambient gold glow */}
+        <div className="absolute -top-20 -right-20 w-64 h-64 bg-[#d4af37]/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-[#b89742]/10 rounded-full blur-3xl pointer-events-none" />
+
+        {/* Section Header */}
+        <div className="p-6 md:p-8 border-b border-[#d4af37]/20 relative z-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-[#d4af37]/15 border border-[#d4af37]/40 flex items-center justify-center shrink-0 shadow-[0_0_15px_rgba(212,175,55,0.2)]">
+              <Camera className="h-6 w-6 text-[#f3e0aa]" />
+            </div>
+            <div>
+              <h3 className="font-cinzel text-lg md:text-2xl font-black tracking-wider text-[#f3e0aa]">
+                Galeria Colaborativa (Meu Boda Live)
+              </h3>
+              <p className="text-xs text-white/80 font-medium tracking-wide mt-0.5">
+                Transmissão e partilha de fotos e vídeos em tempo real
+              </p>
+            </div>
+          </div>
+
+          <div className="inline-flex items-center gap-2 self-start sm:self-auto px-3.5 py-1.5 rounded-full bg-[#d4af37]/15 border border-[#d4af37]/40 shadow-sm">
+            <span className="h-2 w-2 rounded-full bg-[#d4af37] animate-pulse" />
+            <span className="text-[10px] font-black tracking-[2px] text-[#f3e0aa] uppercase">
+              Ao Vivo
+            </span>
+          </div>
+        </div>
+
+        {/* Section Body */}
+        <div className="p-6 md:p-8 space-y-6 relative z-10">
+          <p className="text-sm text-white font-normal leading-relaxed max-w-3xl">
+            Partilhe as suas fotos e vídeos da festa em direto! As memórias enviadas serão projetadas no telão do evento e guardadas na <span className="text-[#f3e0aa] font-semibold">galeria oficial dos noivos</span>.
           </p>
 
-          <div className="flex flex-col md:flex-row items-stretch md:items-end gap-4 max-w-2xl bg-white/5 p-4 rounded-2xl border border-white/10">
-            <div className="flex-1 flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-[#f3e0aa] tracking-wide">
-                Legenda da Foto/Vídeo (opcional)
+          {/* Upload Form Box */}
+          <div 
+            className="flex flex-col md:flex-row items-stretch md:items-end gap-4 max-w-2xl p-5 rounded-2xl border border-[#d4af37]/30 shadow-inner"
+            style={{ backgroundColor: '#14141a' }}
+          >
+            <div className="flex-1 flex flex-col gap-2">
+              <label className="text-xs font-bold text-[#f3e0aa] uppercase tracking-wider flex items-center gap-1.5">
+                <span>✍️ Legenda da Foto ou Vídeo</span>
+                <span className="text-[10px] text-white/60 font-normal lowercase">(opcional)</span>
               </label>
               <input
                 type="text"
-                placeholder="Escreva uma mensagem ou legenda..."
+                placeholder="Escreva uma mensagem de carinho..."
                 value={mediaCaption}
                 onChange={(e) => setMediaCaption(e.target.value)}
-                className="w-full rounded-xl border border-white/20 bg-[#0d0d0f] px-3.5 py-2 text-sm focus:border-[#d4af37] focus:outline-none transition-all text-white placeholder:text-zinc-500"
+                className="w-full rounded-xl border border-[#d4af37]/35 px-4 py-2.5 text-sm focus:border-[#f3e0aa] focus:ring-1 focus:ring-[#f3e0aa] focus:outline-none transition-all text-white placeholder:text-zinc-500 font-medium"
+                style={{ backgroundColor: '#09090c' }}
                 disabled={uploadingMedia}
               />
             </div>
             
             <div className="shrink-0 flex items-center">
-              <label className="relative w-full md:w-auto flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-[#b89742] to-[#d4af37] text-[#0d0d0f] rounded-xl font-bold text-sm cursor-pointer hover:brightness-110 active:scale-95 transition-all shadow-md">
+              <label className="relative w-full md:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-[#b89742] via-[#d4af37] to-[#f3e0aa] text-[#09090c] rounded-xl font-extrabold text-xs uppercase tracking-wider cursor-pointer hover:brightness-110 active:scale-95 transition-all shadow-[0_4px_20px_rgba(212,175,55,0.3)]">
                 {uploadingMedia ? (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <Loader2 className="h-4 w-4 animate-spin text-[#09090c]" />
                     <span>A enviar...</span>
                   </>
                 ) : (
                   <>
-                    <Upload className="h-4 w-4" />
+                    <Upload className="h-4 w-4 text-[#09090c]" />
                     <span>Tirar / Enviar Foto</span>
                   </>
                 )}
@@ -373,23 +407,36 @@ export default function PublicRSVPPage({ params }: RSVPPageProps) {
           </div>
 
           {/* Media list */}
-          <div className="space-y-3">
-            <h4 className="text-xs font-bold text-[#f3e0aa] uppercase tracking-wider">
-              Fotos do Evento ({galleryList.length})
-            </h4>
+          <div className="space-y-4 pt-2">
+            <div className="flex items-center justify-between border-b border-[#d4af37]/20 pb-3">
+              <h4 className="text-xs md:text-sm font-bold text-[#f3e0aa] uppercase tracking-wider flex items-center gap-2.5 font-cinzel">
+                <span>Fotos do Evento</span>
+                <span className="text-[11px] font-sans font-extrabold bg-[#d4af37]/20 text-[#f3e0aa] border border-[#d4af37]/40 px-2.5 py-0.5 rounded-full">
+                  {galleryList.length}
+                </span>
+              </h4>
+              <span className="text-[11px] text-white/70 font-medium">
+                Atualização automática
+              </span>
+            </div>
 
             {galleryList.length === 0 ? (
-              <div className="flex flex-col items-center justify-center text-center py-12 border border-dashed border-white/15 rounded-2xl bg-white/5">
-                <Camera className="h-10 w-10 text-[#d4af37]/40 mb-2" />
-                <p className="text-xs font-medium text-white/80">Ainda nenhuma foto foi publicada.</p>
-                <p className="text-[10px] text-zinc-400 mt-0.5">Seja o primeiro a enviar uma recordação!</p>
+              <div 
+                className="flex flex-col items-center justify-center text-center py-14 px-4 border border-dashed border-[#d4af37]/35 rounded-2xl"
+                style={{ backgroundColor: '#14141a' }}
+              >
+                <div className="w-14 h-14 rounded-full bg-[#d4af37]/10 border border-[#d4af37]/25 flex items-center justify-center mb-3">
+                  <Camera className="h-7 w-7 text-[#f3e0aa]" />
+                </div>
+                <p className="text-sm font-bold text-white">Ainda nenhuma foto foi partilhada.</p>
+                <p className="text-xs text-[#f3e0aa] mt-1 font-medium">Seja o primeiro a enviar uma recordação!</p>
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                 {galleryList.map((item) => (
                   <div
                     key={item.id}
-                    className="relative aspect-square rounded-xl overflow-hidden border border-border-custom bg-black group shadow-sm"
+                    className="relative aspect-square rounded-2xl overflow-hidden border border-[#d4af37]/35 bg-[#09090c] group shadow-lg hover:border-[#f3e0aa] transition-all"
                   >
                     {item.media_type === 'video' ? (
                       <video
@@ -407,11 +454,11 @@ export default function PublicRSVPPage({ params }: RSVPPageProps) {
                       />
                     )}
                     {item.caption && (
-                      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent p-2 text-[10px] text-white font-medium leading-tight">
-                        <p className="line-clamp-2 italic">&quot;{item.caption}&quot;</p>
+                      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#09090c] via-[#09090c]/80 to-transparent p-2.5 text-[10px] text-white font-medium leading-tight">
+                        <p className="line-clamp-2 italic text-white">&quot;{item.caption}&quot;</p>
                       </div>
                     )}
-                    <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-md rounded-full px-2 py-0.5 text-[9px] text-white font-bold">
+                    <div className="absolute top-2 right-2 bg-[#09090c]/90 backdrop-blur-md border border-[#d4af37]/40 rounded-full px-2.5 py-0.5 text-[9px] text-[#f3e0aa] font-bold shadow-md">
                       {item.guest_name}
                     </div>
                   </div>
@@ -419,8 +466,8 @@ export default function PublicRSVPPage({ params }: RSVPPageProps) {
               </div>
             )}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     );
 
     if (templateId === 'royal_parisienne' || templateId === 'royal') {

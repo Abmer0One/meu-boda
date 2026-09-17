@@ -154,16 +154,16 @@ export default function PublicLiveGalleryPage({ params }: LiveGalleryProps) {
       <div className="absolute inset-0 bg-gradient-to-tr from-primary/5 via-transparent to-accent/5 pointer-events-none" />
 
       {/* Slide Header */}
-      <header className="relative z-10 flex items-center justify-between border-b border-white/10 pb-4">
+      <header className="relative z-10 flex items-center justify-between border-b border-[#d4af37]/20 pb-4">
         <div>
-          <span className="text-[10px] font-bold uppercase tracking-widest text-primary flex items-center gap-1.5">
-            <Heart className="h-3 w-3 fill-current animate-pulse text-primary" /> Galeria ao Vivo
+          <span className="text-[10px] font-bold uppercase tracking-[2px] text-[#f3e0aa] flex items-center gap-1.5">
+            <Heart className="h-3.5 w-3.5 fill-[#d4af37] text-[#d4af37] animate-pulse" /> Galeria Colaborativa (Meu Boda Live)
           </span>
-          <h1 className="text-xl font-bold tracking-tight text-white mt-0.5">{event.title}</h1>
+          <h1 className="text-xl md:text-2xl font-serif font-black tracking-tight text-white mt-1">{event.title}</h1>
         </div>
 
         {/* Counter of approved images */}
-        <div className="text-right text-xs font-semibold text-white/60">
+        <div className="text-right text-xs font-bold text-[#f3e0aa] bg-[#d4af37]/15 border border-[#d4af37]/30 px-3.5 py-1.5 rounded-full shadow-sm">
           <span>{mediaList.length} momentos partilhados</span>
         </div>
       </header>
@@ -174,17 +174,17 @@ export default function PublicLiveGalleryPage({ params }: LiveGalleryProps) {
           {mediaList.length > 0 && currentMedia ? (
             <motion.div
               key={currentMedia.id}
-              initial={{ opacity: 0, scale: 0.95, rotate: -1 }}
+              initial={{ opacity: 0, scale: 0.95, rotate: -0.5 }}
               animate={{ opacity: 1, scale: 1, rotate: 0 }}
-              exit={{ opacity: 0, scale: 1.05, rotate: 1 }}
+              exit={{ opacity: 0, scale: 1.05, rotate: 0.5 }}
               transition={{ duration: 0.8, ease: 'easeInOut' }}
-              className="w-full max-w-[85vw] max-h-[70vh] aspect-[4/3] sm:aspect-video md:aspect-[3/2] bg-white text-black p-4 pb-14 shadow-2xl rounded-sm flex flex-col justify-between border border-white/20 select-none relative"
+              className="w-full max-w-[85vw] max-h-[72vh] aspect-[4/3] sm:aspect-video md:aspect-[3/2] bg-[#0e0e13] text-white p-5 pb-16 shadow-2xl rounded-2xl flex flex-col justify-between border-2 border-[#d4af37]/40 select-none relative"
               style={{
-                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)',
+                boxShadow: '0 0 60px rgba(212, 175, 55, 0.2), 0 25px 50px -12px rgba(0, 0, 0, 0.9)',
               }}
             >
               {/* Media container */}
-              <div className="flex-1 bg-[#111] overflow-hidden rounded-sm relative flex items-center justify-center border border-black/10">
+              <div className="flex-1 bg-[#050507] overflow-hidden rounded-xl relative flex items-center justify-center border border-[#d4af37]/20">
                 {currentMedia.media_type === 'video' ? (
                   <video
                     src={currentMedia.media_url}
@@ -204,12 +204,12 @@ export default function PublicLiveGalleryPage({ params }: LiveGalleryProps) {
                 )}
               </div>
 
-              {/* Polaroid Footer */}
-              <div className="absolute bottom-2.5 left-4 right-4 flex items-center justify-between text-black/80 font-medium">
-                <span className="text-sm font-semibold tracking-wide">
-                  Enviado por: <span className="text-primary font-bold">{currentMedia.guest_name}</span>
+              {/* Luxury Frame Footer */}
+              <div className="absolute bottom-3.5 left-6 right-6 flex items-center justify-between text-white font-medium">
+                <span className="text-sm font-semibold tracking-wide text-white/90">
+                  Enviado por: <span className="text-[#f3e0aa] font-bold text-base font-cinzel">{currentMedia.guest_name}</span>
                 </span>
-                <span className="text-xs italic font-serif truncate max-w-[50%]">
+                <span className="text-sm italic font-serif truncate max-w-[50%] text-[#f3e0aa]">
                   {currentMedia.caption ? `"${currentMedia.caption}"` : ''}
                 </span>
               </div>
@@ -219,15 +219,15 @@ export default function PublicLiveGalleryPage({ params }: LiveGalleryProps) {
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="text-center space-y-4 max-w-sm"
+              className="text-center space-y-4 max-w-md p-8 rounded-3xl border border-[#d4af37]/30 bg-[#0e0e13] shadow-2xl"
             >
-              <div className="rounded-full bg-white/5 p-6 inline-block border border-white/10">
-                <Camera className="h-12 w-12 text-primary" />
+              <div className="rounded-full bg-[#d4af37]/15 p-6 inline-block border border-[#d4af37]/30 shadow-[0_0_20px_rgba(212,175,55,0.2)]">
+                <Camera className="h-12 w-12 text-[#f3e0aa]" />
               </div>
               <div>
-                <h3 className="text-lg font-bold tracking-wide">Aguardando Fotos...</h3>
-                <p className="text-xs text-white/50 mt-1.5 leading-relaxed">
-                  Os convidados podem partilhar fotos tiradas nos seus telemóveis abrindo o link do convite e clicando em "Enviar Foto".
+                <h3 className="text-xl font-bold tracking-wide text-[#f3e0aa] font-cinzel">Aguardando Fotos...</h3>
+                <p className="text-xs text-white/90 mt-2 leading-relaxed">
+                  Os convidados podem partilhar fotos tiradas nos seus telemóveis abrindo o link do convite e clicando em &quot;Tirar / Enviar Foto&quot;.
                 </p>
               </div>
             </motion.div>
@@ -236,13 +236,13 @@ export default function PublicLiveGalleryPage({ params }: LiveGalleryProps) {
       </main>
 
       {/* Slide Footer */}
-      <footer className="relative z-10 flex flex-col sm:flex-row items-center justify-between border-t border-white/10 pt-4 text-xs text-white/40">
+      <footer className="relative z-10 flex flex-col sm:flex-row items-center justify-between border-t border-[#d4af37]/20 pt-4 text-xs text-white/60">
         <div>
-          <span>Desenvolvido por <span className="font-semibold text-primary">Meu Boda</span></span>
+          <span>Desenvolvido por <span className="font-bold text-[#f3e0aa]">Meu Boda</span></span>
         </div>
-        <div className="mt-2 sm:mt-0 font-medium bg-white/5 py-1 px-3 rounded-full border border-white/10 flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-success animate-pulse" />
-          <span>Envie as suas fotos acedendo ao link do seu convite</span>
+        <div className="mt-2 sm:mt-0 font-bold bg-[#d4af37]/15 py-1.5 px-4 rounded-full border border-[#d4af37]/30 flex items-center gap-2 text-[#f3e0aa]">
+          <span className="h-2 w-2 rounded-full bg-[#d4af37] animate-pulse" />
+          <span>Envie as suas fotos em tempo real através do link do seu convite</span>
         </div>
       </footer>
     </div>
