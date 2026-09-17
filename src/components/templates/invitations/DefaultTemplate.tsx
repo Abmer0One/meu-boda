@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { Guest, Event, Table, EventSchedule, EventInfoBlock } from '@/types';
 import { resolveCanvaConfig, DEFAULT_CANVA_COVER, DEFAULT_CANVA_INFO } from '@/utils/canvaConfig';
+import { parseEventInitials } from '@/utils/eventHelpers';
 
 export interface TemplateProps {
   guest: Guest;
@@ -84,50 +85,8 @@ export default function DefaultTemplate({
     }
   }, []);
 
-  // Dynamic host initials and names parsing
-  const getAnfitriões = () => {
-    let cleanTitle = event.title;
-    const prefixes = [
-      /^(?:O\s+)?Casamento\s+(?:de|do|da|d')\s+/i,
-      /^(?:O\s+)?Aniversário\s+(?:de|do|da|d')\s+/i,
-      /^(?:O\s+)?Pedido\s+(?:de\s+casamento\s+de|de|do|da)\s+/i,
-      /^(?:O\s+)?Chá\s+de\s+panela\s+(?:de|do|da)\s+/i,
-      /^(?:O\s+)?Alambamento\s+(?:de|do|da)\s+/i,
-      /^(?:A\s+)?Festa\s+(?:de|do|da)\s+/i,
-      /^(?:O\s+)?Workshop\s+(?:de|do|da)\s+/i,
-      /^(?:A\s+)?Palestra\s+(?:de|do|da)\s+/i
-    ];
-    for (const prefix of prefixes) {
-      cleanTitle = cleanTitle.replace(prefix, '');
-    }
-
-    const parts = cleanTitle.split(/(?:e|&|and|\+|\by\b|\/|\\)/i).map(p => p.trim());
-    if (parts.length >= 2) {
-      return {
-        initials: `${parts[0].charAt(0).toUpperCase()} & ${parts[1].charAt(0).toUpperCase()}`,
-        names: cleanTitle,
-        firstName: parts[0],
-        secondName: parts[1],
-      };
-    }
-    const words = cleanTitle.split(/\s+/).filter(Boolean);
-    if (words.length >= 2) {
-      return {
-        initials: `${words[0].charAt(0).toUpperCase()} & ${words[1].charAt(0).toUpperCase()}`,
-        names: cleanTitle,
-        firstName: words[0],
-        secondName: words[1],
-      };
-    }
-    return {
-      initials: cleanTitle.charAt(0).toUpperCase(),
-      names: cleanTitle,
-      firstName: cleanTitle,
-      secondName: '',
-    };
-  };
-
-  const hosts = getAnfitriões();
+  // Dynamic host initials and names parsing with robust word-boundary detection
+  const hosts = parseEventInitials(event.title, event.type);
 
   // Dynamic Intro and Ending Phrases
   const getPhrases = () => {

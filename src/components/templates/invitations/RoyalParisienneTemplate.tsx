@@ -20,6 +20,7 @@ import {
   MailOpen,
 } from 'lucide-react';
 import { TemplateProps } from './DefaultTemplate';
+import { parseEventInitials } from '@/utils/eventHelpers';
 
 export default function RoyalParisienneTemplate({
   guest,
@@ -44,14 +45,8 @@ export default function RoyalParisienneTemplate({
   const isConfirmed = rsvpStatus === 'Confirmed';
   const isDeclined = rsvpStatus === 'Declined';
 
-  // Get initials for the envelope seal (e.g. M & A)
-  const getInitials = (title: string) => {
-    const parts = title.split(/(?:e|&|and|\+)/i).map(p => p.trim());
-    if (parts.length >= 2) {
-      return `${parts[0].charAt(0).toUpperCase()} & ${parts[1].charAt(0).toUpperCase()}`;
-    }
-    return title.substring(0, 3).toUpperCase();
-  };
+  // Dynamic host initials and names parsing with robust word-boundary detection
+  const hosts = parseEventInitials(event.title, event.type);
 
   // Dynamic Intro and Ending Phrases
   const getPhrases = () => {
@@ -133,7 +128,7 @@ export default function RoyalParisienneTemplate({
                 />
                 <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-[#1a1a1f] to-[#27272a] border-2 border-[#d4af37] flex items-center justify-center shadow-2xl relative">
                   <span className="text-xl font-serif font-extrabold tracking-widest bg-gradient-to-r from-[#b89742] via-[#f3e0aa] to-[#b89742] bg-clip-text text-transparent">
-                    {getInitials(event.title)}
+                    {hosts.initials}
                   </span>
                 </div>
               </div>
