@@ -29,7 +29,7 @@ const EVENT_PREFIXES: RegExp[] = [
  * Prevents regex split bugs where letters inside words (e.g. 'e' in 'Marinela' or 'and' in 'André')
  * were falsely treated as conjunction separators.
  */
-export function parseEventInitials(title?: string | null, eventType?: string): EventInitialsResult {
+export function parseEventInitials(title?: string | null, eventType?: string | null): EventInitialsResult {
   if (!title || typeof title !== 'string' || !title.trim()) {
     return {
       initials: 'MB',

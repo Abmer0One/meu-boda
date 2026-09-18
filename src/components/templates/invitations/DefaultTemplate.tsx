@@ -144,6 +144,7 @@ export default function DefaultTemplate({
       return {
         weekday: weekdayCapitalized,
         date: dayMonthYear,
+        full: `${weekdayCapitalized}, ${dayMonthYear}`,
         monthDayYear: `${monthShort} | ${day} | ${year}`,
         weekdayAtTime: `${weekdayCapitalized} às ${timeDisplay}`,
         time: timeStr,
@@ -152,6 +153,7 @@ export default function DefaultTemplate({
       return {
         weekday: 'Sexta Feira',
         date: '06 de Novembro de 2026',
+        full: 'Sexta-feira, 06 de Novembro de 2026',
         monthDayYear: 'NOV | 06 | 2026',
         weekdayAtTime: 'Sexta Feira às 22h',
         time: '22:00',
@@ -165,9 +167,10 @@ export default function DefaultTemplate({
      PDF PRINT MODE LAYOUTS (Landscape A4: 1120x792)
      ========================================================================= */
   if (isPrinting) {
-    const canvaConfig = resolveCanvaConfig(event.id, event.template_config, infoBlocks, null);
-    const canvaCover = canvaConfig.canva_cover_url || DEFAULT_CANVA_COVER;
-    const canvaInfo = canvaConfig.canva_info_url || DEFAULT_CANVA_INFO;
+    const canvaConfig = resolveCanvaConfig(event.id, event.template_config, infoBlocks, null, event);
+    const hasCustomCover = Boolean(canvaConfig.canva_cover_url);
+    const hasCustomInfo = Boolean(canvaConfig.canva_info_url);
+    const isSinglePage = canvaConfig.pdf_mode === 'single_page';
 
     const locCoords = canvaConfig.qr_locations_coords || {
       left: 8.76,
@@ -183,122 +186,323 @@ export default function DefaultTemplate({
       height: 18.52,
     };
 
-    const isSinglePage = canvaConfig.pdf_mode === 'single_page';
+    const initialsData = parseEventInitials(event.title, event.theme);
+    const initials = initialsData.initials || 'MB';
 
+    // -----------------------------------------------------------------
     // PAGE 1: COVER (or SINGLE PAGE INVITATION)
+    // -----------------------------------------------------------------
     if (renderPage === 'cover' || isSinglePage) {
-      return (
-        <div className="w-[1120px] h-[792px] bg-[#FAF8F1] p-0 relative overflow-hidden select-none box-border flex items-center justify-center">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img 
-            src={canvaCover} 
-            alt="Convite Oficial Canva" 
-            crossOrigin="anonymous"
-            className="w-full h-full object-cover select-none pointer-events-none absolute inset-0 z-0"
-          />
+      if (hasCustomCover) {
+        return (
+          <div className="w-[1120px] h-[792px] bg-[#FAF8F1] p-0 relative overflow-hidden select-none box-border flex items-center justify-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img 
+              src={canvaConfig.canva_cover_url!} 
+              alt="Convite Oficial Canva" 
+              crossOrigin="anonymous"
+              className="w-full h-full object-cover select-none pointer-events-none absolute inset-0 z-0"
+            />
 
-          {/* Em modo Página Única, sobrepõe os códigos QR diretamente na Frente */}
-          {isSinglePage && (
-            <>
-              {/* 1. Código QR Real de Localizações */}
-              {locationsQrCodeUrl && canvaConfig.show_locations_qr !== false && (
-                <div 
-                  className="absolute z-10 flex items-center justify-center bg-white shadow-sm overflow-hidden"
-                  style={{
-                    left: `${locCoords.left}%`,
-                    top: `${locCoords.top}%`,
-                    width: `${locCoords.width}%`,
-                    height: `${locCoords.height}%`,
-                  }}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img 
-                    src={locationsQrCodeUrl} 
-                    alt="Código de Localizações Real" 
-                    crossOrigin="anonymous"
-                    className="w-full h-full object-contain p-0.5"
-                  />
-                </div>
-              )}
+            {/* Em modo Página Única, sobrepõe os códigos QR diretamente na Frente */}
+            {isSinglePage && (
+              <>
+                {/* 1. Código QR Real de Localizações */}
+                {locationsQrCodeUrl && canvaConfig.show_locations_qr !== false && (
+                  <div 
+                    className="absolute z-10 flex items-center justify-center bg-white shadow-sm overflow-hidden"
+                    style={{
+                      left: `${locCoords.left}%`,
+                      top: `${locCoords.top}%`,
+                      width: `${locCoords.width}%`,
+                      height: `${locCoords.height}%`,
+                    }}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img 
+                      src={locationsQrCodeUrl} 
+                      alt="Código de Localizações Real" 
+                      crossOrigin="anonymous"
+                      className="w-full h-full object-contain p-0.5"
+                    />
+                  </div>
+                )}
 
-              {/* 2. Código QR Real de Acesso / Portaria */}
-              {qrCodeUrl && canvaConfig.show_access_qr !== false && (
-                <div 
-                  className="absolute z-10 flex items-center justify-center bg-white shadow-sm overflow-hidden"
-                  style={{
-                    left: `${accessCoords.left}%`,
-                    top: `${accessCoords.top}%`,
-                    width: `${accessCoords.width}%`,
-                    height: `${accessCoords.height}%`,
-                  }}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img 
-                    src={qrCodeUrl} 
-                    alt="Código de Acesso Real" 
-                    crossOrigin="anonymous"
-                    className="w-full h-full object-contain p-0.5"
-                  />
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      );
+                {/* 2. Código QR Real de Acesso / Portaria */}
+                {qrCodeUrl && canvaConfig.show_access_qr !== false && (
+                  <div 
+                    className="absolute z-10 flex items-center justify-center bg-white shadow-sm overflow-hidden"
+                    style={{
+                      left: `${accessCoords.left}%`,
+                      top: `${accessCoords.top}%`,
+                      width: `${accessCoords.width}%`,
+                      height: `${accessCoords.height}%`,
+                    }}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img 
+                      src={qrCodeUrl} 
+                      alt="Código de Acesso Real" 
+                      crossOrigin="anonymous"
+                      className="w-full h-full object-contain p-0.5"
+                    />
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        );
+      }
+
+      // Dynamic Basic Template for events without custom Canva uploads
+      if (isSinglePage) {
+        return (
+          <div className="w-[1120px] h-[792px] bg-[#FAF8F5] p-6 relative overflow-hidden select-none box-border flex flex-col justify-between font-serif text-[#1c1c1e] border-[3px] border-[#D4AF37]">
+            {/* Inner Border */}
+            <div className="absolute inset-2 border border-[#E8D49E] pointer-events-none" />
+
+            {/* Header Section: Monogram, Tagline, Title */}
+            <div className="text-center pt-2 relative z-10 space-y-1">
+              <div className="w-14 h-14 rounded-full border-2 border-[#D4AF37] mx-auto flex items-center justify-center text-[#B89742] text-xl font-bold bg-[#FAF8F5]">
+                {initials}
+              </div>
+              <p className="text-[11px] uppercase tracking-[0.25em] text-[#8A7348] font-semibold">Convite Especial</p>
+              <h1 className="text-3xl font-bold tracking-tight text-[#1A1A1A]">{event.title}</h1>
+              <p className="text-xs italic text-[#6B5E51]">Convidam cordialmente para a celebração deste momento inesquecível</p>
+            </div>
+
+            {/* Guest Banner */}
+            <div className="mx-auto bg-[#F5EFE6] border border-[#D4AF37]/60 rounded-xl px-8 py-2 text-center max-w-xl relative z-10">
+              <p className="text-base font-bold text-[#1C1C1E]">Convidado de Honra: {guest.name}</p>
+              <p className="text-[11px] text-[#8A7348]">
+                {table ? `Mesa: ${table.name}` : ''}
+                {guest.companions > 0 ? ` • ${guest.companions + 1} Lugares Reservados` : ''}
+              </p>
+            </div>
+
+            {/* Event Details */}
+            <div className="text-center relative z-10 space-y-0.5 text-xs text-[#4A4036]">
+              <p className="font-bold text-sm text-[#2D241E]">📅 {dateDetails.full}</p>
+              <p>
+                {event.ceremony_location && `Cerimónia: ${event.ceremony_location}${event.ceremony_time ? ' às ' + event.ceremony_time : ''}`}
+                {event.party_location && `  |  Copos-de-Água: ${event.party_location}${event.party_time ? ' às ' + event.party_time : ''}`}
+              </p>
+            </div>
+
+            {/* Two QR Code Cards */}
+            <div className="grid grid-cols-2 gap-6 max-w-3xl mx-auto w-full relative z-10 pb-2">
+              {/* QR Localizações */}
+              <div className="bg-white rounded-xl border border-[#E8D49E] p-3 flex flex-col items-center justify-center text-center shadow-sm">
+                <p className="text-xs font-bold text-[#2D241E]">📍 LOCALIZAÇÃO & ITINERÁRIO</p>
+                <p className="text-[10px] text-[#71717A] mb-1.5">Aponte a câmara do telemóvel para abrir no GPS</p>
+                {locationsQrCodeUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={locationsQrCodeUrl} alt="QR Localização" className="w-40 h-40 object-contain" />
+                ) : (
+                  <div className="w-40 h-40 bg-zinc-100 flex items-center justify-center text-xs text-zinc-400">QR Mapa</div>
+                )}
+                <span className="text-[10px] font-semibold text-[#8A7348] mt-1">Rota no Google Maps</span>
+              </div>
+
+              {/* QR Acesso */}
+              <div className="bg-white rounded-xl border border-[#E8D49E] p-3 flex flex-col items-center justify-center text-center shadow-sm">
+                <p className="text-xs font-bold text-[#2D241E]">🎟️ PASSE DE ENTRADA / PORTARIA</p>
+                <p className="text-[10px] text-[#71717A] mb-1.5">Apresente este código na entrada para check-in</p>
+                {qrCodeUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={qrCodeUrl} alt="QR Acesso" className="w-40 h-40 object-contain" />
+                ) : (
+                  <div className="w-40 h-40 bg-zinc-100 flex items-center justify-center text-xs text-zinc-400">QR Acesso</div>
+                )}
+                <span className="text-[10px] font-semibold text-[#8A7348] mt-1">Check-in Individual</span>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="text-center text-[10px] text-[#A3907C] italic relative z-10 pb-1">
+              Meu Boda • Confirmação de presença e detalhes em meuboda.com
+            </div>
+          </div>
+        );
+      } else {
+        // Double Page - Cover Card
+        return (
+          <div className="w-[1120px] h-[792px] bg-[#FAF8F5] p-12 relative overflow-hidden select-none box-border flex flex-col justify-between items-center text-center font-serif text-[#1c1c1e] border-[3px] border-[#D4AF37]">
+            <div className="absolute inset-3 border border-[#E8D49E] pointer-events-none" />
+
+            <div className="my-auto space-y-4 relative z-10 max-w-2xl">
+              <div className="w-24 h-24 rounded-full border-4 border-[#D4AF37] mx-auto flex items-center justify-center text-[#B89742] text-3xl font-bold bg-[#FAF8F5]">
+                {initials}
+              </div>
+              <p className="text-xs uppercase tracking-[0.3em] text-[#8A7348] font-semibold">Convite de Casamento</p>
+              <h1 className="text-5xl font-bold tracking-tight text-[#1A1A1A]">{event.title}</h1>
+              <p className="text-lg text-[#2D241E] font-medium">{dateDetails.full}</p>
+            </div>
+
+            <div className="bg-[#F5EFE6] border border-[#D4AF37]/60 rounded-2xl px-12 py-4 text-center max-w-xl relative z-10 w-full mb-6">
+              <p className="text-xs italic text-[#8A7348]">Especialmente preparado para</p>
+              <p className="text-2xl font-bold text-[#1C1C1E] mt-0.5">{guest.name}</p>
+              <p className="text-xs text-[#6B5E51] mt-0.5">
+                {table ? `Mesa: ${table.name}` : ''}
+                {guest.companions > 0 ? ` • ${guest.companions + 1} Convidados` : ''}
+              </p>
+            </div>
+
+            <div className="text-[11px] text-[#A3907C] italic relative z-10">
+              Meu Boda • Celebração de Amor & União
+            </div>
+          </div>
+        );
+      }
     } else {
-      // PAGE 2: INFO (Folha de Informações - Horizontal A4 Canva Oficial com QRs Dinâmicos)
+      // -----------------------------------------------------------------
+      // PAGE 2: INFO (Inside Sheet / Tríptico)
+      // -----------------------------------------------------------------
+      if (hasCustomInfo) {
+        return (
+          <div className="w-[1120px] h-[792px] bg-[#FAF8F1] p-0 relative overflow-hidden select-none box-border">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img 
+              src={canvaConfig.canva_info_url!} 
+              alt="Verso do Convite Oficial Canva" 
+              crossOrigin="anonymous"
+              className="w-full h-full object-cover select-none pointer-events-none absolute inset-0 z-0"
+            />
+
+            {/* 1. Código QR Real de Localizações */}
+            {locationsQrCodeUrl && (
+              <div 
+                className="absolute z-10 flex items-center justify-center bg-white"
+                style={{
+                  left: `${locCoords.left}%`,
+                  top: `${locCoords.top}%`,
+                  width: `${locCoords.width}%`,
+                  height: `${locCoords.height}%`,
+                }}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img 
+                  src={locationsQrCodeUrl} 
+                  alt="Código de Localizações Real" 
+                  crossOrigin="anonymous"
+                  className="w-full h-full object-contain p-0.5"
+                />
+              </div>
+            )}
+
+            {/* 2. Código QR Real de Acesso / Portaria */}
+            {qrCodeUrl && (
+              <div 
+                className="absolute z-10 flex items-center justify-center bg-white"
+                style={{
+                  left: `${accessCoords.left}%`,
+                  top: `${accessCoords.top}%`,
+                  width: `${accessCoords.width}%`,
+                  height: `${accessCoords.height}%`,
+                }}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img 
+                  src={qrCodeUrl} 
+                  alt="Código de Acesso Real" 
+                  crossOrigin="anonymous"
+                  className="w-full h-full object-contain p-0.5"
+                />
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      // Dynamic Basic Template Inside Page (Tríptico: Localizações, Programa, Passe de Entrada)
       return (
-        <div className="w-[1120px] h-[792px] bg-[#FAF8F1] p-0 relative overflow-hidden select-none box-border">
-          {/* Imagem de Fundo Oficial do Canva com todas as fontes, cores e ornamentos intactos */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img 
-            src={canvaInfo} 
-            alt="Verso do Convite Oficial Canva" 
-            crossOrigin="anonymous"
-            className="w-full h-full object-cover select-none pointer-events-none absolute inset-0 z-0"
-          />
+        <div className="w-[1120px] h-[792px] bg-[#FAF8F5] p-6 relative overflow-hidden select-none box-border font-serif text-[#1c1c1e] border-[3px] border-[#D4AF37] flex">
+          <div className="absolute inset-2 border border-[#E8D49E] pointer-events-none" />
 
-          {/* 1. Código QR Real de Localizações (Aba Esquerda - Coordenadas dinâmicas do design Canva) */}
-          {locationsQrCodeUrl && (
-            <div 
-              className="absolute z-10 flex items-center justify-center bg-white"
-              style={{
-                left: `${locCoords.left}%`,
-                top: `${locCoords.top}%`,
-                width: `${locCoords.width}%`,
-                height: `${locCoords.height}%`,
-              }}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img 
-                src={locationsQrCodeUrl} 
-                alt="Código de Localizações Real" 
-                crossOrigin="anonymous"
-                className="w-full h-full object-contain p-0.5"
-              />
+          {/* Panel 1: Localizações (Left) */}
+          <div className="flex-1 border-r border-[#E8D49E] p-4 flex flex-col justify-between items-center text-center relative z-10">
+            <div>
+              <h3 className="text-base font-bold text-[#B89742] uppercase tracking-wider">Localizações</h3>
+              <div className="w-12 h-0.5 bg-[#D4AF37] mx-auto my-2" />
+              
+              <div className="space-y-3 mt-4 text-xs text-left w-full px-2">
+                <div>
+                  <p className="font-bold text-[#2D241E]">Cerimónia Religiosa</p>
+                  <p className="text-zinc-600">{event.ceremony_location || 'Local a anunciar'}</p>
+                  {event.ceremony_time && <p className="text-[#8A7348] font-medium">Horário: {event.ceremony_time}</p>}
+                </div>
+                <div>
+                  <p className="font-bold text-[#2D241E]">Copos-de-Água & Festa</p>
+                  <p className="text-zinc-600">{event.party_location || 'Local a anunciar'}</p>
+                  {event.party_time && <p className="text-[#8A7348] font-medium">Horário: {event.party_time}</p>}
+                </div>
+              </div>
             </div>
-          )}
 
-          {/* 2. Código QR Real de Acesso / Portaria (Aba Direita - Coordenadas dinâmicas do design Canva) */}
-          {qrCodeUrl && (
-            <div 
-              className="absolute z-10 flex items-center justify-center bg-white"
-              style={{
-                left: `${accessCoords.left}%`,
-                top: `${accessCoords.top}%`,
-                width: `${accessCoords.width}%`,
-                height: `${accessCoords.height}%`,
-              }}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img 
-                src={qrCodeUrl} 
-                alt="Código de Acesso Real" 
-                crossOrigin="anonymous"
-                className="w-full h-full object-contain p-0.5"
-              />
+            <div className="bg-white rounded-xl border border-[#E8D49E] p-3 flex flex-col items-center w-full max-w-[260px] shadow-sm">
+              <p className="text-[11px] font-bold text-[#2D241E]">📍 MAPA & ITINERÁRIO</p>
+              <p className="text-[9px] text-zinc-500 mb-1">Aponte a câmara para abrir o GPS</p>
+              {locationsQrCodeUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={locationsQrCodeUrl} alt="QR Localização" className="w-36 h-36 object-contain" />
+              ) : (
+                <div className="w-36 h-36 bg-zinc-100 flex items-center justify-center text-xs text-zinc-400">QR Mapa</div>
+              )}
+              <span className="text-[9px] font-semibold text-[#8A7348] mt-1">Rota Google Maps</span>
             </div>
-          )}
+          </div>
+
+          {/* Panel 2: Celebração & Programa (Center) */}
+          <div className="flex-1 border-r border-[#E8D49E] p-4 flex flex-col justify-between items-center text-center relative z-10">
+            <div>
+              <h3 className="text-base font-bold text-[#B89742] uppercase tracking-wider">Celebração</h3>
+              <div className="w-12 h-0.5 bg-[#D4AF37] mx-auto my-2" />
+              <p className="text-xs font-bold text-[#1A1A1A] mt-2">{dateDetails.full}</p>
+
+              <p className="text-xs italic text-[#5A4E42] mt-3 leading-relaxed px-2">
+                {event.description || 'A vossa presença tornará este momento inesquecível. Esperamos por si para celebrar o nosso amor e união.'}
+              </p>
+
+              {event.dress_code_style && (
+                <div className="mt-4 bg-[#F5EFE6] border border-[#D4AF37]/50 rounded-lg p-2 max-w-[240px] mx-auto">
+                  <p className="text-[9px] font-bold uppercase text-[#8A7348]">Traje Recomendado</p>
+                  <p className="text-xs font-bold text-[#1A1A1A]">{event.dress_code_style}</p>
+                </div>
+              )}
+            </div>
+
+            <div className="text-[10px] text-[#8A7348] italic px-2">
+              &quot;O amor é a ponte que une os corações em qualquer jornada.&quot;
+            </div>
+          </div>
+
+          {/* Panel 3: Passe de Entrada (Right) */}
+          <div className="flex-1 p-4 flex flex-col justify-between items-center text-center relative z-10">
+            <div>
+              <h3 className="text-base font-bold text-[#B89742] uppercase tracking-wider">Passe de Entrada</h3>
+              <div className="w-12 h-0.5 bg-[#D4AF37] mx-auto my-2" />
+              
+              <div className="mt-3">
+                <p className="text-[10px] italic text-[#8A7348]">Convidado de Honra:</p>
+                <p className="text-sm font-bold text-[#1A1A1A]">{guest.name}</p>
+                <p className="text-xs font-semibold text-[#2D241E] mt-0.5">
+                  {table ? `Mesa: ${table.name}` : 'Mesa a Confirmar'}
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl border border-[#E8D49E] p-3 flex flex-col items-center w-full max-w-[260px] shadow-sm">
+              <p className="text-[11px] font-bold text-[#2D241E]">🎟️ CÓDIGO DE ACESSO</p>
+              <p className="text-[9px] text-zinc-500 mb-1">Apresente na portaria para check-in</p>
+              {qrCodeUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={qrCodeUrl} alt="QR Acesso" className="w-36 h-36 object-contain" />
+              ) : (
+                <div className="w-36 h-36 bg-zinc-100 flex items-center justify-center text-xs text-zinc-400">QR Acesso</div>
+              )}
+              <span className="text-[9px] font-semibold text-[#8A7348] mt-1">Check-in Individual</span>
+            </div>
+          </div>
         </div>
       );
     }

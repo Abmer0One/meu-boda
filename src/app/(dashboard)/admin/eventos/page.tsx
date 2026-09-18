@@ -16,10 +16,12 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Dialog } from '@/components/ui/Dialog';
 import { Heart, MapPin, Calendar, Palette, Loader2, Plus, Trash2, Clock, Users, Gift, Link2, Shirt, Info, Pencil, Sparkles, Upload, Sliders, CheckCircle2, RotateCcw, QrCode, FileText, AlertCircle } from 'lucide-react';
-import { resolveCanvaConfig, persistCanvaConfig, CANVA_CONFIG_BLOCK_TITLE } from '@/utils/canvaConfig';
+import { resolveCanvaConfig, persistCanvaConfig, CANVA_CONFIG_BLOCK_TITLE, isMarinelaAbiudEvent, isCleanCanvaUrl } from '@/utils/canvaConfig';
+import { parseEventInitials } from '@/utils/eventHelpers';
 
 export default function EventosPage() {
   const { currentEvent, refreshEvents, setCurrentEvent } = useEvent();
+  const isMarinela = isMarinelaAbiudEvent(currentEvent);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -149,7 +151,7 @@ export default function EventosPage() {
         rsvp_deadline: currentEvent.rsvp_deadline || '',
       });
 
-      const resolved = resolveCanvaConfig(currentEvent.id, currentEvent.template_config, null, null);
+      const resolved = resolveCanvaConfig(currentEvent.id, currentEvent.template_config, null, null, currentEvent);
       setCanvaCoverUrl(resolved.canva_cover_url || '');
       setCanvaInfoUrl(resolved.canva_info_url || '');
       setPdfMode(resolved.pdf_mode || 'double_page');
@@ -197,8 +199,16 @@ export default function EventosPage() {
       if (canvaBlock?.content) {
         try {
           const parsed = JSON.parse(canvaBlock.content);
-          if (parsed.canva_cover_url) setCanvaCoverUrl(parsed.canva_cover_url);
-          if (parsed.canva_info_url) setCanvaInfoUrl(parsed.canva_info_url);
+          if (parsed.canva_cover_url && isCleanCanvaUrl(parsed.canva_cover_url, isMarinela)) {
+            setCanvaCoverUrl(parsed.canva_cover_url);
+          } else if (!isMarinela) {
+            setCanvaCoverUrl('');
+          }
+          if (parsed.canva_info_url && isCleanCanvaUrl(parsed.canva_info_url, isMarinela)) {
+            setCanvaInfoUrl(parsed.canva_info_url);
+          } else if (!isMarinela) {
+            setCanvaInfoUrl('');
+          }
           if (parsed.qr_locations_coords) setQrLocCoords(parsed.qr_locations_coords);
           if (parsed.qr_access_coords) setQrAccessCoords(parsed.qr_access_coords);
           if (parsed.pdf_mode) setPdfMode(parsed.pdf_mode);
@@ -404,7 +414,7 @@ export default function EventosPage() {
         ...currentEvent,
         template_config: updatedConfig,
       });
-      setCanvaSuccessMessage('Capa do Canva reposta para o modelo padrão.');
+      setCanvaSuccessMessage(isMarinela ? 'Capa reposta para o modelo oficial de Marinela & Abiúd.' : 'Capa reposta para o Template Básico Padrão.');
       setTimeout(() => setCanvaSuccessMessage(null), 4000);
     } catch (err: any) {
       alert('Erro ao remover capa do Canva: ' + err.message);
@@ -431,7 +441,7 @@ export default function EventosPage() {
         ...currentEvent,
         template_config: updatedConfig,
       });
-      setCanvaSuccessMessage('Verso do Canva reposto para o modelo padrão.');
+      setCanvaSuccessMessage(isMarinela ? 'Verso reposto para o modelo oficial de Marinela & Abiúd.' : 'Verso reposto para o Template Básico Padrão.');
       setTimeout(() => setCanvaSuccessMessage(null), 4000);
     } catch (err: any) {
       alert('Erro ao remover verso do Canva: ' + err.message);
@@ -958,11 +968,15 @@ export default function EventosPage() {
                     <Sparkles className="h-5 w-5 text-amber-500" /> Template Canva do Convite (PDF / Impressão)
                   </CardTitle>
                   <p className="text-xs text-foreground/60 mt-1">
-                    Faça o upload das artes do convite desenhadas no Canva. O sistema sobrepõe automaticamente os códigos QR reais e dinâmicos de cada convidado (Localização e Acesso) ao gerar o PDF.
+                    Por padrão, os eventos usam o <strong>Template Básico Dinâmico</strong> com códigos QR. Para personalizar o convite impresso/PDF, faça o upload das artes desenhadas no Canva.
                   </p>
                 </div>
                 <Badge variant="default" className="self-start sm:self-center border-amber-500/30 text-amber-600 dark:text-amber-400 bg-amber-500/10">
-                  {pdfMode === 'single_page' ? 'Canva Página Única' : 'Canva A4 Trifold'}
+                  {canvaCoverUrl || canvaInfoUrl 
+                    ? (pdfMode === 'single_page' ? 'Canva Personalizado (1 Página)' : 'Canva Personalizado (2 Páginas)') 
+                    : isMarinela
+                    ? 'Canva Oficial (Marinela & Abiúd)'
+                    : 'Template Básico do Sistema (Padrão)'}
                 </Badge>
               </div>
             </CardHeader>
@@ -1057,19 +1071,45 @@ export default function EventosPage() {
 
                     {/* Preview da Capa / Página Única */}
                     <div className="relative aspect-[16/11.3] w-full rounded-xl overflow-hidden border border-border-custom bg-black/5 shadow-inner flex items-center justify-center group">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={canvaCoverUrl || '/templates/canva/page_1.png'}
-                        alt="Pré-visualização da Capa Canva"
-                        className="w-full h-full object-cover"
-                      />
+                      {canvaCoverUrl ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img
+                          src={canvaCoverUrl}
+                          alt="Pré-visualização da Capa Canva"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : isMarinela ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img
+                          src="/templates/canva/page_1.png"
+                          alt="Pré-visualização da Capa Oficial Marinela & Abiúd"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        /* Template Básico Dinâmico (Padrão para outros eventos) */
+                        <div className="w-full h-full bg-[#FAF8F5] p-3 flex flex-col justify-between items-center text-center font-serif text-[#1c1c1e] border-2 border-[#D4AF37] relative">
+                          <div className="absolute inset-1 border border-[#E8D49E] pointer-events-none" />
+                          <div className="my-auto space-y-1 relative z-10">
+                            <div className="w-10 h-10 rounded-full border-2 border-[#D4AF37] mx-auto flex items-center justify-center text-[#B89742] text-sm font-bold bg-[#FAF8F5]">
+                              {parseEventInitials(currentEvent?.title).initials || 'MB'}
+                            </div>
+                            <p className="text-[9px] uppercase tracking-widest text-[#8A7348] font-semibold">
+                              {pdfMode === 'single_page' ? 'Página Única' : 'Capa do Convite'}
+                            </p>
+                            <h3 className="text-sm font-bold text-[#1A1A1A] line-clamp-1 max-w-[220px]">{currentEvent?.title || 'Título do Evento'}</h3>
+                            <p className="text-[10px] text-[#2D241E]">
+                              {currentEvent?.date ? new Date(currentEvent.date).toLocaleDateString('pt-PT', { day: 'numeric', month: 'long', year: 'numeric' }) : 'Data do Evento'}
+                            </p>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Se for Página Única, sobrepor os códigos QR configurados */}
                       {pdfMode === 'single_page' && (
                         <>
                           {showLocationsQr && (
                             <div
-                              className="absolute border-2 border-emerald-500 bg-white/95 text-emerald-900 rounded-sm flex flex-col items-center justify-center p-0.5 shadow-md select-none transition-all"
+                              className="absolute border-2 border-emerald-500 bg-white/95 text-emerald-900 rounded-sm flex flex-col items-center justify-center p-0.5 shadow-md select-none transition-all z-20"
                               style={{
                                 left: `${qrLocCoords.left}%`,
                                 top: `${qrLocCoords.top}%`,
@@ -1086,7 +1126,7 @@ export default function EventosPage() {
                           )}
                           {showAccessQr && (
                             <div
-                              className="absolute border-2 border-indigo-500 bg-white/95 text-indigo-900 rounded-sm flex flex-col items-center justify-center p-0.5 shadow-md select-none transition-all"
+                              className="absolute border-2 border-indigo-500 bg-white/95 text-indigo-900 rounded-sm flex flex-col items-center justify-center p-0.5 shadow-md select-none transition-all z-20"
                               style={{
                                 left: `${qrAccessCoords.left}%`,
                                 top: `${qrAccessCoords.top}%`,
@@ -1104,16 +1144,18 @@ export default function EventosPage() {
                         </>
                       )}
 
-                      <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-md text-white px-2 py-0.5 rounded text-[10px] font-medium">
+                      <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-md text-white px-2 py-0.5 rounded text-[10px] font-medium z-30">
                         {canvaCoverUrl 
                           ? (pdfMode === 'single_page' ? 'Página Única Personalizada' : 'Capa Personalizada') 
-                          : (pdfMode === 'single_page' ? 'Página Única Padrão' : 'Capa Oficial Padrão')}
+                          : isMarinela
+                          ? (pdfMode === 'single_page' ? 'Página Única Oficial (Marinela & Abiúd)' : 'Capa Oficial (Marinela & Abiúd)')
+                          : (pdfMode === 'single_page' ? 'Página Única (Template Básico)' : 'Capa (Template Básico)')}
                       </div>
                       {canvaCoverUrl && (
                         <button
                           type="button"
                           onClick={handleRemoveCanvaCover}
-                          className="absolute top-2 right-2 bg-red-600/90 text-white rounded-lg px-2 py-1 text-[11px] font-medium hover:bg-red-700 transition-colors shadow-md"
+                          className="absolute top-2 right-2 bg-red-600/90 text-white rounded-lg px-2 py-1 text-[11px] font-medium hover:bg-red-700 transition-colors shadow-md z-30"
                         >
                           Repor Padrão
                         </button>
@@ -1193,56 +1235,112 @@ export default function EventosPage() {
 
                       {/* Preview Interativo do Verso com sobreposição dos Códigos QR */}
                       <div className="relative aspect-[16/11.3] w-full rounded-xl overflow-hidden border border-border-custom bg-black/5 shadow-inner group">
-                        {/* Imagem de Fundo do Verso */}
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={canvaInfoUrl || '/templates/canva/page_2_clean.png'}
-                          alt="Pré-visualização do Verso Canva"
-                          className="w-full h-full object-cover"
-                        />
+                        {canvaInfoUrl ? (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img
+                            src={canvaInfoUrl}
+                            alt="Pré-visualização do Verso Canva"
+                            className="w-full h-full object-cover"
+                          />
+                        ) : isMarinela ? (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img
+                            src="/templates/canva/page_2_clean.png"
+                            alt="Pré-visualização do Verso Oficial Marinela & Abiúd"
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          /* Template Básico Dinâmico Verso (3 Painéis) */
+                          <div className="w-full h-full bg-[#FAF8F5] p-2 flex font-serif text-[#1c1c1e] border-2 border-[#D4AF37] relative">
+                            <div className="absolute inset-1 border border-[#E8D49E] pointer-events-none" />
+                            {/* Painel 1: Localizações */}
+                            <div className="flex-1 border-r border-[#E8D49E]/70 p-1 flex flex-col justify-between items-center text-center">
+                              <div>
+                                <p className="text-[8px] font-bold text-[#B89742] uppercase">Localizações</p>
+                                <p className="text-[7px] text-zinc-600 line-clamp-1 mt-0.5">{currentEvent?.ceremony_location || 'Cerimónia'}</p>
+                                <p className="text-[7px] text-zinc-600 line-clamp-1">{currentEvent?.party_location || 'Copos-de-Água'}</p>
+                              </div>
+                              <div className="bg-white border border-[#E8D49E] rounded p-1 flex flex-col items-center">
+                                <QrCode className="h-4 w-4 text-emerald-600" />
+                                <span className="text-[6px] text-zinc-600 font-bold">QR Mapa</span>
+                              </div>
+                            </div>
+                            {/* Painel 2: Celebração */}
+                            <div className="flex-1 border-r border-[#E8D49E]/70 p-1 flex flex-col justify-between items-center text-center">
+                              <div>
+                                <p className="text-[8px] font-bold text-[#B89742] uppercase">Celebração</p>
+                                <p className="text-[7px] text-zinc-600 line-clamp-2 mt-0.5">
+                                  {currentEvent?.description || 'Esperamos por si para celebrar o nosso amor e união.'}
+                                </p>
+                              </div>
+                              <p className="text-[7px] text-[#8A7348] italic">Meu Boda</p>
+                            </div>
+                            {/* Painel 3: Passe Entrada */}
+                            <div className="flex-1 p-1 flex flex-col justify-between items-center text-center">
+                              <div>
+                                <p className="text-[8px] font-bold text-[#B89742] uppercase">Passe Entrada</p>
+                                <p className="text-[7px] font-bold text-zinc-800 mt-0.5">Convidado</p>
+                                <p className="text-[6px] text-zinc-600">Mesa Designada</p>
+                              </div>
+                              <div className="bg-white border border-[#E8D49E] rounded p-1 flex flex-col items-center">
+                                <QrCode className="h-4 w-4 text-indigo-600" />
+                                <span className="text-[6px] text-zinc-600 font-bold">QR Acesso</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
 
-                        {/* Caixa 1: Código QR de Localizações (Aba Esquerda) */}
-                        <div
-                          className="absolute border-2 border-emerald-500 bg-white/95 text-emerald-900 rounded-sm flex flex-col items-center justify-center p-0.5 shadow-md select-none transition-all"
-                          style={{
-                            left: `${qrLocCoords.left}%`,
-                            top: `${qrLocCoords.top}%`,
-                            width: `${qrLocCoords.width}%`,
-                            height: `${qrLocCoords.height}%`,
-                          }}
-                          title="Posição do Código QR de Localizações"
-                        >
-                          <QrCode className="h-3.5 w-3.5 text-emerald-600" />
-                          <span className="text-[8px] font-bold text-emerald-800 leading-tight text-center truncate w-full px-0.5">
-                            QR Mapa
-                          </span>
-                        </div>
+                        {/* Caixas de Posição de QR para artes Canva ou Marinela */}
+                        {(canvaInfoUrl || isMarinela) && (
+                          <>
+                            {/* Caixa 1: Código QR de Localizações (Aba Esquerda) */}
+                            <div
+                              className="absolute border-2 border-emerald-500 bg-white/95 text-emerald-900 rounded-sm flex flex-col items-center justify-center p-0.5 shadow-md select-none transition-all z-20"
+                              style={{
+                                left: `${qrLocCoords.left}%`,
+                                top: `${qrLocCoords.top}%`,
+                                width: `${qrLocCoords.width}%`,
+                                height: `${qrLocCoords.height}%`,
+                              }}
+                              title="Posição do Código QR de Localizações"
+                            >
+                              <QrCode className="h-3.5 w-3.5 text-emerald-600" />
+                              <span className="text-[8px] font-bold text-emerald-800 leading-tight text-center truncate w-full px-0.5">
+                                QR Mapa
+                              </span>
+                            </div>
 
-                        {/* Caixa 2: Código QR de Acesso / Portaria (Aba Direita) */}
-                        <div
-                          className="absolute border-2 border-indigo-500 bg-white/95 text-indigo-900 rounded-sm flex flex-col items-center justify-center p-0.5 shadow-md select-none transition-all"
-                          style={{
-                            left: `${qrAccessCoords.left}%`,
-                            top: `${qrAccessCoords.top}%`,
-                            width: `${qrAccessCoords.width}%`,
-                            height: `${qrAccessCoords.height}%`,
-                          }}
-                          title="Posição do Código QR de Acesso à Portaria"
-                        >
-                          <QrCode className="h-3.5 w-3.5 text-indigo-600" />
-                          <span className="text-[8px] font-bold text-indigo-800 leading-tight text-center truncate w-full px-0.5">
-                            QR Acesso
-                          </span>
-                        </div>
+                            {/* Caixa 2: Código QR de Acesso / Portaria (Aba Direita) */}
+                            <div
+                              className="absolute border-2 border-indigo-500 bg-white/95 text-indigo-900 rounded-sm flex flex-col items-center justify-center p-0.5 shadow-md select-none transition-all z-20"
+                              style={{
+                                left: `${qrAccessCoords.left}%`,
+                                top: `${qrAccessCoords.top}%`,
+                                width: `${qrAccessCoords.width}%`,
+                                height: `${qrAccessCoords.height}%`,
+                              }}
+                              title="Posição do Código QR de Acesso à Portaria"
+                            >
+                              <QrCode className="h-3.5 w-3.5 text-indigo-600" />
+                              <span className="text-[8px] font-bold text-indigo-800 leading-tight text-center truncate w-full px-0.5">
+                                QR Acesso
+                              </span>
+                            </div>
+                          </>
+                        )}
 
-                        <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-md text-white px-2 py-0.5 rounded text-[10px] font-medium">
-                          {canvaInfoUrl ? 'Verso Personalizado' : 'Verso Oficial Padrão'}
+                        <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-md text-white px-2 py-0.5 rounded text-[10px] font-medium z-30">
+                          {canvaInfoUrl 
+                            ? 'Verso Personalizado' 
+                            : isMarinela 
+                            ? 'Verso Oficial (Marinela & Abiúd)' 
+                            : 'Verso (Template Básico)'}
                         </div>
                         {canvaInfoUrl && (
                           <button
                             type="button"
                             onClick={handleRemoveCanvaInfo}
-                            className="absolute top-2 right-2 bg-red-600/90 text-white rounded-lg px-2 py-1 text-[11px] font-medium hover:bg-red-700 transition-colors shadow-md"
+                            className="absolute top-2 right-2 bg-red-600/90 text-white rounded-lg px-2 py-1 text-[11px] font-medium hover:bg-red-700 transition-colors shadow-md z-30"
                           >
                             Repor Padrão
                           </button>

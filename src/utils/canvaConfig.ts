@@ -16,6 +16,7 @@ export interface CanvaTemplateConfig {
   show_access_qr?: boolean;
   qr_locations_coords?: QrCoordinates;
   qr_access_coords?: QrCoordinates;
+  is_basic_template?: boolean;
   [key: string]: any;
 }
 
@@ -38,13 +39,80 @@ export const DEFAULT_CANVA_INFO = '/templates/canva/page_2_clean.png';
 export const CANVA_CONFIG_BLOCK_TITLE = '__canva_template_config__';
 
 /**
- * Ensures that a given URL is a genuine Canva invitation template artwork
- * and not a decorative user photo (such as fundo_... or capa_...)
+ * Known event IDs and slugs strictly belonging to Marinela & Abiúd
  */
-export function isCleanCanvaUrl(url?: string | null): boolean {
+export const MARINELA_ABIUD_EVENT_IDS = [
+  '51399983-26a7-449f-be50-5b3516e97440',
+  'e46d32ba-7b42-47e7-b377-559b9ab6efd6',
+  'c960286d-956c-4da2-8ecf-79dc981ecd88',
+];
+
+/**
+ * Checks if a given event is Marinela & Abiúd's event.
+ * The custom Canva artwork in /templates/canva/ is exclusive to this couple.
+ */
+export function isMarinelaAbiudEvent(
+  eventOrId?: any,
+  slug?: string | null,
+  title?: string | null
+): boolean {
+  if (!eventOrId && !slug && !title) return false;
+
+  let id = '';
+  let s = slug || '';
+  let t = title || '';
+
+  if (typeof eventOrId === 'string') {
+    id = eventOrId;
+  } else if (typeof eventOrId === 'object' && eventOrId !== null) {
+    id = eventOrId.id || '';
+    s = eventOrId.slug || s;
+    t = eventOrId.title || t;
+  }
+
+  if (MARINELA_ABIUD_EVENT_IDS.includes(id)) return true;
+
+  const sLower = (s || '').toLowerCase();
+  const tLower = (t || '').toLowerCase();
+
+  if (sLower === 'marinela-abiud' || sLower === 'marinela-abiud-casamento' || sLower === 'nosso-casamento') {
+    return true;
+  }
+  if (sLower.includes('marinela') && (sLower.includes('abiud') || sLower.includes('abiúd'))) {
+    return true;
+  }
+  if (tLower.includes('marinela') && (tLower.includes('abiud') || tLower.includes('abiúd'))) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Identifies if a URL is Marinela & Abiúd's hardcoded Canva artwork files
+ */
+export function isDefaultMarinelaArtwork(url?: string | null): boolean {
+  if (!url || typeof url !== 'string') return false;
+  return (
+    url.includes('/templates/canva/page_1.png') ||
+    url.includes('/templates/canva/page_2.png') ||
+    url.includes('/templates/canva/page_2_clean.png')
+  );
+}
+
+/**
+ * Ensures that a given URL is a genuine Canva invitation template artwork
+ * and not a decorative user photo (such as fundo_... or capa_...).
+ * If the event is NOT Marinela & Abiúd, it also rejects Marinela's default artwork.
+ */
+export function isCleanCanvaUrl(url?: string | null, isMarinela: boolean = false): boolean {
   if (!url || typeof url !== 'string') return false;
   // If the file path contains fundo_ or capa_ (which are user photos), reject it
   if (url.includes('/fundo_') || url.includes('/capa_')) {
+    return false;
+  }
+  // If not Marinela & Abiúd, reject Marinela's default artwork
+  if (!isMarinela && isDefaultMarinelaArtwork(url)) {
     return false;
   }
   return true;
@@ -55,14 +123,20 @@ export function isCleanCanvaUrl(url?: string | null): boolean {
  * 1. Event template_config field
  * 2. Event info blocks (__canva_template_config__)
  * 3. Browser localStorage
- * 4. Official Canva default templates (DEFAULT_CANVA_COVER & DEFAULT_CANVA_INFO)
+ * 4. Default fallback: Marinela & Abiúd get their official templates;
+ *    all other events without uploaded artwork get null (using the Basic Template with QR codes).
  */
 export function resolveCanvaConfig(
-  eventId?: string | null,
+  eventId?: string | any | null,
   templateConfig?: Record<string, any> | null,
   infoBlocks?: EventInfoBlock[] | null,
-  _backgroundImage?: string | null
+  _backgroundImage?: string | null,
+  eventObject?: any
 ): CanvaTemplateConfig {
+  const actualEvent = eventObject || (typeof eventId === 'object' ? eventId : null);
+  const actualEventId = typeof eventId === 'string' ? eventId : actualEvent?.id || null;
+  const isMarinela = isMarinelaAbiudEvent(actualEvent || actualEventId);
+
   let resolved: CanvaTemplateConfig = {
     canva_cover_url: null,
     canva_info_url: null,
@@ -71,12 +145,17 @@ export function resolveCanvaConfig(
     show_access_qr: true,
     qr_locations_coords: { ...DEFAULT_LOC_COORDS },
     qr_access_coords: { ...DEFAULT_ACCESS_COORDS },
+    is_basic_template: false,
   };
 
   // 1. From template_config if present
   if (templateConfig) {
-    if (isCleanCanvaUrl(templateConfig.canva_cover_url)) resolved.canva_cover_url = templateConfig.canva_cover_url;
-    if (isCleanCanvaUrl(templateConfig.canva_info_url)) resolved.canva_info_url = templateConfig.canva_info_url;
+    if (isCleanCanvaUrl(templateConfig.canva_cover_url, isMarinela)) {
+      resolved.canva_cover_url = templateConfig.canva_cover_url;
+    }
+    if (isCleanCanvaUrl(templateConfig.canva_info_url, isMarinela)) {
+      resolved.canva_info_url = templateConfig.canva_info_url;
+    }
     if (templateConfig.pdf_mode) resolved.pdf_mode = templateConfig.pdf_mode;
     if (templateConfig.show_locations_qr !== undefined) resolved.show_locations_qr = templateConfig.show_locations_qr;
     if (templateConfig.show_access_qr !== undefined) resolved.show_access_qr = templateConfig.show_access_qr;
@@ -90,8 +169,12 @@ export function resolveCanvaConfig(
     if (configBlock?.content) {
       try {
         const parsed = JSON.parse(configBlock.content);
-        if (isCleanCanvaUrl(parsed.canva_cover_url)) resolved.canva_cover_url = parsed.canva_cover_url;
-        if (isCleanCanvaUrl(parsed.canva_info_url)) resolved.canva_info_url = parsed.canva_info_url;
+        if (isCleanCanvaUrl(parsed.canva_cover_url, isMarinela)) {
+          resolved.canva_cover_url = parsed.canva_cover_url;
+        }
+        if (isCleanCanvaUrl(parsed.canva_info_url, isMarinela)) {
+          resolved.canva_info_url = parsed.canva_info_url;
+        }
         if (parsed.pdf_mode) resolved.pdf_mode = parsed.pdf_mode;
         if (parsed.show_locations_qr !== undefined) resolved.show_locations_qr = parsed.show_locations_qr;
         if (parsed.show_access_qr !== undefined) resolved.show_access_qr = parsed.show_access_qr;
@@ -104,13 +187,17 @@ export function resolveCanvaConfig(
   }
 
   // 3. From localStorage if in browser
-  if (typeof window !== 'undefined' && eventId) {
+  if (typeof window !== 'undefined' && actualEventId) {
     try {
-      const stored = localStorage.getItem(`canva_template_${eventId}`);
+      const stored = localStorage.getItem(`canva_template_${actualEventId}`);
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (!resolved.canva_cover_url && isCleanCanvaUrl(parsed.canva_cover_url)) resolved.canva_cover_url = parsed.canva_cover_url;
-        if (!resolved.canva_info_url && isCleanCanvaUrl(parsed.canva_info_url)) resolved.canva_info_url = parsed.canva_info_url;
+        if (!resolved.canva_cover_url && isCleanCanvaUrl(parsed.canva_cover_url, isMarinela)) {
+          resolved.canva_cover_url = parsed.canva_cover_url;
+        }
+        if (!resolved.canva_info_url && isCleanCanvaUrl(parsed.canva_info_url, isMarinela)) {
+          resolved.canva_info_url = parsed.canva_info_url;
+        }
         if (parsed.pdf_mode) resolved.pdf_mode = parsed.pdf_mode;
         if (parsed.show_locations_qr !== undefined) resolved.show_locations_qr = parsed.show_locations_qr;
         if (parsed.show_access_qr !== undefined) resolved.show_access_qr = parsed.show_access_qr;
@@ -122,10 +209,17 @@ export function resolveCanvaConfig(
     }
   }
 
-  // 4. Default fallbacks: NEVER fallback to decorative couple photos (backgroundImage)!
-  // Always fallback to the official clean Canva templates with all layout details.
-  resolved.canva_cover_url = resolved.canva_cover_url || DEFAULT_CANVA_COVER;
-  resolved.canva_info_url = resolved.canva_info_url || DEFAULT_CANVA_INFO;
+  // 4. Default fallbacks:
+  // ONLY Marinela & Abiúd fallback to the official /templates/canva/ artwork.
+  // All other events without custom uploaded artwork remain with null URLs,
+  // designating them to use the dynamic Basic Template with QR codes.
+  if (isMarinela) {
+    resolved.canva_cover_url = resolved.canva_cover_url || DEFAULT_CANVA_COVER;
+    resolved.canva_info_url = resolved.canva_info_url || DEFAULT_CANVA_INFO;
+    resolved.is_basic_template = false;
+  } else {
+    resolved.is_basic_template = !resolved.canva_cover_url && !resolved.canva_info_url;
+  }
 
   return resolved;
 }
