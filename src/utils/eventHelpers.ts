@@ -116,3 +116,95 @@ export function parseEventInitials(title?: string | null, eventType?: string | n
     isCouple: false,
   };
 }
+
+export interface EventLabels {
+  title: string;
+  invitation: string;
+  details: string;
+  theme: string;
+  rsvpQuestion: string;
+}
+
+/**
+ * Returns dynamic event labels for titles, invitations, and RSVPs based on event type/title.
+ * For 'pedido' (Pedido de Casamento / Noivado), the description used on invitations is 'Noivado'
+ * (e.g. 'Convite de Noivado').
+ */
+export function getEventLabels(eventOrType?: any): EventLabels {
+  let type = '';
+  let title = '';
+
+  if (typeof eventOrType === 'string') {
+    type = eventOrType.toLowerCase();
+  } else if (eventOrType && typeof eventOrType === 'object') {
+    type = (eventOrType.type || '').toLowerCase();
+    title = (eventOrType.title || '').toLowerCase();
+  }
+
+  // Pedido de Casamento / Noivado -> Always use 'Noivado' on invitations
+  if (
+    type === 'pedido' ||
+    type === 'noivado' ||
+    type === 'pedido_casamento' ||
+    type.includes('pedido') ||
+    type.includes('noivado') ||
+    title.includes('noivado') ||
+    title.includes('pedido de casamento')
+  ) {
+    return {
+      title: 'Noivado',
+      invitation: 'Convite de Noivado',
+      details: 'Detalhes do Noivado',
+      theme: 'Tema do Noivado',
+      rsvpQuestion: 'comparecer ao nosso noivado',
+    };
+  }
+
+  if (type === 'aniversario' || title.includes('aniversário') || title.includes('aniversario')) {
+    return {
+      title: 'Aniversário',
+      invitation: 'Convite de Aniversário',
+      details: 'Detalhes do Aniversário',
+      theme: 'Tema do Aniversário',
+      rsvpQuestion: 'comparecer ao nosso aniversário',
+    };
+  }
+
+  if (type === 'alambamento' || title.includes('alambamento')) {
+    return {
+      title: 'Alambamento',
+      invitation: 'Convite de Alambamento',
+      details: 'Detalhes do Alambamento',
+      theme: 'Tema do Alambamento',
+      rsvpQuestion: 'comparecer ao nosso alambamento',
+    };
+  }
+
+  if (type === 'cha_panela' || title.includes('chá de panela') || title.includes('cha de panela')) {
+    return {
+      title: 'Chá de Panela',
+      invitation: 'Convite de Chá de Panela',
+      details: 'Detalhes do Chá de Panela',
+      theme: 'Tema do Chá de Panela',
+      rsvpQuestion: 'comparecer ao nosso chá de panela',
+    };
+  }
+
+  if (type === 'casamento' || title.includes('casamento') || !type) {
+    return {
+      title: 'Casamento',
+      invitation: 'Convite de Casamento',
+      details: 'Detalhes do Casamento',
+      theme: 'Tema do Casamento',
+      rsvpQuestion: 'comparecer ao nosso casamento',
+    };
+  }
+
+  return {
+    title: 'Evento',
+    invitation: 'Convite do Evento',
+    details: 'Detalhes do Evento',
+    theme: 'Tema do Evento',
+    rsvpQuestion: 'comparecer ao nosso evento',
+  };
+}

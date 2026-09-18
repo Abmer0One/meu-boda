@@ -15,6 +15,7 @@ import { Dialog } from '@/components/ui/Dialog';
 import { generateQRCode } from '@/utils/qr';
 import { generateGuestPDF } from '@/utils/pdf';
 import { resolveCanvaConfig } from '@/utils/canvaConfig';
+import { getEventLabels } from '@/utils/eventHelpers';
 import { supabase } from '@/lib/supabase';
 import DefaultTemplate from '@/components/templates/invitations/DefaultTemplate';
 import {
@@ -863,13 +864,7 @@ export default function ConvitesPage() {
                     rsvpStatus="Confirmed"
                     saving={false}
                     downloading={false}
-                    eventLabels={{
-                      title: 'Casamento',
-                      invitation: 'Convite Especial',
-                      details: 'Detalhes do Evento',
-                      theme: 'Tema',
-                      rsvpQuestion: 'Confirma a sua presença?',
-                    }}
+                    eventLabels={getEventLabels(currentEvent)}
                     notes=""
                     setNotes={() => {}}
                     handleRSVPSubmit={() => {}}
@@ -895,13 +890,7 @@ export default function ConvitesPage() {
                       rsvpStatus="Confirmed"
                       saving={false}
                       downloading={false}
-                      eventLabels={{
-                        title: 'Casamento',
-                        invitation: 'Convite Especial',
-                        details: 'Detalhes do Evento',
-                        theme: 'Tema',
-                        rsvpQuestion: 'Confirma a sua presença?',
-                      }}
+                      eventLabels={getEventLabels(currentEvent)}
                       notes=""
                       setNotes={() => {}}
                       handleRSVPSubmit={() => {}}

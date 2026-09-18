@@ -47,43 +47,7 @@ function getGoogleMapsLink(locationName: string | null | undefined, mapsUrlOrCoo
   if (!query) return null;
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
 }
-
-const getEventTypeLabel = (type: string) => {
-  switch (type) {
-    case 'casamento':
-      return {
-        title: 'Casamento',
-        invitation: 'Convite de Casamento',
-        details: 'Detalhes do Casamento',
-        theme: 'Tema do Casamento',
-        rsvpQuestion: 'comparecer ao nosso casamento',
-      };
-    case 'aniversario':
-      return {
-        title: 'Aniversário',
-        invitation: 'Convite de Aniversário',
-        details: 'Detalhes do Aniversário',
-        theme: 'Tema do Aniversário',
-        rsvpQuestion: 'comparecer ao nosso aniversário',
-      };
-    case 'pedido':
-      return {
-        title: 'Pedido de Casamento',
-        invitation: 'Convite de Pedido de Casamento',
-        details: 'Detalhes do Pedido',
-        theme: 'Tema do Pedido',
-        rsvpQuestion: 'comparecer ao nosso pedido de casamento',
-      };
-    default:
-      return {
-        title: 'Evento',
-        invitation: 'Convite do Evento',
-        details: 'Detalhes do Evento',
-        theme: 'Tema do Evento',
-        rsvpQuestion: 'comparecer ao nosso evento',
-      };
-  }
-};
+import { getEventLabels } from '@/utils/eventHelpers';
 
 export default function PublicRSVPPage({ params }: RSVPPageProps) {
   // Await params promise in Next.js 15
@@ -295,7 +259,7 @@ export default function PublicRSVPPage({ params }: RSVPPageProps) {
 
   const isConfirmed = rsvpStatus === 'Confirmed';
   const isDeclined = rsvpStatus === 'Declined';
-  const eventLabels = getEventTypeLabel(event.type);
+  const eventLabels = getEventLabels(event);
 
   const templateProps = {
     guest,

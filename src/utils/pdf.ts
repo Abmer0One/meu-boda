@@ -1,7 +1,7 @@
 import { jsPDF } from 'jspdf';
 import { Guest, Event, EventSchedule, EventInfoBlock } from '@/types';
 import { generateQRCode } from '@/utils/qr';
-import { parseEventInitials } from '@/utils/eventHelpers';
+import { parseEventInitials, getEventLabels } from '@/utils/eventHelpers';
 import {
   resolveCanvaConfig,
   DEFAULT_CANVA_COVER,
@@ -239,6 +239,7 @@ async function renderBasicInvitationCanvas(
 
   const initialsData = parseEventInitials(event.title, event.theme);
   const initials = initialsData.initials || 'MB';
+  const eventLabels = getEventLabels(event);
 
   // Format date in Portuguese
   const eventDate = new Date(event.date);
@@ -277,7 +278,7 @@ async function renderBasicInvitationCanvas(
     ctx.font = 'bold 22px Georgia, "Times New Roman", serif';
     ctx.fillStyle = '#8A7348';
     ctx.textAlign = 'center';
-    ctx.fillText('CONVITE ESPECIAL', canvasWidth / 2, 275);
+    ctx.fillText(eventLabels.invitation.toUpperCase(), canvasWidth / 2, 275);
     ctx.restore();
 
     // 3. Event Title
@@ -438,7 +439,7 @@ async function renderBasicInvitationCanvas(
     ctx.font = 'bold 30px Georgia, "Times New Roman", serif';
     ctx.fillStyle = '#8A7348';
     ctx.textAlign = 'center';
-    ctx.fillText('CONVITE DE CASAMENTO', canvasWidth / 2, 620);
+    ctx.fillText(eventLabels.invitation.toUpperCase(), canvasWidth / 2, 620);
 
     // Event Title
     ctx.font = 'bold 88px Georgia, "Times New Roman", serif';

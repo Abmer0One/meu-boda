@@ -266,7 +266,7 @@ export default function DefaultTemplate({
               <div className="w-14 h-14 rounded-full border-2 border-[#D4AF37] mx-auto flex items-center justify-center text-[#B89742] text-xl font-bold bg-[#FAF8F5]">
                 {initials}
               </div>
-              <p className="text-[11px] uppercase tracking-[0.25em] text-[#8A7348] font-semibold">Convite Especial</p>
+              <p className="text-[11px] uppercase tracking-[0.25em] text-[#8A7348] font-semibold">{eventLabels?.invitation || 'Convite Especial'}</p>
               <h1 className="text-3xl font-bold tracking-tight text-[#1A1A1A]">{event.title}</h1>
               <p className="text-xs italic text-[#6B5E51]">Convidam cordialmente para a celebração deste momento inesquecível</p>
             </div>
@@ -334,7 +334,7 @@ export default function DefaultTemplate({
               <div className="w-24 h-24 rounded-full border-4 border-[#D4AF37] mx-auto flex items-center justify-center text-[#B89742] text-3xl font-bold bg-[#FAF8F5]">
                 {initials}
               </div>
-              <p className="text-xs uppercase tracking-[0.3em] text-[#8A7348] font-semibold">Convite de Casamento</p>
+              <p className="text-xs uppercase tracking-[0.3em] text-[#8A7348] font-semibold">{eventLabels?.invitation || 'Convite Especial'}</p>
               <h1 className="text-5xl font-bold tracking-tight text-[#1A1A1A]">{event.title}</h1>
               <p className="text-lg text-[#2D241E] font-medium">{dateDetails.full}</p>
             </div>
