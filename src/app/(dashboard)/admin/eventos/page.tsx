@@ -15,8 +15,18 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Dialog } from '@/components/ui/Dialog';
-import { Heart, MapPin, Calendar, Palette, Loader2, Plus, Trash2, Clock, Users, Gift, Link2, Shirt, Info, Pencil, Sparkles, Upload, Sliders, CheckCircle2, RotateCcw, QrCode, FileText, AlertCircle, Move, Download } from 'lucide-react';
-import { resolveCanvaConfig, persistCanvaConfig, CANVA_CONFIG_BLOCK_TITLE, isMarinelaAbiudEvent, isCleanCanvaUrl } from '@/utils/canvaConfig';
+import { Heart, MapPin, Calendar, Palette, Loader2, Plus, Trash2, Clock, Users, Gift, Link2, Shirt, Info, Pencil, Sparkles, Upload, Sliders, CheckCircle2, RotateCcw, QrCode, FileText, AlertCircle, Move, Download, CreditCard } from 'lucide-react';
+import {
+  resolveCanvaConfig,
+  persistCanvaConfig,
+  CANVA_CONFIG_BLOCK_TITLE,
+  isMarinelaAbiudEvent,
+  isCleanCanvaUrl,
+  DEFAULT_LOC_COORDS,
+  DEFAULT_ACCESS_COORDS,
+  DEFAULT_PORTRAIT_LOC_COORDS,
+  DEFAULT_PORTRAIT_ACCESS_COORDS,
+} from '@/utils/canvaConfig';
 import { parseEventInitials } from '@/utils/eventHelpers';
 import { generateGuestPDF } from '@/utils/pdf';
 import { generateQRCode } from '@/utils/qr';
@@ -34,6 +44,7 @@ export default function EventosPage() {
   // Canva Template States
   const [templateSource, setTemplateSource] = useState<'basic' | 'custom'>('basic');
   const [pdfMode, setPdfMode] = useState<'double_page' | 'single_page'>('double_page');
+  const [pdfOrientation, setPdfOrientation] = useState<'portrait' | 'landscape'>('landscape');
   const [showLocationsQr, setShowLocationsQr] = useState(true);
   const [showAccessQr, setShowAccessQr] = useState(true);
   const [canvaCoverUrl, setCanvaCoverUrl] = useState<string>('');
@@ -166,18 +177,20 @@ export default function EventosPage() {
       setCanvaCoverUrl(resolved.canva_cover_url || '');
       setCanvaInfoUrl(resolved.canva_info_url || '');
       setPdfMode(resolved.pdf_mode || 'double_page');
+      setPdfOrientation(resolved.pdf_orientation || 'landscape');
       setEditorPreviewPage(resolved.pdf_mode === 'single_page' ? 'page_1' : 'page_2');
       setShowLocationsQr(resolved.show_locations_qr !== false);
       setShowAccessQr(resolved.show_access_qr !== false);
+      const isPort = resolved.pdf_orientation === 'portrait';
       if (resolved.qr_locations_coords) {
         setQrLocCoords(resolved.qr_locations_coords);
       } else {
-        setQrLocCoords({ left: 8.76, top: 69.56, width: 11.85, height: 16.76 });
+        setQrLocCoords(isPort ? DEFAULT_PORTRAIT_LOC_COORDS : DEFAULT_LOC_COORDS);
       }
       if (resolved.qr_access_coords) {
         setQrAccessCoords(resolved.qr_access_coords);
       } else {
-        setQrAccessCoords({ left: 80.99, top: 54.14, width: 13.10, height: 18.52 });
+        setQrAccessCoords(isPort ? DEFAULT_PORTRAIT_ACCESS_COORDS : DEFAULT_ACCESS_COORDS);
       }
     }
   }, [currentEvent, reset]);
@@ -310,6 +323,34 @@ export default function EventosPage() {
 
     setIsUploadingCanvaCover(true);
     try {
+      // Auto-detect image aspect ratio/orientation
+      let detectedOrientation = pdfOrientation;
+      try {
+        const imgObj = new window.Image();
+        const objUrl = URL.createObjectURL(file);
+        await new Promise<void>((resolve) => {
+          imgObj.onload = () => {
+            detectedOrientation = imgObj.naturalHeight > imgObj.naturalWidth ? 'portrait' : 'landscape';
+            URL.revokeObjectURL(objUrl);
+            resolve();
+          };
+          imgObj.onerror = () => {
+            URL.revokeObjectURL(objUrl);
+            resolve();
+          };
+          imgObj.src = objUrl;
+        });
+      } catch (e) {}
+
+      setPdfOrientation(detectedOrientation);
+      const isPort = detectedOrientation === 'portrait';
+      const loc = isPort && qrLocCoords.width < 16 ? DEFAULT_PORTRAIT_LOC_COORDS : qrLocCoords;
+      const acc = isPort && qrAccessCoords.width < 16 ? DEFAULT_PORTRAIT_ACCESS_COORDS : qrAccessCoords;
+      if (isPort && qrLocCoords.width < 16) {
+        setQrLocCoords(DEFAULT_PORTRAIT_LOC_COORDS);
+        setQrAccessCoords(DEFAULT_PORTRAIT_ACCESS_COORDS);
+      }
+
       const fileExt = file.name.split('.').pop();
       const fileName = `${currentEvent.id}/canva_capa_${Date.now()}.${fileExt}`;
 
@@ -335,9 +376,10 @@ export default function EventosPage() {
         template_source: 'custom' as const,
         canva_cover_url: publicUrl,
         canva_info_url: canvaInfoUrl || null,
-        qr_locations_coords: qrLocCoords,
-        qr_access_coords: qrAccessCoords,
+        qr_locations_coords: loc,
+        qr_access_coords: acc,
         pdf_mode: pdfMode,
+        pdf_orientation: detectedOrientation,
         show_locations_qr: showLocationsQr,
         show_access_qr: showAccessQr,
       };
@@ -348,7 +390,7 @@ export default function EventosPage() {
         template_config: updatedConfig,
       });
 
-      setCanvaSuccessMessage('Capa do Canva carregada e modelo personalizado ativado!');
+      setCanvaSuccessMessage(`Capa do Canva carregada! Orientação definida como ${detectedOrientation === 'portrait' ? 'Vertical (A4)' : 'Horizontal (A4)'}.`);
       setTimeout(() => setCanvaSuccessMessage(null), 4000);
     } catch (err: any) {
       alert('Erro ao carregar a imagem da capa do Canva: ' + err.message);
@@ -364,6 +406,34 @@ export default function EventosPage() {
 
     setIsUploadingCanvaInfo(true);
     try {
+      // Auto-detect image aspect ratio/orientation
+      let detectedOrientation = pdfOrientation;
+      try {
+        const imgObj = new window.Image();
+        const objUrl = URL.createObjectURL(file);
+        await new Promise<void>((resolve) => {
+          imgObj.onload = () => {
+            detectedOrientation = imgObj.naturalHeight > imgObj.naturalWidth ? 'portrait' : 'landscape';
+            URL.revokeObjectURL(objUrl);
+            resolve();
+          };
+          imgObj.onerror = () => {
+            URL.revokeObjectURL(objUrl);
+            resolve();
+          };
+          imgObj.src = objUrl;
+        });
+      } catch (e) {}
+
+      setPdfOrientation(detectedOrientation);
+      const isPort = detectedOrientation === 'portrait';
+      const loc = isPort && qrLocCoords.width < 16 ? DEFAULT_PORTRAIT_LOC_COORDS : qrLocCoords;
+      const acc = isPort && qrAccessCoords.width < 16 ? DEFAULT_PORTRAIT_ACCESS_COORDS : qrAccessCoords;
+      if (isPort && qrLocCoords.width < 16) {
+        setQrLocCoords(DEFAULT_PORTRAIT_LOC_COORDS);
+        setQrAccessCoords(DEFAULT_PORTRAIT_ACCESS_COORDS);
+      }
+
       const fileExt = file.name.split('.').pop();
       const fileName = `${currentEvent.id}/canva_verso_${Date.now()}.${fileExt}`;
 
@@ -389,9 +459,10 @@ export default function EventosPage() {
         template_source: 'custom' as const,
         canva_cover_url: canvaCoverUrl || null,
         canva_info_url: publicUrl,
-        qr_locations_coords: qrLocCoords,
-        qr_access_coords: qrAccessCoords,
+        qr_locations_coords: loc,
+        qr_access_coords: acc,
         pdf_mode: pdfMode,
+        pdf_orientation: detectedOrientation,
         show_locations_qr: showLocationsQr,
         show_access_qr: showAccessQr,
       };
@@ -402,7 +473,7 @@ export default function EventosPage() {
         template_config: updatedConfig,
       });
 
-      setCanvaSuccessMessage('Verso do Canva carregado e modelo personalizado ativado!');
+      setCanvaSuccessMessage(`Verso do Canva carregado! Orientação definida como ${detectedOrientation === 'portrait' ? 'Vertical (A4)' : 'Horizontal (A4)'}.`);
       setTimeout(() => setCanvaSuccessMessage(null), 4000);
     } catch (err: any) {
       alert('Erro ao carregar a imagem do verso do Canva: ' + err.message);
@@ -426,6 +497,7 @@ export default function EventosPage() {
         qr_locations_coords: qrLocCoords,
         qr_access_coords: qrAccessCoords,
         pdf_mode: pdfMode,
+        pdf_orientation: pdfOrientation,
         show_locations_qr: showLocationsQr,
         show_access_qr: showAccessQr,
       };
@@ -456,6 +528,7 @@ export default function EventosPage() {
         qr_locations_coords: qrLocCoords,
         qr_access_coords: qrAccessCoords,
         pdf_mode: pdfMode,
+        pdf_orientation: pdfOrientation,
         show_locations_qr: showLocationsQr,
         show_access_qr: showAccessQr,
       };
@@ -468,6 +541,34 @@ export default function EventosPage() {
       setTimeout(() => setCanvaSuccessMessage(null), 4000);
     } catch (err: any) {
       alert('Erro ao remover verso do Canva: ' + err.message);
+    }
+  };
+
+  // Change PDF / Template Orientation (Portrait vs Landscape)
+  const handleOrientationChange = (newOrientation: 'portrait' | 'landscape') => {
+    setPdfOrientation(newOrientation);
+    if (newOrientation === 'portrait') {
+      setQrLocCoords(DEFAULT_PORTRAIT_LOC_COORDS);
+      setQrAccessCoords(DEFAULT_PORTRAIT_ACCESS_COORDS);
+    } else {
+      if (pdfMode === 'single_page') {
+        setQrLocCoords({ left: 10, top: 76, width: 14, height: 18 });
+        setQrAccessCoords({ left: 76, top: 76, width: 14, height: 18 });
+      } else {
+        setQrLocCoords({ left: 8.76, top: 69.56, width: 11.85, height: 16.76 });
+        setQrAccessCoords({ left: 80.99, top: 54.14, width: 13.10, height: 18.52 });
+      }
+    }
+  };
+
+  // Image load helper to auto-detect orientation if needed
+  const handleImageLoaded = (img: HTMLImageElement) => {
+    if (img.naturalWidth && img.naturalHeight) {
+      const isPortrait = img.naturalHeight > img.naturalWidth;
+      const detectedOrientation: 'portrait' | 'landscape' = isPortrait ? 'portrait' : 'landscape';
+      if (detectedOrientation !== pdfOrientation) {
+        setPdfOrientation(detectedOrientation);
+      }
     }
   };
 
@@ -485,6 +586,7 @@ export default function EventosPage() {
         qr_locations_coords: qrLocCoords,
         qr_access_coords: qrAccessCoords,
         pdf_mode: pdfMode,
+        pdf_orientation: pdfOrientation,
         show_locations_qr: showLocationsQr,
         show_access_qr: showAccessQr,
       };
@@ -504,12 +606,16 @@ export default function EventosPage() {
 
   // Reset QR Coordinates to default Canva dimensions
   const handleResetCanvaDefaults = () => {
-    if (pdfMode === 'single_page') {
-      if (!confirm('Deseja repor as posições padrão dos códigos QR para Página Única?')) return;
+    if (pdfOrientation === 'portrait') {
+      if (!confirm('Deseja repor as posições padrão dos códigos QR para A4 Vertical (Retrato)?')) return;
+      setQrLocCoords(DEFAULT_PORTRAIT_LOC_COORDS);
+      setQrAccessCoords(DEFAULT_PORTRAIT_ACCESS_COORDS);
+    } else if (pdfMode === 'single_page') {
+      if (!confirm('Deseja repor as posições padrão dos códigos QR para A4 Horizontal - Página Única?')) return;
       setQrLocCoords({ left: 10, top: 76, width: 14, height: 18 });
       setQrAccessCoords({ left: 76, top: 76, width: 14, height: 18 });
     } else {
-      if (!confirm('Deseja repor as posições padrão dos códigos QR para Frente e Verso (Tríptico)?')) return;
+      if (!confirm('Deseja repor as posições padrão dos códigos QR para A4 Horizontal - Frente e Verso (Tríptico)?')) return;
       setQrLocCoords({ left: 8.76, top: 69.56, width: 11.85, height: 16.76 });
       setQrAccessCoords({ left: 80.99, top: 54.14, width: 13.10, height: 18.52 });
     }
@@ -578,6 +684,16 @@ export default function EventosPage() {
 
   // Apply Quick Positioning Presets
   const handleApplyPreset = (preset: 'corners' | 'triptych' | 'single' | 'bottom_center') => {
+    if (pdfOrientation === 'portrait') {
+      if (preset === 'corners' || preset === 'single' || preset === 'triptych') {
+        setQrLocCoords(DEFAULT_PORTRAIT_LOC_COORDS);
+        setQrAccessCoords(DEFAULT_PORTRAIT_ACCESS_COORDS);
+      } else if (preset === 'bottom_center') {
+        setQrLocCoords({ left: 24, top: 80, width: 22, height: 15.5 });
+        setQrAccessCoords({ left: 54, top: 80, width: 22, height: 15.5 });
+      }
+      return;
+    }
     if (preset === 'corners') {
       setQrLocCoords((prev) => ({ ...prev, left: 6, top: 74 }));
       setQrAccessCoords((prev) => ({ ...prev, left: 80, top: 74 }));
@@ -595,6 +711,19 @@ export default function EventosPage() {
 
   // Apply QR Size Presets
   const handleApplyQrSize = (size: 'sm' | 'md' | 'lg') => {
+    if (pdfOrientation === 'portrait') {
+      if (size === 'sm') {
+        setQrLocCoords((prev) => ({ ...prev, width: 18, height: 12.7 }));
+        setQrAccessCoords((prev) => ({ ...prev, width: 18, height: 12.7 }));
+      } else if (size === 'md') {
+        setQrLocCoords((prev) => ({ ...prev, width: 22, height: 15.5 }));
+        setQrAccessCoords((prev) => ({ ...prev, width: 22, height: 15.5 }));
+      } else {
+        setQrLocCoords((prev) => ({ ...prev, width: 26, height: 18.4 }));
+        setQrAccessCoords((prev) => ({ ...prev, width: 26, height: 18.4 }));
+      }
+      return;
+    }
     if (size === 'sm') {
       setQrLocCoords((prev) => ({ ...prev, width: 11, height: 14 }));
       setQrAccessCoords((prev) => ({ ...prev, width: 11, height: 14 }));
@@ -649,6 +778,7 @@ export default function EventosPage() {
         qr_locations_coords: qrLocCoords,
         qr_access_coords: qrAccessCoords,
         pdf_mode: pdfMode,
+        pdf_orientation: pdfOrientation,
         show_locations_qr: showLocationsQr,
         show_access_qr: showAccessQr,
       };
@@ -1318,6 +1448,44 @@ export default function EventosPage() {
                 )}
               </div>
 
+              {/* Seletor de Orientação do Papel (Tamanho A4) */}
+              <div className="bg-secondary/15 p-4 rounded-2xl border border-border-custom space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <label className="text-xs font-bold text-foreground flex items-center gap-1.5 uppercase tracking-wider">
+                      Orientação do Papel (Tamanho A4)
+                    </label>
+                    <p className="text-[11px] text-foreground/60">
+                      O ficheiro descarregado terá sempre o tamanho normalizado <strong>A4 (ISO 216)</strong>. Escolha a orientação que corresponde à sua arte:
+                    </p>
+                  </div>
+                  <div className="inline-flex p-1 bg-secondary/30 rounded-xl border border-border-custom shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleOrientationChange('portrait')}
+                      className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                        pdfOrientation === 'portrait'
+                          ? 'bg-primary text-white shadow-sm'
+                          : 'text-foreground/70 hover:text-foreground'
+                      }`}
+                    >
+                      📱 Vertical / Retrato (210 × 297 mm)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleOrientationChange('landscape')}
+                      className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                        pdfOrientation === 'landscape'
+                          ? 'bg-primary text-white shadow-sm'
+                          : 'text-foreground/70 hover:text-foreground'
+                      }`}
+                    >
+                      💻 Horizontal / Paisagem (297 × 210 mm)
+                    </button>
+                  </div>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* 1. Frente do Convite (Capa ou Página Única) */}
                 <div className="space-y-3 bg-secondary/5 p-4 rounded-2xl border border-border-custom flex flex-col justify-between">
@@ -1337,20 +1505,20 @@ export default function EventosPage() {
                     </p>
 
                     {/* Preview da Capa / Página Única */}
-                    <div className="relative aspect-[16/11.3] w-full rounded-xl overflow-hidden border border-border-custom bg-black/5 shadow-inner flex items-center justify-center group">
+                    <div className={`relative ${pdfOrientation === 'portrait' ? 'aspect-[210/297] max-h-60 mx-auto' : 'aspect-[16/11.3] w-full'} rounded-xl overflow-hidden border border-border-custom bg-black/5 shadow-inner flex items-center justify-center group`}>
                       {templateSource === 'custom' && canvaCoverUrl ? (
                         /* eslint-disable-next-line @next/next/no-img-element */
                         <img
                           src={canvaCoverUrl}
                           alt="Pré-visualização da Capa Canva"
-                          className="w-full h-full object-cover"
+                          className="w-full h-full object-contain"
                         />
                       ) : templateSource === 'custom' && isMarinela ? (
                         /* eslint-disable-next-line @next/next/no-img-element */
                         <img
                           src="/templates/canva/page_1.png"
                           alt="Pré-visualização da Capa Oficial Marinela & Abiúd"
-                          className="w-full h-full object-cover"
+                          className="w-full h-full object-contain"
                         />
                       ) : templateSource === 'custom' ? (
                         /* Placeholder para Template Personalizado sem upload */
@@ -1512,20 +1680,20 @@ export default function EventosPage() {
                       </p>
 
                       {/* Preview Interativo do Verso com sobreposição dos Códigos QR */}
-                      <div className="relative aspect-[16/11.3] w-full rounded-xl overflow-hidden border border-border-custom bg-black/5 shadow-inner group">
+                      <div className={`relative ${pdfOrientation === 'portrait' ? 'aspect-[210/297] max-h-60 mx-auto' : 'aspect-[16/11.3] w-full'} rounded-xl overflow-hidden border border-border-custom bg-black/5 shadow-inner flex items-center justify-center group`}>
                         {templateSource === 'custom' && canvaInfoUrl ? (
                           /* eslint-disable-next-line @next/next/no-img-element */
                           <img
                             src={canvaInfoUrl}
                             alt="Pré-visualização do Verso Canva"
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-contain"
                           />
                         ) : templateSource === 'custom' && isMarinela ? (
                           /* eslint-disable-next-line @next/next/no-img-element */
                           <img
                             src="/templates/canva/page_2_clean.png"
                             alt="Pré-visualização do Verso Oficial Marinela & Abiúd"
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-contain"
                           />
                         ) : templateSource === 'custom' ? (
                           /* Placeholder para Verso Personalizado sem upload */
@@ -1725,22 +1893,37 @@ export default function EventosPage() {
                       <strong>Editor Interativo:</strong> Pode arrastar os códigos verde (Mapa) e índigo (Acesso) livremente com o rato ou dedo.
                     </span>
                   </div>
-                  <span className="text-[11px] opacity-80 shrink-0 hidden sm:inline">Formato A4 (297 × 210 mm)</span>
+                  <span className="text-[11px] opacity-80 shrink-0 hidden sm:inline">
+                    {pdfOrientation === 'portrait' ? 'Formato A4 Vertical (210 × 297 mm)' : 'Formato A4 Paisagem (297 × 210 mm)'}
+                  </span>
                 </div>
 
-                {/* PALCO INTERATIVO DE ARRASTAR E SOLTAR (A4 Landscape 297:210) */}
+                {/* PALCO INTERATIVO DE ARRASTAR E SOLTAR (A4 Dinâmico: Retrato 210:297 ou Paisagem 297:210) */}
                 <div
                   ref={editorStageRef}
-                  className="relative w-full aspect-[297/210] max-w-4xl mx-auto rounded-2xl overflow-hidden border-2 border-border-custom bg-black/5 shadow-inner select-none touch-none"
+                  className={`relative w-full ${
+                    pdfOrientation === 'portrait'
+                      ? 'aspect-[210/297] max-w-md'
+                      : 'aspect-[297/210] max-w-4xl'
+                  } mx-auto rounded-2xl overflow-hidden border-2 border-border-custom bg-black/5 shadow-inner select-none touch-none`}
                 >
                   {/* Conteúdo de Fundo da Página Selecionada */}
                   {editorPreviewPage === 'page_1' ? (
                     templateSource === 'custom' && canvaCoverUrl ? (
                       /* eslint-disable-next-line @next/next/no-img-element */
-                      <img src={canvaCoverUrl} alt="Capa" className="w-full h-full object-cover pointer-events-none select-none" />
+                      <img
+                        src={canvaCoverUrl}
+                        alt="Capa"
+                        onLoad={(e) => handleImageLoaded(e.currentTarget)}
+                        className="w-full h-full object-fill pointer-events-none select-none"
+                      />
                     ) : templateSource === 'custom' && isMarinela ? (
                       /* eslint-disable-next-line @next/next/no-img-element */
-                      <img src="/templates/canva/page_1.png" alt="Capa Oficial" className="w-full h-full object-cover pointer-events-none select-none" />
+                      <img
+                        src="/templates/canva/page_1.png"
+                        alt="Capa Oficial"
+                        className="w-full h-full object-fill pointer-events-none select-none"
+                      />
                     ) : (
                       /* Template Básico Dinâmico Página 1 */
                       <div className="w-full h-full bg-[#FAF8F5] p-6 flex flex-col justify-between items-center text-center font-serif text-[#1c1c1e] border-4 border-[#D4AF37] relative pointer-events-none select-none">
@@ -1766,31 +1949,64 @@ export default function EventosPage() {
                   ) : (
                     templateSource === 'custom' && canvaInfoUrl ? (
                       /* eslint-disable-next-line @next/next/no-img-element */
-                      <img src={canvaInfoUrl} alt="Verso" className="w-full h-full object-cover pointer-events-none select-none" />
+                      <img
+                        src={canvaInfoUrl}
+                        alt="Verso"
+                        onLoad={(e) => handleImageLoaded(e.currentTarget)}
+                        className="w-full h-full object-fill pointer-events-none select-none"
+                      />
                     ) : templateSource === 'custom' && isMarinela ? (
                       /* eslint-disable-next-line @next/next/no-img-element */
-                      <img src="/templates/canva/page_2_clean.png" alt="Verso Oficial" className="w-full h-full object-cover pointer-events-none select-none" />
+                      <img
+                        src="/templates/canva/page_2_clean.png"
+                        alt="Verso Oficial"
+                        className="w-full h-full object-fill pointer-events-none select-none"
+                      />
                     ) : (
-                      /* Template Básico Dinâmico Página 2 (Tríptico) */
-                      <div className="w-full h-full bg-[#FAF8F5] p-3 flex font-serif text-[#1c1c1e] border-4 border-[#D4AF37] relative pointer-events-none select-none">
-                        <div className="absolute inset-1 border border-[#E8D49E]" />
-                        <div className="flex-1 border-r border-[#E8D49E] p-2 flex flex-col justify-between items-center text-center">
-                          <p className="text-xs font-bold text-[#B89742] uppercase">Localizações</p>
-                          <p className="text-[10px] text-zinc-600 line-clamp-1">{currentEvent?.ceremony_location || 'Local da Cerimónia'}</p>
-                          <p className="text-[10px] text-zinc-600 line-clamp-1">{currentEvent?.party_location || 'Local da Festa'}</p>
-                          <div className="w-16 h-16 bg-white border border-[#E8D49E] rounded flex items-center justify-center text-[10px] text-zinc-400">QR Mapa</div>
+                      /* Template Básico Dinâmico Página 2 */
+                      pdfOrientation === 'portrait' ? (
+                        <div className="w-full h-full bg-[#FAF8F5] p-5 flex flex-col justify-between font-serif text-[#1c1c1e] border-4 border-[#D4AF37] relative pointer-events-none select-none">
+                          <div className="absolute inset-1.5 border border-[#E8D49E]" />
+                          <div className="text-center space-y-1 relative z-10 pt-2">
+                            <p className="text-[10px] uppercase tracking-widest text-[#8A7348] font-bold">Informações & Acesso</p>
+                            <h3 className="text-base font-bold text-[#1A1A1A] line-clamp-1">{currentEvent?.title || 'Celebração'}</h3>
+                          </div>
+                          <div className="space-y-3 relative z-10 px-2 my-auto">
+                            <div className="bg-white/80 border border-[#E8D49E] rounded-lg p-2.5 text-center">
+                              <p className="text-[9px] font-bold text-[#B89742] uppercase">Cerimónia & Recepção</p>
+                              <p className="text-[10px] text-zinc-700 font-medium line-clamp-1">{currentEvent?.ceremony_location || 'Local da Cerimónia'}</p>
+                              <p className="text-[10px] text-zinc-700 font-medium line-clamp-1">{currentEvent?.party_location || 'Local da Festa'}</p>
+                            </div>
+                            <div className="text-center">
+                              <p className="text-[9px] text-zinc-600 line-clamp-2 italic">{currentEvent?.description || 'Esperamos por si para celebrar este momento especial.'}</p>
+                            </div>
+                          </div>
+                          <div className="relative z-10 text-center pb-2">
+                            <p className="text-[9px] text-[#8A7348] italic font-medium">Apresente este convite na portaria</p>
+                          </div>
                         </div>
-                        <div className="flex-1 border-r border-[#E8D49E] p-2 flex flex-col justify-between items-center text-center">
-                          <p className="text-xs font-bold text-[#B89742] uppercase">Celebração</p>
-                          <p className="text-[10px] text-zinc-600 line-clamp-3">{currentEvent?.description || 'Esperamos por si para celebrar este momento especial.'}</p>
-                          <p className="text-[10px] text-[#8A7348] italic">Meu Boda</p>
+                      ) : (
+                        /* Template Básico Dinâmico Página 2 (Tríptico Paisagem) */
+                        <div className="w-full h-full bg-[#FAF8F5] p-3 flex font-serif text-[#1c1c1e] border-4 border-[#D4AF37] relative pointer-events-none select-none">
+                          <div className="absolute inset-1 border border-[#E8D49E]" />
+                          <div className="flex-1 border-r border-[#E8D49E] p-2 flex flex-col justify-between items-center text-center">
+                            <p className="text-xs font-bold text-[#B89742] uppercase">Localizações</p>
+                            <p className="text-[10px] text-zinc-600 line-clamp-1">{currentEvent?.ceremony_location || 'Local da Cerimónia'}</p>
+                            <p className="text-[10px] text-zinc-600 line-clamp-1">{currentEvent?.party_location || 'Local da Festa'}</p>
+                            <div className="w-16 h-16 bg-white border border-[#E8D49E] rounded flex items-center justify-center text-[10px] text-zinc-400">QR Mapa</div>
+                          </div>
+                          <div className="flex-1 border-r border-[#E8D49E] p-2 flex flex-col justify-between items-center text-center">
+                            <p className="text-xs font-bold text-[#B89742] uppercase">Celebração</p>
+                            <p className="text-[10px] text-zinc-600 line-clamp-3">{currentEvent?.description || 'Esperamos por si para celebrar este momento especial.'}</p>
+                            <p className="text-[10px] text-[#8A7348] italic">Meu Boda</p>
+                          </div>
+                          <div className="flex-1 p-2 flex flex-col justify-between items-center text-center">
+                            <p className="text-xs font-bold text-[#B89742] uppercase">Passe Entrada</p>
+                            <p className="text-[10px] font-bold text-zinc-800">Convidado</p>
+                            <div className="w-16 h-16 bg-white border border-[#E8D49E] rounded flex items-center justify-center text-[10px] text-zinc-400">QR Acesso</div>
+                          </div>
                         </div>
-                        <div className="flex-1 p-2 flex flex-col justify-between items-center text-center">
-                          <p className="text-xs font-bold text-[#B89742] uppercase">Passe Entrada</p>
-                          <p className="text-[10px] font-bold text-zinc-800">Convidado</p>
-                          <div className="w-16 h-16 bg-white border border-[#E8D49E] rounded flex items-center justify-center text-[10px] text-zinc-400">QR Acesso</div>
-                        </div>
-                      </div>
+                      )
                     )
                   )}
 
@@ -1863,10 +2079,10 @@ export default function EventosPage() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleApplyPreset(pdfMode === 'single_page' ? 'single' : 'triptych')}
+                      onClick={() => handleApplyPreset(pdfOrientation === 'portrait' ? 'single' : (pdfMode === 'single_page' ? 'single' : 'triptych'))}
                       className="px-2.5 py-1 text-xs bg-secondary/30 hover:bg-secondary/60 rounded-lg text-foreground/80 transition-colors cursor-pointer"
                     >
-                      {pdfMode === 'single_page' ? 'Padrão Página Única' : 'Padrão Tríptico'}
+                      {pdfOrientation === 'portrait' ? 'Padrão Retrato (Cantos)' : (pdfMode === 'single_page' ? 'Padrão Página Única' : 'Padrão Tríptico')}
                     </button>
                     <button
                       type="button"

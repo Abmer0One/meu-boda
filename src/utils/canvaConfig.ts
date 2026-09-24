@@ -13,6 +13,7 @@ export interface CanvaTemplateConfig {
   canva_cover_url?: string | null;
   canva_info_url?: string | null;
   pdf_mode?: 'double_page' | 'single_page';
+  pdf_orientation?: 'portrait' | 'landscape';
   show_locations_qr?: boolean;
   show_access_qr?: boolean;
   qr_locations_coords?: QrCoordinates;
@@ -33,6 +34,20 @@ export const DEFAULT_ACCESS_COORDS: QrCoordinates = {
   top: 54.14,
   width: 13.10,
   height: 18.52,
+};
+
+export const DEFAULT_PORTRAIT_LOC_COORDS: QrCoordinates = {
+  left: 10,
+  top: 79,
+  width: 22,
+  height: 15.5,
+};
+
+export const DEFAULT_PORTRAIT_ACCESS_COORDS: QrCoordinates = {
+  left: 68,
+  top: 79,
+  width: 22,
+  height: 15.5,
 };
 
 export const DEFAULT_CANVA_COVER = '/templates/canva/page_1.png';
@@ -143,6 +158,7 @@ export function resolveCanvaConfig(
     canva_cover_url: null,
     canva_info_url: null,
     pdf_mode: 'double_page',
+    pdf_orientation: 'landscape',
     show_locations_qr: true,
     show_access_qr: true,
     qr_locations_coords: { ...DEFAULT_LOC_COORDS },
@@ -160,6 +176,7 @@ export function resolveCanvaConfig(
       resolved.canva_info_url = templateConfig.canva_info_url;
     }
     if (templateConfig.pdf_mode) resolved.pdf_mode = templateConfig.pdf_mode;
+    if (templateConfig.pdf_orientation) resolved.pdf_orientation = templateConfig.pdf_orientation;
     if (templateConfig.show_locations_qr !== undefined) resolved.show_locations_qr = templateConfig.show_locations_qr;
     if (templateConfig.show_access_qr !== undefined) resolved.show_access_qr = templateConfig.show_access_qr;
     if (templateConfig.qr_locations_coords) resolved.qr_locations_coords = { ...templateConfig.qr_locations_coords };
@@ -180,6 +197,7 @@ export function resolveCanvaConfig(
           resolved.canva_info_url = parsed.canva_info_url;
         }
         if (parsed.pdf_mode) resolved.pdf_mode = parsed.pdf_mode;
+        if (parsed.pdf_orientation) resolved.pdf_orientation = parsed.pdf_orientation;
         if (parsed.show_locations_qr !== undefined) resolved.show_locations_qr = parsed.show_locations_qr;
         if (parsed.show_access_qr !== undefined) resolved.show_access_qr = parsed.show_access_qr;
         if (parsed.qr_locations_coords) resolved.qr_locations_coords = { ...parsed.qr_locations_coords };
@@ -204,6 +222,7 @@ export function resolveCanvaConfig(
           resolved.canva_info_url = parsed.canva_info_url;
         }
         if (parsed.pdf_mode) resolved.pdf_mode = parsed.pdf_mode;
+        if (parsed.pdf_orientation) resolved.pdf_orientation = parsed.pdf_orientation;
         if (parsed.show_locations_qr !== undefined) resolved.show_locations_qr = parsed.show_locations_qr;
         if (parsed.show_access_qr !== undefined) resolved.show_access_qr = parsed.show_access_qr;
         if (parsed.qr_locations_coords) resolved.qr_locations_coords = { ...parsed.qr_locations_coords };

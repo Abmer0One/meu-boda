@@ -8,6 +8,8 @@ import {
   DEFAULT_CANVA_INFO,
   DEFAULT_LOC_COORDS,
   DEFAULT_ACCESS_COORDS,
+  DEFAULT_PORTRAIT_LOC_COORDS,
+  DEFAULT_PORTRAIT_ACCESS_COORDS,
 } from '@/utils/canvaConfig';
 
 /**
@@ -184,10 +186,12 @@ async function renderBasicInvitationCanvas(
   qrAccessDataUrl: string,
   qrLocationsDataUrl: string,
   pageType: 'single' | 'cover' | 'info',
-  schedules: EventSchedule[] = []
+  schedules: EventSchedule[] = [],
+  orientation: 'portrait' | 'landscape' = 'landscape'
 ): Promise<string> {
-  const canvasWidth = 2240;
-  const canvasHeight = 1584;
+  const isPortrait = orientation === 'portrait';
+  const canvasWidth = isPortrait ? 1584 : 2240;
+  const canvasHeight = isPortrait ? 2240 : 1584;
   const canvas = document.createElement('canvas');
   canvas.width = canvasWidth;
   canvas.height = canvasHeight;
@@ -255,14 +259,165 @@ async function renderBasicInvitationCanvas(
   // MODE 1: SINGLE PAGE INVITATION (ALL IN ONE)
   // ==========================================
   if (pageType === 'single') {
-    // 1. Monogram Seal at top center
-    const monoY = 175;
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(canvasWidth / 2, monoY, 62, 0, Math.PI * 2);
-    ctx.fillStyle = '#FAF8F5';
-    ctx.fill();
-    ctx.strokeStyle = '#D4AF37';
+    if (isPortrait) {
+      // 1. Monogram Seal at top center
+      const monoY = 220;
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(canvasWidth / 2, monoY, 65, 0, Math.PI * 2);
+      ctx.fillStyle = '#FAF8F5';
+      ctx.fill();
+      ctx.strokeStyle = '#D4AF37';
+      ctx.lineWidth = 3.5;
+      ctx.stroke();
+
+      ctx.font = 'bold 54px Georgia, "Times New Roman", serif';
+      ctx.fillStyle = '#B89742';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(initials, canvasWidth / 2, monoY + 2);
+      ctx.restore();
+
+      // 2. Subtitle Tagline
+      ctx.save();
+      ctx.font = 'bold 24px Georgia, "Times New Roman", serif';
+      ctx.fillStyle = '#8A7348';
+      ctx.textAlign = 'center';
+      ctx.fillText(eventLabels.invitation.toUpperCase(), canvasWidth / 2, 335);
+      ctx.restore();
+
+      // 3. Event Title
+      ctx.save();
+      ctx.font = 'bold 64px Georgia, "Times New Roman", serif';
+      ctx.fillStyle = '#1A1A1A';
+      ctx.textAlign = 'center';
+      ctx.fillText(event.title, canvasWidth / 2, 420);
+      ctx.restore();
+
+      // 4. Invitation Sentence
+      ctx.save();
+      ctx.font = 'italic 24px Georgia, "Times New Roman", serif';
+      ctx.fillStyle = '#6B5E51';
+      ctx.textAlign = 'center';
+      ctx.fillText('Convidam cordialmente para a celebração deste momento inesquecível', canvasWidth / 2, 480);
+      ctx.restore();
+
+      // 5. Guest Box (Personalized)
+      const guestBoxY = 540;
+      drawRoundedRect(ctx, 160, guestBoxY, canvasWidth - 320, 110, 16, '#F5EFE6', '#D4AF37', 1.5);
+
+      ctx.save();
+      ctx.font = 'bold 34px Georgia, "Times New Roman", serif';
+      ctx.fillStyle = '#1C1C1E';
+      ctx.textAlign = 'center';
+      ctx.fillText(`Convidado de Honra: ${guest.name}`, canvasWidth / 2, guestBoxY + 48);
+
+      const companionText = guest.companions > 0 ? ` • ${guest.companions + 1} Lugares Reservados` : '';
+      const tableText = tableName ? `Mesa: ${tableName}` : '';
+      const guestMeta = [tableText, companionText].filter(Boolean).join('');
+      if (guestMeta) {
+        ctx.font = '20px sans-serif';
+        ctx.fillStyle = '#8A7348';
+        ctx.fillText(guestMeta, canvasWidth / 2, guestBoxY + 84);
+      }
+      ctx.restore();
+
+      // 6. Date & Venues
+      ctx.save();
+      ctx.font = 'bold 28px Georgia, "Times New Roman", serif';
+      ctx.fillStyle = '#2D241E';
+      ctx.textAlign = 'center';
+      ctx.fillText(`📅 ${capitalizedDate}`, canvasWidth / 2, 715);
+
+      ctx.font = '22px Georgia, "Times New Roman", serif';
+      ctx.fillStyle = '#4A4036';
+      let venueLine = '';
+      if (event.ceremony_location) {
+        venueLine += `Cerimónia: ${event.ceremony_location}${event.ceremony_time ? ' às ' + event.ceremony_time : ''}`;
+      }
+      if (event.party_location) {
+        if (venueLine) venueLine += '  |  ';
+        venueLine += `Copos-de-Água: ${event.party_location}${event.party_time ? ' às ' + event.party_time : ''}`;
+      }
+      if (venueLine) {
+        ctx.fillText(venueLine, canvasWidth / 2, 760);
+      }
+      ctx.restore();
+
+      // Separator line
+      ctx.strokeStyle = '#D4AF37';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(250, 810);
+      ctx.lineTo(canvasWidth - 250, 810);
+      ctx.stroke();
+
+      // 7. QR Cards (Side-by-side in Portrait)
+      const cardY = 860;
+      const cardH = 680;
+      const cardW = 590;
+
+      // Left Card: Localizações
+      drawRoundedRect(ctx, 160, cardY, cardW, cardH, 20, '#FFFFFF', '#E8D49E', 2);
+      ctx.save();
+      ctx.font = 'bold 22px Georgia, "Times New Roman", serif';
+      ctx.fillStyle = '#2D241E';
+      ctx.textAlign = 'center';
+      ctx.fillText('📍 LOCALIZAÇÃO & GPS', 160 + cardW / 2, cardY + 50);
+      ctx.font = '15px sans-serif';
+      ctx.fillStyle = '#71717A';
+      ctx.fillText('Aponte a câmara para abrir o mapa', 160 + cardW / 2, cardY + 82);
+      if (qrLocationsDataUrl) {
+        try {
+          const qrLocImg = await loadHtmlImage(qrLocationsDataUrl);
+          const qrSize = 380;
+          ctx.drawImage(qrLocImg, 160 + (cardW - qrSize) / 2, cardY + 115, qrSize, qrSize);
+        } catch (e) {}
+      }
+      ctx.font = 'bold 16px sans-serif';
+      ctx.fillStyle = '#8A7348';
+      ctx.fillText('Itinerário Google Maps', 160 + cardW / 2, cardY + 590);
+      ctx.restore();
+
+      // Right Card: Acesso
+      drawRoundedRect(ctx, 834, cardY, cardW, cardH, 20, '#FFFFFF', '#E8D49E', 2);
+      ctx.save();
+      ctx.font = 'bold 22px Georgia, "Times New Roman", serif';
+      ctx.fillStyle = '#2D241E';
+      ctx.textAlign = 'center';
+      ctx.fillText('🎟️ PASSE DE ENTRADA', 834 + cardW / 2, cardY + 50);
+      ctx.font = '15px sans-serif';
+      ctx.fillStyle = '#71717A';
+      ctx.fillText('Apresente na portaria do evento', 834 + cardW / 2, cardY + 82);
+      if (qrAccessDataUrl) {
+        try {
+          const qrAccImg = await loadHtmlImage(qrAccessDataUrl);
+          const qrSize = 380;
+          ctx.drawImage(qrAccImg, 834 + (cardW - qrSize) / 2, cardY + 115, qrSize, qrSize);
+        } catch (e) {}
+      }
+      ctx.font = 'bold 16px sans-serif';
+      ctx.fillStyle = '#8A7348';
+      const shortCode = guest.qr_token ? guest.qr_token.slice(0, 10).toUpperCase() : 'MB-VIP';
+      ctx.fillText(`Código: ${shortCode}`, 834 + cardW / 2, cardY + 590);
+      ctx.restore();
+
+      // 8. Footer
+      ctx.save();
+      ctx.font = 'italic 18px Georgia, "Times New Roman", serif';
+      ctx.fillStyle = '#A3907C';
+      ctx.textAlign = 'center';
+      ctx.fillText('Meu Boda • Confirmação de presença e detalhes do evento em meuboda.com', canvasWidth / 2, 2150);
+      ctx.restore();
+    } else {
+      // 1. Monogram Seal at top center (Landscape)
+      const monoY = 175;
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(canvasWidth / 2, monoY, 62, 0, Math.PI * 2);
+      ctx.fillStyle = '#FAF8F5';
+      ctx.fill();
+      ctx.strokeStyle = '#D4AF37';
     ctx.lineWidth = 3;
     ctx.stroke();
 
@@ -410,6 +565,7 @@ async function renderBasicInvitationCanvas(
     ctx.textAlign = 'center';
     ctx.fillText('Meu Boda • Confirmação de presença e detalhes do evento em meuboda.com', canvasWidth / 2, 1495);
     ctx.restore();
+    }
   }
 
   // ==========================================
@@ -417,17 +573,17 @@ async function renderBasicInvitationCanvas(
   // ==========================================
   else if (pageType === 'cover') {
     // Grand Monogram Seal
-    const monoY = 410;
+    const monoY = isPortrait ? 520 : 410;
     ctx.save();
     ctx.beginPath();
-    ctx.arc(canvasWidth / 2, monoY, 130, 0, Math.PI * 2);
+    ctx.arc(canvasWidth / 2, monoY, isPortrait ? 150 : 130, 0, Math.PI * 2);
     ctx.fillStyle = '#FAF8F5';
     ctx.fill();
     ctx.strokeStyle = '#D4AF37';
     ctx.lineWidth = 4;
     ctx.stroke();
 
-    ctx.font = 'bold 100px Georgia, "Times New Roman", serif';
+    ctx.font = `bold ${isPortrait ? 115 : 100}px Georgia, "Times New Roman", serif`;
     ctx.fillStyle = '#B89742';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -439,30 +595,32 @@ async function renderBasicInvitationCanvas(
     ctx.font = 'bold 30px Georgia, "Times New Roman", serif';
     ctx.fillStyle = '#8A7348';
     ctx.textAlign = 'center';
-    ctx.fillText(eventLabels.invitation.toUpperCase(), canvasWidth / 2, 620);
+    ctx.fillText(eventLabels.invitation.toUpperCase(), canvasWidth / 2, isPortrait ? 780 : 620);
 
     // Event Title
-    ctx.font = 'bold 88px Georgia, "Times New Roman", serif';
+    ctx.font = `bold ${isPortrait ? 80 : 88}px Georgia, "Times New Roman", serif`;
     ctx.fillStyle = '#1A1A1A';
-    ctx.fillText(event.title, canvasWidth / 2, 730);
+    ctx.fillText(event.title, canvasWidth / 2, isPortrait ? 900 : 730);
 
     // Event Date
     ctx.font = 'bold 36px Georgia, "Times New Roman", serif';
     ctx.fillStyle = '#2D241E';
-    ctx.fillText(capitalizedDate, canvasWidth / 2, 850);
+    ctx.fillText(capitalizedDate, canvasWidth / 2, isPortrait ? 1030 : 850);
     ctx.restore();
 
     // Decorative divider
     ctx.strokeStyle = '#D4AF37';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.moveTo(canvasWidth / 2 - 250, 910);
-    ctx.lineTo(canvasWidth / 2 + 250, 910);
+    ctx.moveTo(canvasWidth / 2 - 250, isPortrait ? 1100 : 910);
+    ctx.lineTo(canvasWidth / 2 + 250, isPortrait ? 1100 : 910);
     ctx.stroke();
 
     // Guest Badge at bottom
-    const badgeY = 980;
-    drawRoundedRect(ctx, 470, badgeY, 1300, 190, 24, '#F5EFE6', '#D4AF37', 2);
+    const badgeY = isPortrait ? 1220 : 980;
+    const badgeW = isPortrait ? canvasWidth - 360 : 1300;
+    const badgeX = isPortrait ? 180 : 470;
+    drawRoundedRect(ctx, badgeX, badgeY, badgeW, 190, 24, '#F5EFE6', '#D4AF37', 2);
 
     ctx.save();
     ctx.font = 'italic 26px Georgia, "Times New Roman", serif';
@@ -486,7 +644,7 @@ async function renderBasicInvitationCanvas(
     ctx.font = 'italic 20px Georgia, "Times New Roman", serif';
     ctx.fillStyle = '#A3907C';
     ctx.textAlign = 'center';
-    ctx.fillText('Meu Boda • Celebração de Amor & União', canvasWidth / 2, 1490);
+    ctx.fillText('Meu Boda • Celebração de Amor & União', canvasWidth / 2, isPortrait ? 2120 : 1490);
     ctx.restore();
   }
 
@@ -494,17 +652,182 @@ async function renderBasicInvitationCanvas(
   // MODE 3: DOUBLE PAGE - PAGE 2 (INFO TRÍPTICO)
   // ==========================================
   else if (pageType === 'info') {
-    // 2 vertical dividers dividing into 3 panels
-    const col1X = 746;
-    const col2X = 1493;
+    if (isPortrait) {
+      // Horizontal dividers dividing into 3 sections
+      ctx.strokeStyle = '#E8D49E';
+      ctx.lineWidth = 1.5;
 
-    ctx.strokeStyle = '#E8D49E';
-    ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(100, 720);
+      ctx.lineTo(canvasWidth - 100, 720);
+      ctx.stroke();
 
-    ctx.beginPath();
-    ctx.moveTo(col1X, 100);
-    ctx.lineTo(col1X, canvasHeight - 100);
-    ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(100, 1440);
+      ctx.lineTo(canvasWidth - 100, 1440);
+      ctx.stroke();
+
+      // --- SECTION 1: LOCALIZAÇÕES (Top) ---
+      const p1Center = canvasWidth / 2;
+      ctx.save();
+      ctx.font = 'bold 30px Georgia, "Times New Roman", serif';
+      ctx.fillStyle = '#B89742';
+      ctx.textAlign = 'center';
+      ctx.fillText('LOCALIZAÇÕES', p1Center, 140);
+
+      ctx.strokeStyle = '#D4AF37';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(p1Center - 80, 165);
+      ctx.lineTo(p1Center + 80, 165);
+      ctx.stroke();
+
+      ctx.font = 'bold 22px Georgia, "Times New Roman", serif';
+      ctx.fillStyle = '#2D241E';
+      let locY = 210;
+      if (event.ceremony_location) {
+        ctx.fillText(`Cerimónia: ${event.ceremony_location}${event.ceremony_time ? ' (' + event.ceremony_time + ')' : ''}`, p1Center, locY);
+        locY += 34;
+      }
+      if (event.party_location) {
+        ctx.fillText(`Copos-de-Água: ${event.party_location}${event.party_time ? ' (' + event.party_time + ')' : ''}`, p1Center, locY);
+      }
+
+      // QR Locations Card
+      const qr1BoxY = 280;
+      drawRoundedRect(ctx, p1Center - 180, qr1BoxY, 360, 400, 16, '#FFFFFF', '#E8D49E', 2);
+      ctx.font = 'bold 18px Georgia, "Times New Roman", serif';
+      ctx.fillStyle = '#2D241E';
+      ctx.fillText('📍 CÓDIGO QR - MAPA', p1Center, qr1BoxY + 36);
+
+      if (qrLocationsDataUrl) {
+        try {
+          const qrLocImg = await loadHtmlImage(qrLocationsDataUrl);
+          ctx.drawImage(qrLocImg, p1Center - 130, qr1BoxY + 55, 260, 260);
+        } catch (e) {}
+      }
+
+      ctx.font = 'bold 15px sans-serif';
+      ctx.fillStyle = '#8A7348';
+      ctx.fillText('Itinerário & Rota GPS', p1Center, qr1BoxY + 365);
+      ctx.restore();
+
+      // --- SECTION 2: CELEBRAÇÃO & PROGRAMA (Middle) ---
+      const p2Center = canvasWidth / 2;
+      ctx.save();
+      ctx.font = 'bold 30px Georgia, "Times New Roman", serif';
+      ctx.fillStyle = '#B89742';
+      ctx.textAlign = 'center';
+      ctx.fillText('CELEBRAÇÃO', p2Center, 790);
+
+      ctx.strokeStyle = '#D4AF37';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(p2Center - 80, 815);
+      ctx.lineTo(p2Center + 80, 815);
+      ctx.stroke();
+
+      ctx.font = 'bold 26px Georgia, "Times New Roman", serif';
+      ctx.fillStyle = '#1A1A1A';
+      ctx.fillText(capitalizedDate, p2Center, 865);
+
+      // Message
+      const msg = event.description || 'A vossa presença tornará este momento inesquecível. Esperamos por si para celebrar o nosso amor e união.';
+      ctx.font = 'italic 22px Georgia, "Times New Roman", serif';
+      ctx.fillStyle = '#5A4E42';
+      const lines = wrapText(ctx, msg, 800);
+      let msgY = 920;
+      for (const l of lines.slice(0, 4)) {
+        ctx.fillText(l, p2Center, msgY);
+        msgY += 34;
+      }
+
+      // Dress code
+      if (event.dress_code_style) {
+        drawRoundedRect(ctx, p2Center - 260, 1080, 520, 75, 12, '#F5EFE6', '#D4AF37', 1);
+        ctx.font = 'bold 16px sans-serif';
+        ctx.fillStyle = '#8A7348';
+        ctx.fillText('👗 TRAJE RECOMENDADO', p2Center, 1105);
+        ctx.font = 'bold 20px Georgia, "Times New Roman", serif';
+        ctx.fillStyle = '#1A1A1A';
+        ctx.fillText(event.dress_code_style, p2Center, 1135);
+      }
+
+      // Schedule summary if present
+      if (schedules && schedules.length > 0) {
+        ctx.font = 'bold 20px Georgia, "Times New Roman", serif';
+        ctx.fillStyle = '#2D241E';
+        ctx.fillText('PROGRAMA DO DIA', p2Center, 1200);
+
+        let schedY = 1240;
+        for (const s of schedules.slice(0, 4)) {
+          ctx.font = 'bold 17px sans-serif';
+          ctx.fillStyle = '#B89742';
+          ctx.fillText(`${s.time} - ${s.title}`, p2Center, schedY);
+          schedY += 36;
+        }
+      }
+      ctx.restore();
+
+      // --- SECTION 3: PASSE DE ACESSO (Bottom) ---
+      const p3Center = canvasWidth / 2;
+      ctx.save();
+      ctx.font = 'bold 30px Georgia, "Times New Roman", serif';
+      ctx.fillStyle = '#B89742';
+      ctx.textAlign = 'center';
+      ctx.fillText('PASSE DE ENTRADA', p3Center, 1510);
+
+      ctx.strokeStyle = '#D4AF37';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(p3Center - 80, 1535);
+      ctx.lineTo(p3Center + 80, 1535);
+      ctx.stroke();
+
+      ctx.font = 'bold 28px Georgia, "Times New Roman", serif';
+      ctx.fillStyle = '#1A1A1A';
+      ctx.fillText(guest.name, p3Center, 1585);
+
+      if (tableName) {
+        ctx.font = '20px sans-serif';
+        ctx.fillStyle = '#8A7348';
+        ctx.fillText(`Mesa: ${tableName}`, p3Center, 1620);
+      }
+
+      // QR Access Card
+      const qr2BoxY = 1650;
+      drawRoundedRect(ctx, p3Center - 180, qr2BoxY, 360, 420, 16, '#FFFFFF', '#E8D49E', 2);
+      ctx.font = 'bold 18px Georgia, "Times New Roman", serif';
+      ctx.fillStyle = '#2D241E';
+      ctx.fillText('🎟️ CÓDIGO DE ENTRADA', p3Center, qr2BoxY + 36);
+
+      if (qrAccessDataUrl) {
+        try {
+          const qrAccImg = await loadHtmlImage(qrAccessDataUrl);
+          ctx.drawImage(qrAccImg, p3Center - 130, qr2BoxY + 55, 260, 260);
+        } catch (e) {}
+      }
+
+      ctx.font = 'bold 16px sans-serif';
+      ctx.fillStyle = '#8A7348';
+      const shortCode = guest.qr_token ? guest.qr_token.slice(0, 10).toUpperCase() : 'MB-VIP';
+      ctx.fillText(`Passe: ${shortCode}`, p3Center, qr2BoxY + 365);
+      ctx.font = '14px sans-serif';
+      ctx.fillStyle = '#555555';
+      ctx.fillText('Código intransmissível e exclusivo', p3Center, qr2BoxY + 395);
+      ctx.restore();
+    } else {
+      // 2 vertical dividers dividing into 3 panels (Landscape)
+      const col1X = 746;
+      const col2X = 1493;
+
+      ctx.strokeStyle = '#E8D49E';
+      ctx.lineWidth = 1.5;
+
+      ctx.beginPath();
+      ctx.moveTo(col1X, 100);
+      ctx.lineTo(col1X, canvasHeight - 100);
+      ctx.stroke();
 
     ctx.beginPath();
     ctx.moveTo(col2X, 100);
@@ -695,6 +1018,7 @@ async function renderBasicInvitationCanvas(
     ctx.fillStyle = '#555555';
     ctx.fillText('Código intransmissível e exclusivo', p3Center, qr2BoxY + 612);
     ctx.restore();
+    }
   }
 
   // Return high-quality JPEG
@@ -711,10 +1035,37 @@ async function renderInvitationPage(
   qrOverlays: Array<{
     qrDataUrl: string;
     coords: { left: number; top: number; width: number; height: number };
-  }>
+  }>,
+  targetOrientation: 'portrait' | 'landscape' = 'landscape'
 ): Promise<string> {
-  const canvasWidth = 2240;
-  const canvasHeight = 1584;
+  // 1. Draw Background Image
+  let bgImg: HTMLImageElement | null = null;
+  const candidateUrls = [bgUrl, fallbackBgUrl].filter(Boolean);
+
+  for (const url of candidateUrls) {
+    try {
+      const safeDataUrl = await getSafeImageDataUrl(url);
+      if (safeDataUrl) {
+        bgImg = await loadHtmlImage(safeDataUrl);
+        break;
+      }
+    } catch (err) {
+      console.warn('Candidato a imagem de fundo falhou:', url, err);
+    }
+  }
+
+  // Detect orientation: prioritize targetOrientation, but auto-detect if image dimensions dictate
+  let isPortrait = targetOrientation === 'portrait';
+  if (!targetOrientation && bgImg) {
+    isPortrait = bgImg.height > bgImg.width;
+  }
+
+  // Strict A4 dimensions:
+  // Portrait: 1584 px width x 2240 px height (ratio: 210/297 = 0.7071)
+  // Landscape: 2240 px width x 1584 px height (ratio: 297/210 = 1.4141)
+  const canvasWidth = isPortrait ? 1584 : 2240;
+  const canvasHeight = isPortrait ? 2240 : 1584;
+
   const canvas = document.createElement('canvas');
   canvas.width = canvasWidth;
   canvas.height = canvasHeight;
@@ -725,26 +1076,9 @@ async function renderInvitationPage(
   ctx.fillStyle = '#FAF8F5';
   ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-  // 1. Draw Background Image
-  let bgDrawn = false;
-  const candidateUrls = [bgUrl, fallbackBgUrl].filter(Boolean);
-
-  for (const url of candidateUrls) {
-    try {
-      const safeDataUrl = await getSafeImageDataUrl(url);
-      if (safeDataUrl) {
-        const bgImg = await loadHtmlImage(safeDataUrl);
-        ctx.drawImage(bgImg, 0, 0, canvasWidth, canvasHeight);
-        bgDrawn = true;
-        break;
-      }
-    } catch (err) {
-      console.warn('Candidato a imagem de fundo falhou:', url, err);
-    }
-  }
-
-  // If no background could be drawn, draw a clean gold border
-  if (!bgDrawn) {
+  if (bgImg) {
+    ctx.drawImage(bgImg, 0, 0, canvasWidth, canvasHeight);
+  } else {
     ctx.strokeStyle = '#D4AF37';
     ctx.lineWidth = 4;
     ctx.strokeRect(20, 20, canvasWidth - 40, canvasHeight - 40);
@@ -760,8 +1094,8 @@ async function renderInvitationPage(
       let height = Number(overlay.coords?.height);
 
       // Safe fallback if coordinates are undefined, NaN, or out of range
-      if (isNaN(width) || width < 6 || width > 40) width = 14;
-      if (isNaN(height) || height < 8 || height > 45) height = 18;
+      if (isNaN(width) || width < 4 || width > 50) width = isPortrait ? 22 : 14;
+      if (isNaN(height) || height < 4 || height > 50) height = isPortrait ? 15.5 : 18;
       if (isNaN(left)) left = 10;
       if (isNaN(top)) top = 76;
 
@@ -802,6 +1136,24 @@ export async function generateGuestPDF(
   const canvaConfig = resolveCanvaConfig(event.id, event.template_config, infoBlocks, null, event);
   const isSinglePage = canvaConfig.pdf_mode === 'single_page';
 
+  // Determine A4 paper orientation (portrait 210x297 or landscape 297x210)
+  let isPortrait = canvaConfig.pdf_orientation === 'portrait';
+  if (!canvaConfig.pdf_orientation && canvaConfig.canva_cover_url) {
+    try {
+      const probeUrl = await getSafeImageDataUrl(canvaConfig.canva_cover_url);
+      if (probeUrl) {
+        const probeImg = await loadHtmlImage(probeUrl);
+        if (probeImg.height > probeImg.width) {
+          isPortrait = true;
+        }
+      }
+    } catch (e) {
+      console.warn('Não foi possível sondar a orientação da imagem de capa:', e);
+    }
+  }
+
+  const orientation: 'portrait' | 'landscape' = isPortrait ? 'portrait' : 'landscape';
+
   // Generate locations redirect QR code link
   const guestToken = guest.qr_token || guest.id || 'convidado';
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
@@ -833,8 +1185,8 @@ export async function generateGuestPDF(
     }
   }
 
-  const locCoords = canvaConfig.qr_locations_coords || DEFAULT_LOC_COORDS;
-  const accessCoords = canvaConfig.qr_access_coords || DEFAULT_ACCESS_COORDS;
+  const locCoords = canvaConfig.qr_locations_coords || (isPortrait ? DEFAULT_PORTRAIT_LOC_COORDS : DEFAULT_LOC_COORDS);
+  const accessCoords = canvaConfig.qr_access_coords || (isPortrait ? DEFAULT_PORTRAIT_ACCESS_COORDS : DEFAULT_ACCESS_COORDS);
 
   const isCustomMode = canvaConfig.template_source === 'custom' && !canvaConfig.is_basic_template;
   const hasCustomCover = isCustomMode && Boolean(canvaConfig.canva_cover_url);
@@ -859,7 +1211,7 @@ export async function generateGuestPDF(
       }
     }
 
-    coverDataUrl = await renderInvitationPage(canvaConfig.canva_cover_url!, DEFAULT_CANVA_COVER, page1Overlays);
+    coverDataUrl = await renderInvitationPage(canvaConfig.canva_cover_url!, DEFAULT_CANVA_COVER, page1Overlays, orientation);
   } else {
     // Dynamic Basic Template for events without custom Canva uploads
     coverDataUrl = await renderBasicInvitationCanvas(
@@ -869,7 +1221,8 @@ export async function generateGuestPDF(
       finalAccessQr,
       locationsQrCodeUrl,
       isSinglePage ? 'single' : 'cover',
-      schedules
+      schedules,
+      orientation
     );
   }
 
@@ -888,7 +1241,7 @@ export async function generateGuestPDF(
         page2Overlays.push({ qrDataUrl: finalAccessQr, coords: accessCoords });
       }
 
-      infoDataUrl = await renderInvitationPage(canvaConfig.canva_info_url!, DEFAULT_CANVA_INFO, page2Overlays);
+      infoDataUrl = await renderInvitationPage(canvaConfig.canva_info_url!, DEFAULT_CANVA_INFO, page2Overlays, orientation);
     } else {
       // Dynamic Basic Template Info Page for events without custom Canva uploads
       infoDataUrl = await renderBasicInvitationCanvas(
@@ -898,27 +1251,28 @@ export async function generateGuestPDF(
         finalAccessQr,
         locationsQrCodeUrl,
         'info',
-        schedules
+        schedules,
+        orientation
       );
     }
   }
 
-  // 3. Assemble A4 landscape PDF (297 x 210 mm)
+  // 3. Assemble A4 PDF (strictly 210 x 297 mm for portrait, 297 x 210 mm for landscape)
   const doc = new jsPDF({
-    orientation: 'landscape',
+    orientation: orientation,
     unit: 'mm',
     format: 'a4',
   });
 
-  const imgWidth = 297;
-  const imgHeight = 210;
+  const imgWidth = isPortrait ? 210 : 297;
+  const imgHeight = isPortrait ? 297 : 210;
 
   // Add cover page (Page 1)
   doc.addImage(coverDataUrl, 'JPEG', 0, 0, imgWidth, imgHeight);
 
   // Add inside info page (Page 2) if double page mode
   if (!isSinglePage && infoDataUrl) {
-    doc.addPage();
+    doc.addPage('a4', orientation);
     doc.addImage(infoDataUrl, 'JPEG', 0, 0, imgWidth, imgHeight);
   }
 
