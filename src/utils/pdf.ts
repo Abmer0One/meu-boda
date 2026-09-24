@@ -754,19 +754,34 @@ async function renderInvitationPage(
   for (const overlay of qrOverlays) {
     if (!overlay.qrDataUrl) continue;
     try {
-      const x = (overlay.coords.left / 100) * canvasWidth;
-      const y = (overlay.coords.top / 100) * canvasHeight;
-      const w = (overlay.coords.width / 100) * canvasWidth;
-      const h = (overlay.coords.height / 100) * canvasHeight;
+      let left = Number(overlay.coords?.left);
+      let top = Number(overlay.coords?.top);
+      let width = Number(overlay.coords?.width);
+      let height = Number(overlay.coords?.height);
 
-      // Draw crisp white background card
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fillRect(x, y, w, h);
+      // Safe fallback if coordinates are undefined, NaN, or out of range
+      if (isNaN(width) || width < 6 || width > 40) width = 14;
+      if (isNaN(height) || height < 8 || height > 45) height = 18;
+      if (isNaN(left)) left = 10;
+      if (isNaN(top)) top = 76;
+
+      // Clamp strictly to page bounds so QR code is ALWAYS visible
+      left = Math.max(0, Math.min(left, 100 - width));
+      top = Math.max(0, Math.min(top, 100 - height));
+
+      const x = (left / 100) * canvasWidth;
+      const y = (top / 100) * canvasHeight;
+      const w = (width / 100) * canvasWidth;
+      const h = (height / 100) * canvasHeight;
+
+      // Draw crisp white background card with rounded corners and luxury gold border
+      drawRoundedRect(ctx, x, y, w, h, 18, '#FFFFFF', '#D4AF37', 3);
 
       // Draw QR image with slight padding for optimal scanning
       const qrImg = await loadHtmlImage(overlay.qrDataUrl);
-      const padding = Math.min(w, h) * 0.035;
-      ctx.drawImage(qrImg, x + padding, y + padding, w - padding * 2, h - padding * 2);
+      const padX = w * 0.06;
+      const padY = h * 0.06;
+      ctx.drawImage(qrImg, x + padX, y + padY, w - padX * 2, h - padY * 2);
     } catch (err) {
       console.error('Falha ao desenhar QR Code sobre o canvas:', err);
     }
@@ -788,14 +803,42 @@ export async function generateGuestPDF(
   const isSinglePage = canvaConfig.pdf_mode === 'single_page';
 
   // Generate locations redirect QR code link
-  const locationsLink = `${typeof window !== 'undefined' ? window.location.origin : ''}/convite/${guest.qr_token}#mapas`;
-  const locationsQrCodeUrl = await generateQRCode(locationsLink);
+  const guestToken = guest.qr_token || guest.id || 'convidado';
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  const locationsLink = `${origin}/convite/${guestToken}#mapas`;
+  let locationsQrCodeUrl = '';
+  try {
+    locationsQrCodeUrl = await generateQRCode(locationsLink);
+  } catch (e) {
+    console.error('Erro ao gerar QR Code de Localizações:', e);
+  }
+
+  // Ensure access QR code exists
+  let finalAccessQr = qrCodeDataUrl;
+  if (!finalAccessQr) {
+    try {
+      const qrData = {
+        eventId: event.id,
+        guestId: guest.id,
+        name: guest.name,
+        table: tableName,
+        companions: (guest.companions || 0).toString(),
+        event: event.title,
+        date: event.date ? event.date.split('T')[0] : '',
+        token: guestToken,
+      };
+      finalAccessQr = await generateQRCode(qrData);
+    } catch (e) {
+      console.error('Erro ao gerar QR Code de Acesso:', e);
+    }
+  }
 
   const locCoords = canvaConfig.qr_locations_coords || DEFAULT_LOC_COORDS;
   const accessCoords = canvaConfig.qr_access_coords || DEFAULT_ACCESS_COORDS;
 
-  const hasCustomCover = Boolean(canvaConfig.canva_cover_url);
-  const hasCustomInfo = Boolean(canvaConfig.canva_info_url);
+  const isCustomMode = canvaConfig.template_source === 'custom' && !canvaConfig.is_basic_template;
+  const hasCustomCover = isCustomMode && Boolean(canvaConfig.canva_cover_url);
+  const hasCustomInfo = isCustomMode && Boolean(canvaConfig.canva_info_url);
 
   let coverDataUrl: string;
   let infoDataUrl: string | null = null;
@@ -811,8 +854,8 @@ export async function generateGuestPDF(
       if (locationsQrCodeUrl && canvaConfig.show_locations_qr !== false) {
         page1Overlays.push({ qrDataUrl: locationsQrCodeUrl, coords: locCoords });
       }
-      if (qrCodeDataUrl && canvaConfig.show_access_qr !== false) {
-        page1Overlays.push({ qrDataUrl: qrCodeDataUrl, coords: accessCoords });
+      if (finalAccessQr && canvaConfig.show_access_qr !== false) {
+        page1Overlays.push({ qrDataUrl: finalAccessQr, coords: accessCoords });
       }
     }
 
@@ -823,7 +866,7 @@ export async function generateGuestPDF(
       event,
       guest,
       tableName,
-      qrCodeDataUrl,
+      finalAccessQr,
       locationsQrCodeUrl,
       isSinglePage ? 'single' : 'cover',
       schedules
@@ -841,8 +884,8 @@ export async function generateGuestPDF(
       if (locationsQrCodeUrl) {
         page2Overlays.push({ qrDataUrl: locationsQrCodeUrl, coords: locCoords });
       }
-      if (qrCodeDataUrl) {
-        page2Overlays.push({ qrDataUrl: qrCodeDataUrl, coords: accessCoords });
+      if (finalAccessQr) {
+        page2Overlays.push({ qrDataUrl: finalAccessQr, coords: accessCoords });
       }
 
       infoDataUrl = await renderInvitationPage(canvaConfig.canva_info_url!, DEFAULT_CANVA_INFO, page2Overlays);
@@ -852,7 +895,7 @@ export async function generateGuestPDF(
         event,
         guest,
         tableName,
-        qrCodeDataUrl,
+        finalAccessQr,
         locationsQrCodeUrl,
         'info',
         schedules
@@ -860,7 +903,7 @@ export async function generateGuestPDF(
     }
   }
 
-  // 3. Assemble A4 landscape PDF
+  // 3. Assemble A4 landscape PDF (297 x 210 mm)
   const doc = new jsPDF({
     orientation: 'landscape',
     unit: 'mm',

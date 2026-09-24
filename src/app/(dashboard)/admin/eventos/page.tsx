@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useEvent } from '@/contexts/EventContext';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -9,15 +9,17 @@ import { EventRepository } from '@/repositories/event.repository';
 import { ScheduleRepository } from '@/repositories/schedule.repository';
 import { InfoBlockRepository } from '@/repositories/infoblock.repository';
 import { supabase } from '@/lib/supabase';
-import { EventSchedule, EventInfoBlock } from '@/types';
+import { EventSchedule, EventInfoBlock, Guest } from '@/types';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Dialog } from '@/components/ui/Dialog';
-import { Heart, MapPin, Calendar, Palette, Loader2, Plus, Trash2, Clock, Users, Gift, Link2, Shirt, Info, Pencil, Sparkles, Upload, Sliders, CheckCircle2, RotateCcw, QrCode, FileText, AlertCircle } from 'lucide-react';
+import { Heart, MapPin, Calendar, Palette, Loader2, Plus, Trash2, Clock, Users, Gift, Link2, Shirt, Info, Pencil, Sparkles, Upload, Sliders, CheckCircle2, RotateCcw, QrCode, FileText, AlertCircle, Move, Download } from 'lucide-react';
 import { resolveCanvaConfig, persistCanvaConfig, CANVA_CONFIG_BLOCK_TITLE, isMarinelaAbiudEvent, isCleanCanvaUrl } from '@/utils/canvaConfig';
 import { parseEventInitials } from '@/utils/eventHelpers';
+import { generateGuestPDF } from '@/utils/pdf';
+import { generateQRCode } from '@/utils/qr';
 
 export default function EventosPage() {
   const { currentEvent, refreshEvents, setCurrentEvent } = useEvent();
@@ -53,6 +55,11 @@ export default function EventosPage() {
   const [isSavingCanva, setIsSavingCanva] = useState(false);
   const [canvaSuccessMessage, setCanvaSuccessMessage] = useState<string | null>(null);
   const [showQrFineTuning, setShowQrFineTuning] = useState(false);
+  const [draggedQr, setDraggedQr] = useState<'loc' | 'access' | null>(null);
+  const [editorPreviewPage, setEditorPreviewPage] = useState<'page_1' | 'page_2'>('page_2');
+  const [isGeneratingTestPdf, setIsGeneratingTestPdf] = useState(false);
+  const editorStageRef = useRef<HTMLDivElement | null>(null);
+  const dragStartOffsetRef = useRef<{ offsetX: number; offsetY: number }>({ offsetX: 0, offsetY: 0 });
 
   // Timeline / Schedules States
   const [schedules, setSchedules] = useState<EventSchedule[]>([]);
@@ -159,6 +166,7 @@ export default function EventosPage() {
       setCanvaCoverUrl(resolved.canva_cover_url || '');
       setCanvaInfoUrl(resolved.canva_info_url || '');
       setPdfMode(resolved.pdf_mode || 'double_page');
+      setEditorPreviewPage(resolved.pdf_mode === 'single_page' ? 'page_1' : 'page_2');
       setShowLocationsQr(resolved.show_locations_qr !== false);
       setShowAccessQr(resolved.show_access_qr !== false);
       if (resolved.qr_locations_coords) {
@@ -504,6 +512,166 @@ export default function EventosPage() {
       if (!confirm('Deseja repor as posições padrão dos códigos QR para Frente e Verso (Tríptico)?')) return;
       setQrLocCoords({ left: 8.76, top: 69.56, width: 11.85, height: 16.76 });
       setQrAccessCoords({ left: 80.99, top: 54.14, width: 13.10, height: 18.52 });
+    }
+  };
+
+  // Start dragging a QR code box on the interactive stage
+  const handleStartDrag = (
+    qrType: 'loc' | 'access',
+    e: React.PointerEvent<HTMLDivElement>
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!editorStageRef.current) return;
+    const rect = editorStageRef.current.getBoundingClientRect();
+    const currentCoords = qrType === 'loc' ? qrLocCoords : qrAccessCoords;
+    const boxPixelX = rect.left + (currentCoords.left / 100) * rect.width;
+    const boxPixelY = rect.top + (currentCoords.top / 100) * rect.height;
+
+    dragStartOffsetRef.current = {
+      offsetX: e.clientX - boxPixelX,
+      offsetY: e.clientY - boxPixelY,
+    };
+    setDraggedQr(qrType);
+  };
+
+  // Window listeners for smooth, responsive drag-and-drop
+  useEffect(() => {
+    if (!draggedQr) return;
+
+    const handlePointerMove = (e: PointerEvent) => {
+      if (!editorStageRef.current) return;
+      const rect = editorStageRef.current.getBoundingClientRect();
+      const currentCoords = draggedQr === 'loc' ? qrLocCoords : qrAccessCoords;
+
+      const rawX = e.clientX - rect.left - dragStartOffsetRef.current.offsetX;
+      const rawY = e.clientY - rect.top - dragStartOffsetRef.current.offsetY;
+
+      let pctX = (rawX / rect.width) * 100;
+      let pctY = (rawY / rect.height) * 100;
+
+      // Clamp strictly within [0%, 100% - width/height] so QR code cannot go off-screen
+      pctX = Math.max(0, Math.min(100 - currentCoords.width, pctX));
+      pctY = Math.max(0, Math.min(100 - currentCoords.height, pctY));
+
+      pctX = Math.round(pctX * 10) / 10;
+      pctY = Math.round(pctY * 10) / 10;
+
+      if (draggedQr === 'loc') {
+        setQrLocCoords((prev) => ({ ...prev, left: pctX, top: pctY }));
+      } else {
+        setQrAccessCoords((prev) => ({ ...prev, left: pctX, top: pctY }));
+      }
+    };
+
+    const handlePointerUp = () => {
+      setDraggedQr(null);
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+    };
+  }, [draggedQr, qrLocCoords.width, qrLocCoords.height, qrAccessCoords.width, qrAccessCoords.height]);
+
+  // Apply Quick Positioning Presets
+  const handleApplyPreset = (preset: 'corners' | 'triptych' | 'single' | 'bottom_center') => {
+    if (preset === 'corners') {
+      setQrLocCoords((prev) => ({ ...prev, left: 6, top: 74 }));
+      setQrAccessCoords((prev) => ({ ...prev, left: 80, top: 74 }));
+    } else if (preset === 'triptych') {
+      setQrLocCoords({ left: 8.76, top: 69.56, width: 11.85, height: 16.76 });
+      setQrAccessCoords({ left: 80.99, top: 54.14, width: 13.10, height: 18.52 });
+    } else if (preset === 'single') {
+      setQrLocCoords({ left: 10, top: 76, width: 14, height: 18 });
+      setQrAccessCoords({ left: 76, top: 76, width: 14, height: 18 });
+    } else if (preset === 'bottom_center') {
+      setQrLocCoords((prev) => ({ ...prev, left: 28, top: 74 }));
+      setQrAccessCoords((prev) => ({ ...prev, left: 58, top: 74 }));
+    }
+  };
+
+  // Apply QR Size Presets
+  const handleApplyQrSize = (size: 'sm' | 'md' | 'lg') => {
+    if (size === 'sm') {
+      setQrLocCoords((prev) => ({ ...prev, width: 11, height: 14 }));
+      setQrAccessCoords((prev) => ({ ...prev, width: 11, height: 14 }));
+    } else if (size === 'md') {
+      setQrLocCoords((prev) => ({ ...prev, width: 13.5, height: 17.5 }));
+      setQrAccessCoords((prev) => ({ ...prev, width: 13.5, height: 17.5 }));
+    } else {
+      setQrLocCoords((prev) => ({ ...prev, width: 16.5, height: 21 }));
+      setQrAccessCoords((prev) => ({ ...prev, width: 16.5, height: 21 }));
+    }
+  };
+
+  // Generate & Download Instant Test A4 PDF directly from the editor
+  const handleDownloadTestPdf = async () => {
+    if (!currentEvent) return;
+    setIsGeneratingTestPdf(true);
+    try {
+      const dummyGuest: Guest = {
+        id: 'teste-convidado',
+        event_id: currentEvent.id,
+        name: 'Convidado de Demonstração',
+        phone: '+244 923 000 000',
+        email: 'convidado@exemplo.com',
+        family_group: null,
+        status: 'Confirmed',
+        companions: 1,
+        table_id: null,
+        invitation_sent: false,
+        qr_token: 'MB-TESTE-VIP',
+        notes: null,
+        created_at: new Date().toISOString(),
+      };
+
+      const qrData = {
+        eventId: currentEvent.id,
+        guestId: dummyGuest.id,
+        name: dummyGuest.name,
+        table: 'Mesa de Demonstração',
+        companions: '1',
+        event: currentEvent.title,
+        date: currentEvent.date ? currentEvent.date.split('T')[0] : '',
+        token: dummyGuest.qr_token,
+      };
+
+      const sampleQrCode = await generateQRCode(qrData);
+
+      const testConfig = {
+        ...(currentEvent.template_config || {}),
+        template_source: templateSource,
+        canva_cover_url: canvaCoverUrl || null,
+        canva_info_url: canvaInfoUrl || null,
+        qr_locations_coords: qrLocCoords,
+        qr_access_coords: qrAccessCoords,
+        pdf_mode: pdfMode,
+        show_locations_qr: showLocationsQr,
+        show_access_qr: showAccessQr,
+      };
+
+      const eventWithTestConfig = {
+        ...currentEvent,
+        template_config: testConfig,
+      };
+
+      const pdf = await generateGuestPDF(
+        dummyGuest,
+        eventWithTestConfig,
+        'Mesa de Demonstração',
+        sampleQrCode,
+        schedules,
+        infoBlocks
+      );
+
+      pdf.save(`teste_convite_a4_${currentEvent.slug || 'evento'}.pdf`);
+    } catch (err: any) {
+      alert('Erro ao gerar PDF de teste: ' + (err?.message || err));
+    } finally {
+      setIsGeneratingTestPdf(false);
     }
   };
 
@@ -1095,7 +1263,10 @@ export default function EventosPage() {
                   <div className="inline-flex p-1 bg-secondary/30 rounded-xl border border-border-custom shrink-0">
                     <button
                       type="button"
-                      onClick={() => setPdfMode('double_page')}
+                      onClick={() => {
+                        setPdfMode('double_page');
+                        setEditorPreviewPage('page_2');
+                      }}
                       className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                         pdfMode === 'double_page'
                           ? 'bg-primary text-white shadow-sm'
@@ -1106,7 +1277,10 @@ export default function EventosPage() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setPdfMode('single_page')}
+                      onClick={() => {
+                        setPdfMode('single_page');
+                        setEditorPreviewPage('page_1');
+                      }}
                       className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                         pdfMode === 'single_page'
                           ? 'bg-primary text-white shadow-sm'
@@ -1497,176 +1671,400 @@ export default function EventosPage() {
                 )}
               </div>
 
-              {/* Ajustes Finos de Posição dos Códigos QR (Opcional / Retrátil) */}
-              <div className="border border-border-custom rounded-xl p-4 bg-secondary/5 space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowQrFineTuning(!showQrFineTuning)}
-                    className="flex items-center gap-2 text-xs font-bold text-foreground hover:text-primary transition-colors cursor-pointer"
-                  >
-                    <Sliders className="h-4 w-4 text-primary" />
-                    <span>
-                      {showQrFineTuning
-                        ? 'Ocultar Ajuste Fino dos Códigos QR'
-                        : pdfMode === 'single_page'
-                        ? 'Ajustar Posição dos Códigos QR na Página Única (Opcional)'
-                        : 'Ajustar Posição dos Códigos QR no Verso (Opcional)'}
-                    </span>
-                  </button>
+              {/* Posicionamento Visual dos Códigos QR no Convite (Arrastar e Soltar) */}
+              <div className="border border-border-custom rounded-2xl p-5 bg-card-bg shadow-sm space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                      <Move className="h-4 w-4 text-primary" />
+                      Posicionamento Visual dos Códigos QR (Arrastar & Soltar)
+                    </h3>
+                    <p className="text-xs text-foreground/60 mt-0.5">
+                      Clique e <strong>arraste</strong> as caixas dos códigos QR diretamente sobre a arte do convite. O PDF descarregado é rigorosamente no formato <strong>A4 Paisagem (297 × 210 mm)</strong>.
+                    </p>
+                  </div>
 
-                  <div className="flex items-center gap-2 flex-wrap">
+                  {/* Seletor de Página no editor (se Frente e Verso) */}
+                  {pdfMode === 'double_page' ? (
+                    <div className="inline-flex p-1 bg-secondary/30 rounded-xl border border-border-custom shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setEditorPreviewPage('page_2')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                          editorPreviewPage === 'page_2'
+                            ? 'bg-primary text-white shadow-sm'
+                            : 'text-foreground/70 hover:text-foreground'
+                        }`}
+                      >
+                        📖 Página 2: Verso (Principal)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditorPreviewPage('page_1')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                          editorPreviewPage === 'page_1'
+                            ? 'bg-primary text-white shadow-sm'
+                            : 'text-foreground/70 hover:text-foreground'
+                        }`}
+                      >
+                        📄 Página 1: Frente / Capa
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="text-xs font-semibold bg-primary/10 text-primary px-3 py-1.5 rounded-xl border border-primary/20 shrink-0">
+                      📄 Página Única Ativa
+                    </span>
+                  )}
+                </div>
+
+                {/* Dica de interação */}
+                <div className="flex items-center justify-between gap-2 text-xs bg-amber-500/10 text-amber-800 dark:text-amber-300 border border-amber-500/20 px-3.5 py-2 rounded-xl">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-amber-500 shrink-0" />
+                    <span>
+                      <strong>Editor Interativo:</strong> Pode arrastar os códigos verde (Mapa) e índigo (Acesso) livremente com o rato ou dedo.
+                    </span>
+                  </div>
+                  <span className="text-[11px] opacity-80 shrink-0 hidden sm:inline">Formato A4 (297 × 210 mm)</span>
+                </div>
+
+                {/* PALCO INTERATIVO DE ARRASTAR E SOLTAR (A4 Landscape 297:210) */}
+                <div
+                  ref={editorStageRef}
+                  className="relative w-full aspect-[297/210] max-w-4xl mx-auto rounded-2xl overflow-hidden border-2 border-border-custom bg-black/5 shadow-inner select-none touch-none"
+                >
+                  {/* Conteúdo de Fundo da Página Selecionada */}
+                  {editorPreviewPage === 'page_1' ? (
+                    templateSource === 'custom' && canvaCoverUrl ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img src={canvaCoverUrl} alt="Capa" className="w-full h-full object-cover pointer-events-none select-none" />
+                    ) : templateSource === 'custom' && isMarinela ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img src="/templates/canva/page_1.png" alt="Capa Oficial" className="w-full h-full object-cover pointer-events-none select-none" />
+                    ) : (
+                      /* Template Básico Dinâmico Página 1 */
+                      <div className="w-full h-full bg-[#FAF8F5] p-6 flex flex-col justify-between items-center text-center font-serif text-[#1c1c1e] border-4 border-[#D4AF37] relative pointer-events-none select-none">
+                        <div className="absolute inset-2 border border-[#E8D49E]" />
+                        <div className="my-auto space-y-2 relative z-10">
+                          <div className="w-14 h-14 rounded-full border-2 border-[#D4AF37] mx-auto flex items-center justify-center text-[#B89742] text-xl font-bold bg-[#FAF8F5]">
+                            {parseEventInitials(currentEvent?.title).initials || 'MB'}
+                          </div>
+                          <p className="text-xs uppercase tracking-widest text-[#8A7348] font-semibold">
+                            {pdfMode === 'single_page' ? 'Página Única do Convite' : 'Capa do Convite'}
+                          </p>
+                          <h2 className="text-xl sm:text-2xl font-bold text-[#1A1A1A] max-w-md">{currentEvent?.title || 'Título do Evento'}</h2>
+                          <p className="text-xs text-[#2D241E]">
+                            {currentEvent?.date ? new Date(currentEvent.date).toLocaleDateString('pt-PT', { day: 'numeric', month: 'long', year: 'numeric' }) : 'Data do Evento'}
+                          </p>
+                          <div className="bg-[#F5EFE6] border border-[#D4AF37]/60 rounded-xl px-6 py-2 text-center max-w-sm mx-auto mt-2">
+                            <p className="text-xs font-bold text-[#1C1C1E]">Convidado de Demonstração</p>
+                            <p className="text-[10px] text-[#8A7348]">Mesa de Honra • 2 Convidados</p>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  ) : (
+                    templateSource === 'custom' && canvaInfoUrl ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img src={canvaInfoUrl} alt="Verso" className="w-full h-full object-cover pointer-events-none select-none" />
+                    ) : templateSource === 'custom' && isMarinela ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img src="/templates/canva/page_2_clean.png" alt="Verso Oficial" className="w-full h-full object-cover pointer-events-none select-none" />
+                    ) : (
+                      /* Template Básico Dinâmico Página 2 (Tríptico) */
+                      <div className="w-full h-full bg-[#FAF8F5] p-3 flex font-serif text-[#1c1c1e] border-4 border-[#D4AF37] relative pointer-events-none select-none">
+                        <div className="absolute inset-1 border border-[#E8D49E]" />
+                        <div className="flex-1 border-r border-[#E8D49E] p-2 flex flex-col justify-between items-center text-center">
+                          <p className="text-xs font-bold text-[#B89742] uppercase">Localizações</p>
+                          <p className="text-[10px] text-zinc-600 line-clamp-1">{currentEvent?.ceremony_location || 'Local da Cerimónia'}</p>
+                          <p className="text-[10px] text-zinc-600 line-clamp-1">{currentEvent?.party_location || 'Local da Festa'}</p>
+                          <div className="w-16 h-16 bg-white border border-[#E8D49E] rounded flex items-center justify-center text-[10px] text-zinc-400">QR Mapa</div>
+                        </div>
+                        <div className="flex-1 border-r border-[#E8D49E] p-2 flex flex-col justify-between items-center text-center">
+                          <p className="text-xs font-bold text-[#B89742] uppercase">Celebração</p>
+                          <p className="text-[10px] text-zinc-600 line-clamp-3">{currentEvent?.description || 'Esperamos por si para celebrar este momento especial.'}</p>
+                          <p className="text-[10px] text-[#8A7348] italic">Meu Boda</p>
+                        </div>
+                        <div className="flex-1 p-2 flex flex-col justify-between items-center text-center">
+                          <p className="text-xs font-bold text-[#B89742] uppercase">Passe Entrada</p>
+                          <p className="text-[10px] font-bold text-zinc-800">Convidado</p>
+                          <div className="w-16 h-16 bg-white border border-[#E8D49E] rounded flex items-center justify-center text-[10px] text-zinc-400">QR Acesso</div>
+                        </div>
+                      </div>
+                    )
+                  )}
+
+                  {/* CÓDIGOS QR ARRASTÁVEIS */}
+                  {/* 1. QR Localizações */}
+                  {showLocationsQr && (
+                    <div
+                      onPointerDown={(e) => handleStartDrag('loc', e)}
+                      className={`absolute z-30 select-none touch-none rounded-xl bg-white border-2 border-emerald-500 shadow-xl flex flex-col items-center justify-between p-1 cursor-grab active:cursor-grabbing transition-shadow ${
+                        draggedQr === 'loc' ? 'ring-4 ring-emerald-400 shadow-2xl scale-105' : 'hover:scale-[1.02]'
+                      }`}
+                      style={{
+                        left: `${qrLocCoords.left}%`,
+                        top: `${qrLocCoords.top}%`,
+                        width: `${qrLocCoords.width}%`,
+                        height: `${qrLocCoords.height}%`,
+                      }}
+                    >
+                      <div className="w-full flex items-center justify-between px-1 mb-0.5 text-[9px] font-bold text-emerald-800 bg-emerald-50 rounded">
+                        <span className="flex items-center gap-0.5 truncate"><MapPin className="h-2.5 w-2.5 text-emerald-600" /> QR Mapa</span>
+                        <Move className="h-2.5 w-2.5 text-emerald-500 shrink-0" />
+                      </div>
+                      <div className="flex-1 w-full flex items-center justify-center bg-white rounded p-0.5 overflow-hidden">
+                        <QrCode className="h-full w-full text-emerald-700 max-h-16 object-contain" />
+                      </div>
+                      <span className="text-[8px] font-mono text-emerald-700 font-semibold bg-emerald-50/80 px-1 rounded mt-0.5">
+                        {qrLocCoords.left.toFixed(1)}%, {qrLocCoords.top.toFixed(1)}%
+                      </span>
+                    </div>
+                  )}
+
+                  {/* 2. QR Acesso */}
+                  {showAccessQr && (
+                    <div
+                      onPointerDown={(e) => handleStartDrag('access', e)}
+                      className={`absolute z-30 select-none touch-none rounded-xl bg-white border-2 border-indigo-500 shadow-xl flex flex-col items-center justify-between p-1 cursor-grab active:cursor-grabbing transition-shadow ${
+                        draggedQr === 'access' ? 'ring-4 ring-indigo-400 shadow-2xl scale-105' : 'hover:scale-[1.02]'
+                      }`}
+                      style={{
+                        left: `${qrAccessCoords.left}%`,
+                        top: `${qrAccessCoords.top}%`,
+                        width: `${qrAccessCoords.width}%`,
+                        height: `${qrAccessCoords.height}%`,
+                      }}
+                    >
+                      <div className="w-full flex items-center justify-between px-1 mb-0.5 text-[9px] font-bold text-indigo-800 bg-indigo-50 rounded">
+                        <span className="flex items-center gap-0.5 truncate"><QrCode className="h-2.5 w-2.5 text-indigo-600" /> QR Acesso</span>
+                        <Move className="h-2.5 w-2.5 text-indigo-500 shrink-0" />
+                      </div>
+                      <div className="flex-1 w-full flex items-center justify-center bg-white rounded p-0.5 overflow-hidden">
+                        <QrCode className="h-full w-full text-indigo-700 max-h-16 object-contain" />
+                      </div>
+                      <span className="text-[8px] font-mono text-indigo-700 font-semibold bg-indigo-50/80 px-1 rounded mt-0.5">
+                        {qrAccessCoords.left.toFixed(1)}%, {qrAccessCoords.top.toFixed(1)}%
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* BOTÕES DE PRESET RÁPIDO & TAMANHO */}
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-semibold text-foreground/70">Posições Rápidas:</span>
                     <button
                       type="button"
-                      onClick={() => {
-                        setQrLocCoords({ left: 10, top: 76, width: 14, height: 18 });
-                        setQrAccessCoords({ left: 76, top: 76, width: 14, height: 18 });
-                      }}
-                      className="text-[11px] bg-secondary/40 hover:bg-secondary px-2.5 py-1 rounded-lg text-foreground/70 hover:text-foreground transition-colors cursor-pointer"
-                      title="Aplicar coordenadas ideais para página única"
+                      onClick={() => handleApplyPreset('corners')}
+                      className="px-2.5 py-1 text-xs bg-secondary/30 hover:bg-secondary/60 rounded-lg text-foreground/80 transition-colors cursor-pointer"
                     >
-                      Padrão Página Única
+                      Cantos Inferiores
                     </button>
                     <button
                       type="button"
-                      onClick={() => {
-                        setQrLocCoords({ left: 8.76, top: 69.56, width: 11.85, height: 16.76 });
-                        setQrAccessCoords({ left: 80.99, top: 54.14, width: 13.10, height: 18.52 });
-                      }}
-                      className="text-[11px] bg-secondary/40 hover:bg-secondary px-2.5 py-1 rounded-lg text-foreground/70 hover:text-foreground transition-colors cursor-pointer"
-                      title="Aplicar coordenadas ideais para tríptico"
+                      onClick={() => handleApplyPreset(pdfMode === 'single_page' ? 'single' : 'triptych')}
+                      className="px-2.5 py-1 text-xs bg-secondary/30 hover:bg-secondary/60 rounded-lg text-foreground/80 transition-colors cursor-pointer"
                     >
-                      Padrão Tríptico
+                      {pdfMode === 'single_page' ? 'Padrão Página Única' : 'Padrão Tríptico'}
                     </button>
                     <button
                       type="button"
-                      onClick={handleResetCanvaDefaults}
-                      className="flex items-center gap-1 text-[11px] text-foreground/50 hover:text-foreground transition-colors cursor-pointer ml-1"
+                      onClick={() => handleApplyPreset('bottom_center')}
+                      className="px-2.5 py-1 text-xs bg-secondary/30 hover:bg-secondary/60 rounded-lg text-foreground/80 transition-colors cursor-pointer"
                     >
-                      <RotateCcw className="h-3 w-3" />
-                      <span>Repor</span>
+                      Centro Inferior
+                    </button>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-foreground/70">Tamanho:</span>
+                    <button
+                      type="button"
+                      onClick={() => handleApplyQrSize('sm')}
+                      className="px-2 py-1 text-xs bg-secondary/30 hover:bg-secondary/60 rounded-lg text-foreground/80 transition-colors cursor-pointer"
+                    >
+                      Pequeno
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleApplyQrSize('md')}
+                      className="px-2 py-1 text-xs bg-primary/20 text-primary font-semibold rounded-lg hover:bg-primary/30 transition-colors cursor-pointer"
+                    >
+                      Médio (Recomendado)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleApplyQrSize('lg')}
+                      className="px-2 py-1 text-xs bg-secondary/30 hover:bg-secondary/60 rounded-lg text-foreground/80 transition-colors cursor-pointer"
+                    >
+                      Grande
                     </button>
                   </div>
                 </div>
 
-                {showQrFineTuning && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-border-custom/60 animate-in fade-in">
-                    {/* QR Localizações */}
-                    <div className="p-3 bg-card-bg rounded-xl border border-emerald-500/20 space-y-3">
-                      <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                        Código QR de Localização {pdfMode === 'single_page' ? '(Página Única)' : '(Aba Esquerda)'}
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 text-[11px]">
-                        <div>
-                          <label className="text-foreground/60 block mb-1">Posição X (%):</label>
-                          <input
-                            type="number"
-                            step="0.1"
-                            value={qrLocCoords.left}
-                            onChange={(e) => setQrLocCoords({ ...qrLocCoords, left: parseFloat(e.target.value) || 0 })}
-                            className="w-full bg-secondary/10 border border-border-custom rounded-lg px-2 py-1 text-xs"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-foreground/60 block mb-1">Posição Y (%):</label>
-                          <input
-                            type="number"
-                            step="0.1"
-                            value={qrLocCoords.top}
-                            onChange={(e) => setQrLocCoords({ ...qrLocCoords, top: parseFloat(e.target.value) || 0 })}
-                            className="w-full bg-secondary/10 border border-border-custom rounded-lg px-2 py-1 text-xs"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-foreground/60 block mb-1">Largura (%):</label>
-                          <input
-                            type="number"
-                            step="0.1"
-                            value={qrLocCoords.width}
-                            onChange={(e) => setQrLocCoords({ ...qrLocCoords, width: parseFloat(e.target.value) || 0 })}
-                            className="w-full bg-secondary/10 border border-border-custom rounded-lg px-2 py-1 text-xs"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-foreground/60 block mb-1">Altura (%):</label>
-                          <input
-                            type="number"
-                            step="0.1"
-                            value={qrLocCoords.height}
-                            onChange={(e) => setQrLocCoords({ ...qrLocCoords, height: parseFloat(e.target.value) || 0 })}
-                            className="w-full bg-secondary/10 border border-border-custom rounded-lg px-2 py-1 text-xs"
-                          />
-                        </div>
-                      </div>
-                    </div>
+                {/* Acordeão de Ajuste Numérico Fino */}
+                <div className="pt-2 border-t border-border-custom/50">
+                  <button
+                    type="button"
+                    onClick={() => setShowQrFineTuning(!showQrFineTuning)}
+                    className="flex items-center gap-1.5 text-xs text-foreground/60 hover:text-foreground transition-colors cursor-pointer font-medium"
+                  >
+                    <Sliders className="h-3.5 w-3.5" />
+                    <span>{showQrFineTuning ? 'Ocultar Coordenadas Numéricas (X, Y, Largura, Altura)' : 'Ver Coordenadas Numéricas Detalhadas (X, Y, Largura, Altura)'}</span>
+                  </button>
 
-                    {/* QR Acesso */}
-                    <div className="p-3 bg-card-bg rounded-xl border border-indigo-500/20 space-y-3">
-                      <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-600 dark:text-indigo-400">
-                        <span className="w-2 h-2 rounded-full bg-indigo-500" />
-                        Código QR de Acesso {pdfMode === 'single_page' ? '(Página Única)' : '(Aba Direita)'}
+                  {showQrFineTuning && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3 animate-in fade-in">
+                      {/* Inputs QR Localizações */}
+                      <div className="p-3 bg-secondary/10 rounded-xl border border-emerald-500/20 space-y-2">
+                        <span className="text-xs font-bold text-emerald-600 flex items-center gap-1">
+                          <MapPin className="h-3.5 w-3.5" /> QR Localização (GPS)
+                        </span>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div>
+                            <label className="text-[10px] text-foreground/60 block">Posição X (%):</label>
+                            <input
+                              type="number"
+                              min="0"
+                              max="90"
+                              step="0.1"
+                              value={qrLocCoords.left}
+                              onChange={(e) => setQrLocCoords({ ...qrLocCoords, left: Math.max(0, Math.min(90, parseFloat(e.target.value) || 0)) })}
+                              className="w-full bg-card-bg border border-border-custom rounded-lg px-2 py-1 text-xs"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-foreground/60 block">Posição Y (%):</label>
+                            <input
+                              type="number"
+                              min="0"
+                              max="90"
+                              step="0.1"
+                              value={qrLocCoords.top}
+                              onChange={(e) => setQrLocCoords({ ...qrLocCoords, top: Math.max(0, Math.min(90, parseFloat(e.target.value) || 0)) })}
+                              className="w-full bg-card-bg border border-border-custom rounded-lg px-2 py-1 text-xs"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-foreground/60 block">Largura (%):</label>
+                            <input
+                              type="number"
+                              min="6"
+                              max="40"
+                              step="0.1"
+                              value={qrLocCoords.width}
+                              onChange={(e) => setQrLocCoords({ ...qrLocCoords, width: Math.max(6, Math.min(40, parseFloat(e.target.value) || 10)) })}
+                              className="w-full bg-card-bg border border-border-custom rounded-lg px-2 py-1 text-xs"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-foreground/60 block">Altura (%):</label>
+                            <input
+                              type="number"
+                              min="8"
+                              max="45"
+                              step="0.1"
+                              value={qrLocCoords.height}
+                              onChange={(e) => setQrLocCoords({ ...qrLocCoords, height: Math.max(8, Math.min(45, parseFloat(e.target.value) || 14)) })}
+                              className="w-full bg-card-bg border border-border-custom rounded-lg px-2 py-1 text-xs"
+                            />
+                          </div>
+                        </div>
                       </div>
-                      <div className="grid grid-cols-2 gap-2 text-[11px]">
-                        <div>
-                          <label className="text-foreground/60 block mb-1">Posição X (%):</label>
-                          <input
-                            type="number"
-                            step="0.1"
-                            value={qrAccessCoords.left}
-                            onChange={(e) => setQrAccessCoords({ ...qrAccessCoords, left: parseFloat(e.target.value) || 0 })}
-                            className="w-full bg-secondary/10 border border-border-custom rounded-lg px-2 py-1 text-xs"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-foreground/60 block mb-1">Posição Y (%):</label>
-                          <input
-                            type="number"
-                            step="0.1"
-                            value={qrAccessCoords.top}
-                            onChange={(e) => setQrAccessCoords({ ...qrAccessCoords, top: parseFloat(e.target.value) || 0 })}
-                            className="w-full bg-secondary/10 border border-border-custom rounded-lg px-2 py-1 text-xs"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-foreground/60 block mb-1">Largura (%):</label>
-                          <input
-                            type="number"
-                            step="0.1"
-                            value={qrAccessCoords.width}
-                            onChange={(e) => setQrAccessCoords({ ...qrAccessCoords, width: parseFloat(e.target.value) || 0 })}
-                            className="w-full bg-secondary/10 border border-border-custom rounded-lg px-2 py-1 text-xs"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-foreground/60 block mb-1">Altura (%):</label>
-                          <input
-                            type="number"
-                            step="0.1"
-                            value={qrAccessCoords.height}
-                            onChange={(e) => setQrAccessCoords({ ...qrAccessCoords, height: parseFloat(e.target.value) || 0 })}
-                            className="w-full bg-secondary/10 border border-border-custom rounded-lg px-2 py-1 text-xs"
-                          />
+
+                      {/* Inputs QR Acesso */}
+                      <div className="p-3 bg-secondary/10 rounded-xl border border-indigo-500/20 space-y-2">
+                        <span className="text-xs font-bold text-indigo-600 flex items-center gap-1">
+                          <QrCode className="h-3.5 w-3.5" /> QR Acesso / Portaria
+                        </span>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div>
+                            <label className="text-[10px] text-foreground/60 block">Posição X (%):</label>
+                            <input
+                              type="number"
+                              min="0"
+                              max="90"
+                              step="0.1"
+                              value={qrAccessCoords.left}
+                              onChange={(e) => setQrAccessCoords({ ...qrAccessCoords, left: Math.max(0, Math.min(90, parseFloat(e.target.value) || 0)) })}
+                              className="w-full bg-card-bg border border-border-custom rounded-lg px-2 py-1 text-xs"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-foreground/60 block">Posição Y (%):</label>
+                            <input
+                              type="number"
+                              min="0"
+                              max="90"
+                              step="0.1"
+                              value={qrAccessCoords.top}
+                              onChange={(e) => setQrAccessCoords({ ...qrAccessCoords, top: Math.max(0, Math.min(90, parseFloat(e.target.value) || 0)) })}
+                              className="w-full bg-card-bg border border-border-custom rounded-lg px-2 py-1 text-xs"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-foreground/60 block">Largura (%):</label>
+                            <input
+                              type="number"
+                              min="6"
+                              max="40"
+                              step="0.1"
+                              value={qrAccessCoords.width}
+                              onChange={(e) => setQrAccessCoords({ ...qrAccessCoords, width: Math.max(6, Math.min(40, parseFloat(e.target.value) || 10)) })}
+                              className="w-full bg-card-bg border border-border-custom rounded-lg px-2 py-1 text-xs"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-foreground/60 block">Altura (%):</label>
+                            <input
+                              type="number"
+                              min="8"
+                              max="45"
+                              step="0.1"
+                              value={qrAccessCoords.height}
+                              onChange={(e) => setQrAccessCoords({ ...qrAccessCoords, height: Math.max(8, Math.min(45, parseFloat(e.target.value) || 14)) })}
+                              className="w-full bg-card-bg border border-border-custom rounded-lg px-2 py-1 text-xs"
+                            />
+                          </div>
                         </div>
                       </div>
                     </div>
+                  )}
+                </div>
+
+                {/* Ações: Descarregar Teste A4 e Guardar Configuração */}
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-border-custom">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleDownloadTestPdf}
+                      disabled={isGeneratingTestPdf}
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border-custom bg-secondary/20 hover:bg-secondary/40 text-foreground font-semibold text-xs transition-all cursor-pointer shadow-sm"
+                    >
+                      {isGeneratingTestPdf ? (
+                        <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                      ) : (
+                        <Download className="h-4 w-4 text-primary" />
+                      )}
+                      <span>Descarregar Teste em PDF (A4)</span>
+                    </button>
+                    <span className="text-[11px] text-foreground/50 hidden md:inline">
+                      Gera um PDF A4 de amostra com os códigos QR nas posições definidas.
+                    </span>
                   </div>
-                )}
-              </div>
 
-              {/* Botão de Guardar Configuração do Template Canva */}
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-border-custom">
-                <p className="text-[11px] text-foreground/50">
-                  *As alterações de imagens e posições serão aplicadas a todos os PDFs descarregados na página de Convites.
-                </p>
-                <Button
-                  type="button"
-                  onClick={handleSaveCanvaConfig}
-                  isLoading={isSavingCanva}
-                  className="rounded-xl px-5 w-full sm:w-auto"
-                >
-                  Guardar Template Canva
-                </Button>
+                  <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                    <Button
+                      type="button"
+                      onClick={handleSaveCanvaConfig}
+                      isLoading={isSavingCanva}
+                      className="rounded-xl px-5 w-full sm:w-auto cursor-pointer"
+                    >
+                      Guardar Template Canva
+                    </Button>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
