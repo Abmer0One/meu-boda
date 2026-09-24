@@ -109,8 +109,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [newEventModalOpen, setNewEventModalOpen] = useState(false);
   const [eventTitle, setEventTitle] = useState('');
   const [eventSlug, setEventSlug] = useState('');
-  const [eventType, setEventType] = useState<'casamento' | 'aniversario' | 'pedido' | 'outro'>('casamento');
+  const [eventType, setEventType] = useState<'casamento' | 'casamento_tradicional' | 'alambamento' | 'noivado' | 'pedido' | 'aniversario' | 'outro'>('casamento');
   const [eventDate, setEventDate] = useState('');
+  const [eventLocation, setEventLocation] = useState('');
+  const [eventMapsUrl, setEventMapsUrl] = useState('');
   const [isCreatingEvent, setIsCreatingEvent] = useState(false);
   const [slugStatus, setSlugStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
   const [formError, setFormError] = useState<string | null>(null);
@@ -195,8 +197,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         type: eventType,
         date: new Date(eventDate).toISOString(),
         description: '',
-        ceremony_location: '',
+        ceremony_location: eventLocation || null,
         party_location: '',
+        ceremony_maps_url: eventMapsUrl || null,
         theme: '',
         cover_image: null,
       });
@@ -218,6 +221,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         setEventSlug('');
         setEventType('casamento');
         setEventDate('');
+        setEventLocation('');
+        setEventMapsUrl('');
         setSlugStatus('idle');
         setFormError(null);
       }
@@ -515,8 +520,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               className="w-full rounded-xl border border-border-custom bg-card-bg px-3.5 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all duration-200"
             >
               <option value="casamento">Casamento</option>
+              <option value="casamento_tradicional">Casamento Tradicional</option>
+              <option value="noivado">Noivado</option>
               <option value="aniversario">Aniversário</option>
-              <option value="pedido">Pedido de Casamento / Noivado</option>
               <option value="outro">Outro Evento</option>
             </select>
           </div>
@@ -525,10 +531,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             label={
               eventType === 'casamento'
                 ? 'Nome do Casamento (ex: Maria & João)'
+                : eventType === 'casamento_tradicional' || eventType === 'alambamento'
+                ? 'Nome do Casamento Tradicional (ex: Maria & João)'
+                : eventType === 'noivado' || eventType === 'pedido'
+                ? 'Nome do Noivado (ex: Carlos & Clara)'
                 : eventType === 'aniversario'
                 ? 'Nome do Aniversário (ex: Sofia - 30 Anos)'
-                : eventType === 'pedido'
-                ? 'Nome do Pedido / Noivado (ex: Carlos & Clara)'
                 : 'Nome do Evento (ex: Gala Anual)'
             }
             value={eventTitle}
@@ -536,10 +544,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             placeholder={
               eventType === 'casamento'
                 ? 'Noiva & Noivo'
+                : eventType === 'casamento_tradicional' || eventType === 'alambamento'
+                ? 'Noiva & Noivo'
+                : eventType === 'noivado' || eventType === 'pedido'
+                ? 'Carlos & Clara'
                 : eventType === 'aniversario'
                 ? 'Sofia - 30 Anos'
-                : eventType === 'pedido'
-                ? 'Carlos & Clara'
                 : 'Nome do Evento'
             }
             required
@@ -584,10 +594,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             label={
               eventType === 'casamento'
                 ? 'Data e Hora do Casamento'
+                : eventType === 'casamento_tradicional' || eventType === 'alambamento'
+                ? 'Data e Hora do Casamento Tradicional'
+                : eventType === 'noivado' || eventType === 'pedido'
+                ? 'Data e Hora do Noivado'
                 : eventType === 'aniversario'
                 ? 'Data e Hora do Aniversário'
-                : eventType === 'pedido'
-                ? 'Data e Hora do Pedido'
                 : 'Data e Hora do Evento'
             }
             type="datetime-local"
@@ -595,6 +607,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             onChange={(e) => setEventDate(e.target.value)}
             required
           />
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 border-t border-border-custom/40">
+            <Input
+              label="Local Principal do Evento (Opcional)"
+              value={eventLocation}
+              onChange={(e) => setEventLocation(e.target.value)}
+              placeholder="ex: Hotel Epic Sana, Luanda"
+            />
+            <Input
+              label="Coordenadas / GPS / Maps (Opcional)"
+              value={eventMapsUrl}
+              onChange={(e) => setEventMapsUrl(e.target.value)}
+              placeholder="ex: -8.8159,13.2306 ou link maps"
+              helperText="Coordenadas (lat, long) ou link Google Maps."
+            />
+          </div>
 
           <div className="flex justify-end gap-2 pt-2">
             <Button
@@ -604,6 +632,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 setNewEventModalOpen(false);
                 setFormError(null);
                 setSlugStatus('idle');
+                setEventLocation('');
+                setEventMapsUrl('');
               }}
             >
               Cancelar

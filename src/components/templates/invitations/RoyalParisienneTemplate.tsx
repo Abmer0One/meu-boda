@@ -56,15 +56,26 @@ export default function RoyalParisienneTemplate({
           intro: 'Com a bênção de Deus e de nossas famílias, convidamo-vos para partilhar connosco este dia.',
           outro: 'A vossa presença tornará o nosso dia ainda mais inesquecível e feliz.',
         };
-      case 'aniversario':
+      case 'casamento_tradicional':
         return {
-          intro: 'A vida é uma dádiva e celebrá-la ao lado de pessoas queridas é a maior das alegrias.',
-          outro: 'Espero por si para partilhar abraços, sorrisos e brindes a este novo ciclo.',
+          intro: 'Em união com as nossas tradições e as nossas famílias, convidamo-vos para o nosso Casamento Tradicional.',
+          outro: 'Vem testemunhar o início do nosso compromisso e celebrar o amor familiar.',
         };
       case 'alambamento':
         return {
           intro: 'Em união com as nossas tradições e as nossas famílias, convidamo-vos para o nosso Alambamento.',
           outro: 'Vem testemunhar o início do nosso compromisso e celebrar o amor familiar.',
+        };
+      case 'noivado':
+      case 'pedido':
+        return {
+          intro: 'Com imensa alegria nos nossos corações, convidamo-vos para celebrar o nosso Noivado.',
+          outro: 'A vossa presença tornará este momento do nosso sim ainda mais especial e inesquecível.',
+        };
+      case 'aniversario':
+        return {
+          intro: 'A vida é uma dádiva e celebrá-la ao lado de pessoas queridas é a maior das alegrias.',
+          outro: 'Espero por si para partilhar abraços, sorrisos e brindes a este novo ciclo.',
         };
       case 'cha_panela':
         return {

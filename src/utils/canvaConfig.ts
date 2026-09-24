@@ -9,6 +9,7 @@ export interface QrCoordinates {
 }
 
 export interface CanvaTemplateConfig {
+  template_source?: 'basic' | 'custom';
   canva_cover_url?: string | null;
   canva_info_url?: string | null;
   pdf_mode?: 'double_page' | 'single_page';
@@ -138,6 +139,7 @@ export function resolveCanvaConfig(
   const isMarinela = isMarinelaAbiudEvent(actualEvent || actualEventId);
 
   let resolved: CanvaTemplateConfig = {
+    template_source: undefined,
     canva_cover_url: null,
     canva_info_url: null,
     pdf_mode: 'double_page',
@@ -150,6 +152,7 @@ export function resolveCanvaConfig(
 
   // 1. From template_config if present
   if (templateConfig) {
+    if (templateConfig.template_source) resolved.template_source = templateConfig.template_source;
     if (isCleanCanvaUrl(templateConfig.canva_cover_url, isMarinela)) {
       resolved.canva_cover_url = templateConfig.canva_cover_url;
     }
@@ -169,6 +172,7 @@ export function resolveCanvaConfig(
     if (configBlock?.content) {
       try {
         const parsed = JSON.parse(configBlock.content);
+        if (parsed.template_source) resolved.template_source = parsed.template_source;
         if (isCleanCanvaUrl(parsed.canva_cover_url, isMarinela)) {
           resolved.canva_cover_url = parsed.canva_cover_url;
         }
@@ -192,6 +196,7 @@ export function resolveCanvaConfig(
       const stored = localStorage.getItem(`canva_template_${actualEventId}`);
       if (stored) {
         const parsed = JSON.parse(stored);
+        if (parsed.template_source && !resolved.template_source) resolved.template_source = parsed.template_source;
         if (!resolved.canva_cover_url && isCleanCanvaUrl(parsed.canva_cover_url, isMarinela)) {
           resolved.canva_cover_url = parsed.canva_cover_url;
         }
@@ -211,14 +216,23 @@ export function resolveCanvaConfig(
 
   // 4. Default fallbacks:
   // ONLY Marinela & Abiúd fallback to the official /templates/canva/ artwork.
-  // All other events without custom uploaded artwork remain with null URLs,
-  // designating them to use the dynamic Basic Template with QR codes.
   if (isMarinela) {
     resolved.canva_cover_url = resolved.canva_cover_url || DEFAULT_CANVA_COVER;
     resolved.canva_info_url = resolved.canva_info_url || DEFAULT_CANVA_INFO;
-    resolved.is_basic_template = false;
+    resolved.template_source = resolved.template_source || 'custom';
+    resolved.is_basic_template = resolved.template_source === 'basic';
   } else {
-    resolved.is_basic_template = !resolved.canva_cover_url && !resolved.canva_info_url;
+    // If user explicitly chose basic or custom
+    if (resolved.template_source === 'basic') {
+      resolved.is_basic_template = true;
+    } else if (resolved.template_source === 'custom') {
+      resolved.is_basic_template = !resolved.canva_cover_url && !resolved.canva_info_url;
+    } else {
+      // Auto-detect: if uploaded artwork exists, it's custom; otherwise basic
+      const hasUpload = Boolean(resolved.canva_cover_url || resolved.canva_info_url);
+      resolved.template_source = hasUpload ? 'custom' : 'basic';
+      resolved.is_basic_template = !hasUpload;
+    }
   }
 
   return resolved;
@@ -257,20 +271,28 @@ export async function persistCanvaConfig(
       .maybeSingle();
 
     if (existing?.id) {
-      await supabase
+      // Do NOT pass updated_at: event_info_blocks does not have an updated_at column
+      const { error: updateErr } = await supabase
         .from('event_info_blocks')
         .update({
           content: jsonString,
-          updated_at: new Date().toISOString(),
         })
         .eq('id', existing.id);
+
+      if (updateErr) {
+        console.error('Error updating event_info_blocks canva config:', updateErr);
+      }
     } else {
-      await supabase.from('event_info_blocks').insert({
+      const { error: insertErr } = await supabase.from('event_info_blocks').insert({
         event_id: eventId,
         title: CANVA_CONFIG_BLOCK_TITLE,
         content: jsonString,
         sort_order: 9999,
       });
+
+      if (insertErr) {
+        console.error('Error inserting event_info_blocks canva config:', insertErr);
+      }
     }
   } catch (err) {
     console.error('Error saving to event_info_blocks:', err);

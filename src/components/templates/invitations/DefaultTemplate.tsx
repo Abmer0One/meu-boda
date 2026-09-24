@@ -96,15 +96,26 @@ export default function DefaultTemplate({
           intro: 'Com a bênção de Deus e de nossas famílias, convidamo-vos para partilhar connosco este dia.',
           outro: 'A vossa presença tornará o nosso dia ainda mais inesquecível e feliz.',
         };
-      case 'aniversario':
+      case 'casamento_tradicional':
         return {
-          intro: 'A vida é uma dádiva e celebrá-la ao lado de pessoas queridas é a maior das alegrias.',
-          outro: 'Espero por si para partilhar abraços, sorrisos e brindes a este novo ciclo.',
+          intro: 'Em união com as nossas tradições e as nossas famílias, convidamo-vos para o nosso Casamento Tradicional.',
+          outro: 'Vem testemunhar o início do nosso compromisso e celebrar o amor familiar.',
         };
       case 'alambamento':
         return {
           intro: 'Em união com as nossas tradições e as nossas famílias, convidamo-vos para o nosso Alambamento.',
           outro: 'Vem testemunhar o início do nosso compromisso e celebrar o amor familiar.',
+        };
+      case 'noivado':
+      case 'pedido':
+        return {
+          intro: 'Com imensa alegria nos nossos corações, convidamo-vos para celebrar o nosso Noivado.',
+          outro: 'A vossa presença tornará este momento do nosso sim ainda mais especial e inesquecível.',
+        };
+      case 'aniversario':
+        return {
+          intro: 'A vida é uma dádiva e celebrá-la ao lado de pessoas queridas é a maior das alegrias.',
+          outro: 'Espero por si para partilhar abraços, sorrisos e brindes a este novo ciclo.',
         };
       case 'cha_panela':
         return {
@@ -168,8 +179,8 @@ export default function DefaultTemplate({
      ========================================================================= */
   if (isPrinting) {
     const canvaConfig = resolveCanvaConfig(event.id, event.template_config, infoBlocks, null, event);
-    const hasCustomCover = Boolean(canvaConfig.canva_cover_url);
-    const hasCustomInfo = Boolean(canvaConfig.canva_info_url);
+    const hasCustomCover = !canvaConfig.is_basic_template && Boolean(canvaConfig.canva_cover_url);
+    const hasCustomInfo = !canvaConfig.is_basic_template && Boolean(canvaConfig.canva_info_url);
     const isSinglePage = canvaConfig.pdf_mode === 'single_page';
 
     const locCoords = canvaConfig.qr_locations_coords || {
@@ -427,15 +438,23 @@ export default function DefaultTemplate({
               
               <div className="space-y-3 mt-4 text-xs text-left w-full px-2">
                 <div>
-                  <p className="font-bold text-[#2D241E]">Cerimónia Religiosa</p>
-                  <p className="text-zinc-600">{event.ceremony_location || 'Local a anunciar'}</p>
-                  {event.ceremony_time && <p className="text-[#8A7348] font-medium">Horário: {event.ceremony_time}</p>}
+                  <p className="font-bold text-[#2D241E]">
+                    {event.type === 'aniversario' ? 'Local da Celebração' : 'Cerimónia'}
+                  </p>
+                  <p className="text-zinc-600">{event.ceremony_location || event.party_location || 'Local a anunciar'}</p>
+                  {(event.ceremony_time || event.party_time) && (
+                    <p className="text-[#8A7348] font-medium">Horário: {event.ceremony_time || event.party_time}</p>
+                  )}
                 </div>
-                <div>
-                  <p className="font-bold text-[#2D241E]">Copos-de-Água & Festa</p>
-                  <p className="text-zinc-600">{event.party_location || 'Local a anunciar'}</p>
-                  {event.party_time && <p className="text-[#8A7348] font-medium">Horário: {event.party_time}</p>}
-                </div>
+                {event.party_location && event.ceremony_location && (
+                  <div>
+                    <p className="font-bold text-[#2D241E]">
+                      {event.type === 'aniversario' ? 'Festa / Convívio' : 'Copos-de-Água & Festa'}
+                    </p>
+                    <p className="text-zinc-600">{event.party_location}</p>
+                    {event.party_time && <p className="text-[#8A7348] font-medium">Horário: {event.party_time}</p>}
+                  </div>
+                )}
               </div>
             </div>
 

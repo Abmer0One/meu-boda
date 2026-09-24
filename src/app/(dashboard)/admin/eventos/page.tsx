@@ -30,6 +30,7 @@ export default function EventosPage() {
   const [slugStatus, setSlugStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
 
   // Canva Template States
+  const [templateSource, setTemplateSource] = useState<'basic' | 'custom'>('basic');
   const [pdfMode, setPdfMode] = useState<'double_page' | 'single_page'>('double_page');
   const [showLocationsQr, setShowLocationsQr] = useState(true);
   const [showAccessQr, setShowAccessQr] = useState(true);
@@ -84,6 +85,7 @@ export default function EventosPage() {
   const coverImageUrl = watch('cover_image');
   const backgroundImage = watch('background_image');
   const watchedSlug = watch('slug');
+  const watchedType = watch('type') || currentEvent?.type || 'casamento';
 
   // Real-time slug availability check with debounce
   useEffect(() => {
@@ -128,6 +130,7 @@ export default function EventosPage() {
       const localISOTime = new Date(dateObj.getTime() - tzOffset).toISOString().slice(0, 16);
 
       reset({
+        type: (currentEvent.type as any) || 'casamento',
         title: currentEvent.title,
         slug: currentEvent.slug,
         date: localISOTime,
@@ -152,6 +155,7 @@ export default function EventosPage() {
       });
 
       const resolved = resolveCanvaConfig(currentEvent.id, currentEvent.template_config, null, null, currentEvent);
+      setTemplateSource(resolved.template_source || (resolved.canva_cover_url || resolved.canva_info_url || isMarinela ? 'custom' : 'basic'));
       setCanvaCoverUrl(resolved.canva_cover_url || '');
       setCanvaInfoUrl(resolved.canva_info_url || '');
       setPdfMode(resolved.pdf_mode || 'double_page');
@@ -199,6 +203,7 @@ export default function EventosPage() {
       if (canvaBlock?.content) {
         try {
           const parsed = JSON.parse(canvaBlock.content);
+          if (parsed.template_source) setTemplateSource(parsed.template_source);
           if (parsed.canva_cover_url && isCleanCanvaUrl(parsed.canva_cover_url, isMarinela)) {
             setCanvaCoverUrl(parsed.canva_cover_url);
           } else if (!isMarinela) {
@@ -314,10 +319,12 @@ export default function EventosPage() {
         .getPublicUrl(fileName);
 
       setCanvaCoverUrl(publicUrl);
+      setTemplateSource('custom');
 
       // Auto-save across all storage layers
       const updatedConfig = {
         ...(currentEvent.template_config || {}),
+        template_source: 'custom' as const,
         canva_cover_url: publicUrl,
         canva_info_url: canvaInfoUrl || null,
         qr_locations_coords: qrLocCoords,
@@ -333,7 +340,7 @@ export default function EventosPage() {
         template_config: updatedConfig,
       });
 
-      setCanvaSuccessMessage('Capa do Canva carregada e guardada com sucesso!');
+      setCanvaSuccessMessage('Capa do Canva carregada e modelo personalizado ativado!');
       setTimeout(() => setCanvaSuccessMessage(null), 4000);
     } catch (err: any) {
       alert('Erro ao carregar a imagem da capa do Canva: ' + err.message);
@@ -366,10 +373,12 @@ export default function EventosPage() {
         .getPublicUrl(fileName);
 
       setCanvaInfoUrl(publicUrl);
+      setTemplateSource('custom');
 
       // Auto-save across all storage layers
       const updatedConfig = {
         ...(currentEvent.template_config || {}),
+        template_source: 'custom' as const,
         canva_cover_url: canvaCoverUrl || null,
         canva_info_url: publicUrl,
         qr_locations_coords: qrLocCoords,
@@ -385,7 +394,7 @@ export default function EventosPage() {
         template_config: updatedConfig,
       });
 
-      setCanvaSuccessMessage('Verso do Canva carregado e guardado com sucesso!');
+      setCanvaSuccessMessage('Verso do Canva carregado e modelo personalizado ativado!');
       setTimeout(() => setCanvaSuccessMessage(null), 4000);
     } catch (err: any) {
       alert('Erro ao carregar a imagem do verso do Canva: ' + err.message);
@@ -398,9 +407,12 @@ export default function EventosPage() {
   const handleRemoveCanvaCover = async () => {
     if (!currentEvent) return;
     setCanvaCoverUrl('');
+    const newSource: 'basic' | 'custom' = canvaInfoUrl ? 'custom' : 'basic';
+    setTemplateSource(newSource);
     try {
       const updatedConfig = {
         ...(currentEvent.template_config || {}),
+        template_source: newSource,
         canva_cover_url: null,
         canva_info_url: canvaInfoUrl || null,
         qr_locations_coords: qrLocCoords,
@@ -425,9 +437,12 @@ export default function EventosPage() {
   const handleRemoveCanvaInfo = async () => {
     if (!currentEvent) return;
     setCanvaInfoUrl('');
+    const newSource: 'basic' | 'custom' = canvaCoverUrl ? 'custom' : 'basic';
+    setTemplateSource(newSource);
     try {
       const updatedConfig = {
         ...(currentEvent.template_config || {}),
+        template_source: newSource,
         canva_cover_url: canvaCoverUrl || null,
         canva_info_url: null,
         qr_locations_coords: qrLocCoords,
@@ -456,6 +471,7 @@ export default function EventosPage() {
     try {
       const updatedConfig = {
         ...(currentEvent.template_config || {}),
+        template_source: templateSource,
         canva_cover_url: canvaCoverUrl || null,
         canva_info_url: canvaInfoUrl || null,
         qr_locations_coords: qrLocCoords,
@@ -614,6 +630,7 @@ export default function EventosPage() {
     try {
       const updatedConfig = {
         ...(currentEvent.template_config || {}),
+        template_source: templateSource,
         canva_cover_url: canvaCoverUrl || null,
         canva_info_url: canvaInfoUrl || null,
         qr_locations_coords: qrLocCoords,
@@ -626,6 +643,7 @@ export default function EventosPage() {
       await persistCanvaConfig(currentEvent.id, updatedConfig);
 
       const updatedEvent = await EventRepository.update(currentEvent.id, {
+        type: data.type,
         title: data.title,
         slug: cleanSlug || data.slug,
         date: new Date(data.date).toISOString(),
@@ -706,7 +724,20 @@ export default function EventosPage() {
                   </div>
                 )}
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-semibold text-foreground/75 tracking-wide">Tipo de Evento</label>
+                    <select
+                      {...register('type')}
+                      className="w-full rounded-xl border border-border-custom bg-card-bg px-3.5 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all duration-200"
+                    >
+                      <option value="casamento">Casamento</option>
+                      <option value="casamento_tradicional">Casamento Tradicional</option>
+                      <option value="noivado">Noivado</option>
+                      <option value="aniversario">Aniversário</option>
+                      <option value="outro">Outro Evento</option>
+                    </select>
+                  </div>
                   <Input
                     label="Título do Evento"
                     placeholder="Ana & Pedro"
@@ -761,74 +792,77 @@ export default function EventosPage() {
                   />
                 </div>
 
-                {currentEvent.type === 'casamento' ? (
-                  <>
-                    <div className="border-t border-border-custom pt-4 mt-2 space-y-4">
-                      <h4 className="text-sm font-semibold text-primary">Cerimónia / Igreja</h4>
-                      <Input
-                        label="Igreja / Local da Cerimónia"
-                        placeholder="Igreja de Nossa Senhora de Fátima, Luanda"
-                        error={errors.ceremony_location?.message}
-                        {...register('ceremony_location')}
-                      />
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <Input
-                          label="Hora da Cerimónia"
-                          placeholder="Ex: 15:30"
-                          error={errors.ceremony_time?.message}
-                          {...register('ceremony_time')}
-                        />
-                        <Input
-                          label="Link Google Maps / Endereço / Coordenadas"
-                          placeholder="Ex: -8.8159,13.2306 ou link maps"
-                          error={errors.ceremony_maps_url?.message}
-                          {...register('ceremony_maps_url')}
-                          helperText="Cole coordenadas (latitude, longitude), link do Google Maps ou endereço."
-                        />
-                      </div>
-                    </div>
+                {/* Localização Principal & Coordenadas GPS (Para todos os tipos de eventos) */}
+                <div className="border-t border-border-custom pt-4 mt-2 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-semibold text-primary">
+                      {watchedType === 'casamento'
+                        ? 'Cerimónia / Igreja'
+                        : watchedType === 'casamento_tradicional'
+                        ? 'Local do Casamento Tradicional'
+                        : watchedType === 'noivado'
+                        ? 'Local do Noivado'
+                        : watchedType === 'aniversario'
+                        ? 'Local do Aniversário / Festa Principal'
+                        : 'Local Principal do Evento'}
+                    </h4>
+                    <span className="text-[10px] text-foreground/50">Localização e Coordenadas GPS</span>
+                  </div>
+                  <Input
+                    label={watchedType === 'casamento' ? 'Igreja / Local da Cerimónia' : 'Nome do Local Principal'}
+                    placeholder={watchedType === 'casamento' ? 'Igreja de Nossa Senhora de Fátima, Luanda' : 'ex: Salão Lookal, Ilha de Luanda'}
+                    error={errors.ceremony_location?.message}
+                    {...register('ceremony_location')}
+                  />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Input
+                      label={watchedType === 'casamento' ? 'Hora da Cerimónia' : 'Hora de Início'}
+                      placeholder="Ex: 15:30"
+                      error={errors.ceremony_time?.message}
+                      {...register('ceremony_time')}
+                    />
+                    <Input
+                      label="Link Google Maps / Endereço / Coordenadas"
+                      placeholder="Ex: -8.8159,13.2306 ou link maps"
+                      error={errors.ceremony_maps_url?.message}
+                      {...register('ceremony_maps_url')}
+                      helperText="Cole coordenadas (latitude, longitude), link do Google Maps ou endereço."
+                    />
+                  </div>
+                </div>
 
-                    <div className="border-t border-border-custom pt-4 mt-2 space-y-4">
-                      <h4 className="text-sm font-semibold text-primary">Copo d'Água / Festa</h4>
-                      <Input
-                        label="Local do Copo d'Água / Festa"
-                        placeholder="Salão de Festas Lookal, Ilha de Luanda"
-                        error={errors.party_location?.message}
-                        {...register('party_location')}
-                      />
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <Input
-                          label="Hora da Festa"
-                          placeholder="Ex: 18:00"
-                          error={errors.party_time?.message}
-                          {...register('party_time')}
-                        />
-                        <Input
-                          label="Link Google Maps / Endereço / Coordenadas"
-                          placeholder="Ex: -8.7992,13.2185 ou link maps"
-                          error={errors.party_maps_url?.message}
-                          {...register('party_maps_url')}
-                          helperText="Cole coordenadas (latitude, longitude), link do Google Maps ou endereço."
-                        />
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <>
+                {/* Localização Secundária / Festa / Recepção (Para todos os tipos de eventos) */}
+                <div className="border-t border-border-custom pt-4 mt-2 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-semibold text-primary">
+                      {watchedType === 'casamento'
+                        ? "Copo d'Água / Festa"
+                        : "Local Secundário / Recepção / Festa (Opcional)"}
+                    </h4>
+                    <span className="text-[10px] text-foreground/50">Opcional</span>
+                  </div>
+                  <Input
+                    label={watchedType === 'casamento' ? "Local do Copo d'Água / Festa" : "Nome do Local Secundário / Festa"}
+                    placeholder={watchedType === 'casamento' ? 'Salão de Festas Lookal, Ilha de Luanda' : 'Local secundário de celebração'}
+                    error={errors.party_location?.message}
+                    {...register('party_location')}
+                  />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <Input
-                      label="Local do Evento"
-                      placeholder="Local de celebração"
-                      error={errors.ceremony_location?.message}
-                      {...register('ceremony_location')}
+                      label="Hora da Festa"
+                      placeholder="Ex: 18:00"
+                      error={errors.party_time?.message}
+                      {...register('party_time')}
                     />
                     <Input
-                      label="Local da Recepção / Festa (Opcional)"
-                      placeholder="Local secundário"
-                      error={errors.party_location?.message}
-                      {...register('party_location')}
+                      label="Link Google Maps / Endereço / Coordenadas"
+                      placeholder="Ex: -8.7992,13.2185 ou link maps"
+                      error={errors.party_maps_url?.message}
+                      {...register('party_maps_url')}
+                      helperText="Cole coordenadas (latitude, longitude), link do Google Maps ou endereço."
                     />
-                  </>
-                )}
+                  </div>
+                </div>
 
                 <div className="space-y-2">
                   <label className="text-xs font-semibold text-foreground/75 tracking-wide block">
@@ -972,11 +1006,13 @@ export default function EventosPage() {
                   </p>
                 </div>
                 <Badge variant="default" className="self-start sm:self-center border-amber-500/30 text-amber-600 dark:text-amber-400 bg-amber-500/10">
-                  {canvaCoverUrl || canvaInfoUrl 
-                    ? (pdfMode === 'single_page' ? 'Canva Personalizado (1 Página)' : 'Canva Personalizado (2 Páginas)') 
+                  {templateSource === 'basic'
+                    ? (pdfMode === 'single_page' ? 'Template Básico (1 Página)' : 'Template Básico (2 Páginas)')
+                    : canvaCoverUrl || canvaInfoUrl
+                    ? (pdfMode === 'single_page' ? 'Canva Personalizado (1 Página)' : 'Canva Personalizado (2 Páginas)')
                     : isMarinela
                     ? 'Canva Oficial (Marinela & Abiúd)'
-                    : 'Template Básico do Sistema (Padrão)'}
+                    : 'Template Personalizado (Sem Ficheiros)'}
                 </Badge>
               </div>
             </CardHeader>
@@ -987,6 +1023,63 @@ export default function EventosPage() {
                   <span>{canvaSuccessMessage}</span>
                 </div>
               )}
+
+              {/* Seletor de Modelo: Básico vs Canva Personalizado */}
+              <div className="bg-secondary/15 p-4 rounded-2xl border border-border-custom space-y-3">
+                <div>
+                  <label className="text-xs font-bold text-foreground flex items-center gap-1.5 uppercase tracking-wider">
+                    Modelo do Convite (PDF / Impressão)
+                  </label>
+                  <p className="text-[11px] text-foreground/60">
+                    Selecione se deseja usar o template padrão do sistema com monograma e códigos QR automáticos, ou se prefere utilizar as suas artes personalizadas desenhadas no Canva.
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setTemplateSource('basic')}
+                    className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                      templateSource === 'basic'
+                        ? 'border-primary bg-primary/10 shadow-sm ring-1 ring-primary'
+                        : 'border-border-custom bg-card-bg/60 hover:bg-secondary/30 text-foreground/75'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                        ✨ Template Básico do Sistema (Padrão)
+                      </span>
+                      {templateSource === 'basic' && (
+                        <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
+                      )}
+                    </div>
+                    <p className="text-[11px] text-foreground/60 mt-1 leading-relaxed">
+                      Design elegante gerado pelo Meu Boda com selo monograma, dados do evento e códigos QR dinâmicos.
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setTemplateSource('custom')}
+                    className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                      templateSource === 'custom'
+                        ? 'border-primary bg-primary/10 shadow-sm ring-1 ring-primary'
+                        : 'border-border-custom bg-card-bg/60 hover:bg-secondary/30 text-foreground/75'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                        🎨 Template Personalizado do Canva
+                      </span>
+                      {templateSource === 'custom' && (
+                        <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
+                      )}
+                    </div>
+                    <p className="text-[11px] text-foreground/60 mt-1 leading-relaxed">
+                      Carregue as suas artes desenhadas no Canva. Os códigos QR serão sobrepostos com precisão milimétrica.
+                    </p>
+                  </button>
+                </div>
+              </div>
 
               {/* Seletor de Formato do PDF / Template */}
               <div className="bg-secondary/15 p-4 rounded-2xl border border-border-custom space-y-3">
@@ -1071,20 +1164,29 @@ export default function EventosPage() {
 
                     {/* Preview da Capa / Página Única */}
                     <div className="relative aspect-[16/11.3] w-full rounded-xl overflow-hidden border border-border-custom bg-black/5 shadow-inner flex items-center justify-center group">
-                      {canvaCoverUrl ? (
+                      {templateSource === 'custom' && canvaCoverUrl ? (
                         /* eslint-disable-next-line @next/next/no-img-element */
                         <img
                           src={canvaCoverUrl}
                           alt="Pré-visualização da Capa Canva"
                           className="w-full h-full object-cover"
                         />
-                      ) : isMarinela ? (
+                      ) : templateSource === 'custom' && isMarinela ? (
                         /* eslint-disable-next-line @next/next/no-img-element */
                         <img
                           src="/templates/canva/page_1.png"
                           alt="Pré-visualização da Capa Oficial Marinela & Abiúd"
                           className="w-full h-full object-cover"
                         />
+                      ) : templateSource === 'custom' ? (
+                        /* Placeholder para Template Personalizado sem upload */
+                        <div className="w-full h-full bg-secondary/15 p-4 flex flex-col justify-center items-center text-center">
+                          <Upload className="h-8 w-8 text-foreground/40 mb-2" />
+                          <p className="text-xs font-semibold text-foreground/80">Nenhuma arte carregada</p>
+                          <p className="text-[10px] text-foreground/50 max-w-[220px] mt-0.5">
+                            Carregue a imagem da {pdfMode === 'single_page' ? 'página única' : 'capa'} do convite no campo abaixo.
+                          </p>
+                        </div>
                       ) : (
                         /* Template Básico Dinâmico (Padrão para outros eventos) */
                         <div className="w-full h-full bg-[#FAF8F5] p-3 flex flex-col justify-between items-center text-center font-serif text-[#1c1c1e] border-2 border-[#D4AF37] relative">
@@ -1104,8 +1206,8 @@ export default function EventosPage() {
                         </div>
                       )}
 
-                      {/* Se for Página Única, sobrepor os códigos QR configurados */}
-                      {pdfMode === 'single_page' && (
+                      {/* Se for Página Única e Arte Personalizada, sobrepor os códigos QR configurados */}
+                      {pdfMode === 'single_page' && templateSource === 'custom' && (canvaCoverUrl || isMarinela) && (
                         <>
                           {showLocationsQr && (
                             <div
@@ -1145,11 +1247,13 @@ export default function EventosPage() {
                       )}
 
                       <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-md text-white px-2 py-0.5 rounded text-[10px] font-medium z-30">
-                        {canvaCoverUrl 
+                        {templateSource === 'basic'
+                          ? (pdfMode === 'single_page' ? 'Página Única (Template Básico)' : 'Capa (Template Básico)')
+                          : canvaCoverUrl 
                           ? (pdfMode === 'single_page' ? 'Página Única Personalizada' : 'Capa Personalizada') 
                           : isMarinela
                           ? (pdfMode === 'single_page' ? 'Página Única Oficial (Marinela & Abiúd)' : 'Capa Oficial (Marinela & Abiúd)')
-                          : (pdfMode === 'single_page' ? 'Página Única (Template Básico)' : 'Capa (Template Básico)')}
+                          : (pdfMode === 'single_page' ? 'Página Única (Sem Arte)' : 'Capa (Sem Arte)')}
                       </div>
                       {canvaCoverUrl && (
                         <button
@@ -1235,20 +1339,29 @@ export default function EventosPage() {
 
                       {/* Preview Interativo do Verso com sobreposição dos Códigos QR */}
                       <div className="relative aspect-[16/11.3] w-full rounded-xl overflow-hidden border border-border-custom bg-black/5 shadow-inner group">
-                        {canvaInfoUrl ? (
+                        {templateSource === 'custom' && canvaInfoUrl ? (
                           /* eslint-disable-next-line @next/next/no-img-element */
                           <img
                             src={canvaInfoUrl}
                             alt="Pré-visualização do Verso Canva"
                             className="w-full h-full object-cover"
                           />
-                        ) : isMarinela ? (
+                        ) : templateSource === 'custom' && isMarinela ? (
                           /* eslint-disable-next-line @next/next/no-img-element */
                           <img
                             src="/templates/canva/page_2_clean.png"
                             alt="Pré-visualização do Verso Oficial Marinela & Abiúd"
                             className="w-full h-full object-cover"
                           />
+                        ) : templateSource === 'custom' ? (
+                          /* Placeholder para Verso Personalizado sem upload */
+                          <div className="w-full h-full bg-secondary/15 p-4 flex flex-col justify-center items-center text-center">
+                            <Upload className="h-8 w-8 text-foreground/40 mb-2" />
+                            <p className="text-xs font-semibold text-foreground/80">Nenhum verso carregado</p>
+                            <p className="text-[10px] text-foreground/50 max-w-[220px] mt-0.5">
+                              Carregue a imagem do verso do convite no campo abaixo.
+                            </p>
+                          </div>
                         ) : (
                           /* Template Básico Dinâmico Verso (3 Painéis) */
                           <div className="w-full h-full bg-[#FAF8F5] p-2 flex font-serif text-[#1c1c1e] border-2 border-[#D4AF37] relative">
@@ -1290,8 +1403,8 @@ export default function EventosPage() {
                           </div>
                         )}
 
-                        {/* Caixas de Posição de QR para artes Canva ou Marinela */}
-                        {(canvaInfoUrl || isMarinela) && (
+                        {/* Caixas de Posição de QR para artes Canva ou Marinela em modo Personalizado */}
+                        {templateSource === 'custom' && (canvaInfoUrl || isMarinela) && (
                           <>
                             {/* Caixa 1: Código QR de Localizações (Aba Esquerda) */}
                             <div
@@ -1330,11 +1443,13 @@ export default function EventosPage() {
                         )}
 
                         <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-md text-white px-2 py-0.5 rounded text-[10px] font-medium z-30">
-                          {canvaInfoUrl 
+                          {templateSource === 'basic'
+                            ? 'Verso (Template Básico)'
+                            : canvaInfoUrl 
                             ? 'Verso Personalizado' 
                             : isMarinela 
                             ? 'Verso Oficial (Marinela & Abiúd)' 
-                            : 'Verso (Template Básico)'}
+                            : 'Verso (Sem Arte)'}
                         </div>
                         {canvaInfoUrl && (
                           <button

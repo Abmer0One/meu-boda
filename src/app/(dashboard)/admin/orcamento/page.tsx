@@ -47,7 +47,7 @@ export default function OrcamentoPage() {
       // Pre-populate default categories if this event has NO budget records yet
       if (fetchedBudgets.length === 0) {
         let defaultCategories: string[] = [];
-        if (currentEvent.type === 'casamento') {
+        if (currentEvent.type === 'casamento' || currentEvent.type === 'casamento_tradicional' || currentEvent.type === 'alambamento') {
           defaultCategories = [
             'Salão',
             'Buffet',
@@ -72,7 +72,7 @@ export default function OrcamentoPage() {
             'Animação / Entretenimento',
             'Outros',
           ];
-        } else if (currentEvent.type === 'pedido') {
+        } else if (currentEvent.type === 'noivado' || currentEvent.type === 'pedido') {
           defaultCategories = [
             'Anel / Alianças',
             'Restaurante / Espaço',
@@ -204,10 +204,14 @@ export default function OrcamentoPage() {
     switch (currentEvent.type) {
       case 'casamento':
         return 'casamento';
+      case 'casamento_tradicional':
+      case 'alambamento':
+        return 'casamento tradicional';
       case 'aniversario':
         return 'aniversário';
+      case 'noivado':
       case 'pedido':
-        return 'pedido de casamento';
+        return 'noivado';
       default:
         return 'evento';
     }

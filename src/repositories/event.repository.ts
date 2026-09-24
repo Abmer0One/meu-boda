@@ -133,11 +133,27 @@ export const EventRepository = {
   },
 
   async create(event: Omit<Event, 'id' | 'created_at' | 'updated_at'>): Promise<{ event: Event | null; error: string | null; code?: string }> {
-    const { data, error } = await supabase
+    let payload = { ...event };
+    let { data, error } = await supabase
       .from('events')
-      .insert(event)
+      .insert(payload)
       .select()
       .single();
+
+    // Fallback for check constraint if remote database hasn't run the expanded enum migration yet
+    if (error && (error.code === '23514' || error.message?.includes('events_type_check'))) {
+      if (payload.type === 'casamento_tradicional') {
+        const retry = await supabase.from('events').insert({ ...payload, type: 'alambamento' }).select().single();
+        if (!retry.error && retry.data) {
+          return { event: retry.data as Event, error: null };
+        }
+      } else if (payload.type === 'noivado') {
+        const retry = await supabase.from('events').insert({ ...payload, type: 'pedido' }).select().single();
+        if (!retry.error && retry.data) {
+          return { event: retry.data as Event, error: null };
+        }
+      }
+    }
 
     if (error) {
       console.error('Error creating event:', error.message, '| Details:', error.details, '| Hint:', error.hint, '| Code:', error.code);
@@ -158,12 +174,30 @@ export const EventRepository = {
   },
 
   async update(id: string, event: Partial<Omit<Event, 'id' | 'user_id' | 'created_at' | 'updated_at'>>): Promise<Event | null> {
-    const { data, error } = await supabase
+    let payload = { ...event, updated_at: new Date().toISOString() };
+    let { data, error } = await supabase
       .from('events')
-      .update({ ...event, updated_at: new Date().toISOString() })
+      .update(payload)
       .eq('id', id)
       .select()
       .single();
+
+    // Fallback for check constraint if remote database hasn't run the expanded enum migration yet
+    if (error && (error.code === '23514' || error.message?.includes('events_type_check'))) {
+      if (payload.type === 'casamento_tradicional') {
+        payload = { ...payload, type: 'alambamento' };
+        const retry = await supabase.from('events').update(payload).eq('id', id).select().single();
+        if (!retry.error && retry.data) {
+          return retry.data as Event;
+        }
+      } else if (payload.type === 'noivado') {
+        payload = { ...payload, type: 'pedido' };
+        const retry = await supabase.from('events').update(payload).eq('id', id).select().single();
+        if (!retry.error && retry.data) {
+          return retry.data as Event;
+        }
+      }
+    }
 
     if (error) {
       if (error.code === '23505' || error.message?.includes('events_slug_key') || error.message?.includes('duplicate key')) {

@@ -20,7 +20,18 @@ export const registerSchema = z.object({
 export const eventSchema = z.object({
   title: z.string().min(2, 'O título deve ter pelo menos 2 caracteres'),
   slug: z.string().min(2, 'O slug deve ter pelo menos 2 caracteres').regex(/^[a-z0-9-]+$/, 'Slug inválido (apenas letras minúsculas, números e hifens)'),
-  type: z.enum(['casamento', 'aniversario', 'pedido', 'outro']).default('casamento'),
+  type: z.enum([
+    'casamento',
+    'casamento_tradicional',
+    'alambamento',
+    'noivado',
+    'pedido',
+    'aniversario',
+    'cha_panela',
+    'palestra',
+    'festa_rua',
+    'outro'
+  ]).default('casamento'),
   date: z.string().min(1, 'A data é obrigatória'),
   ceremony_location: z.string().nullable().optional(),
   party_location: z.string().nullable().optional(),

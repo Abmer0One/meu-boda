@@ -76,8 +76,14 @@ export function parseEventInitials(title?: string | null, eventType?: string | n
   const words = cleanedNames.split(/\s+/).filter((w) => /^[\p{L}]/u.test(w));
   
   if (words.length >= 2) {
-    // If it's explicitly a wedding, alambamento or engagement without conjunction (e.g. "Romeo Julieta")
-    if (eventType === 'casamento' || eventType === 'alambamento' || eventType === 'pedido') {
+    // If it's explicitly a wedding, traditional wedding, alambamento or engagement without conjunction (e.g. "Romeo Julieta")
+    if (
+      eventType === 'casamento' ||
+      eventType === 'casamento_tradicional' ||
+      eventType === 'alambamento' ||
+      eventType === 'pedido' ||
+      eventType === 'noivado'
+    ) {
       return {
         initials: `${words[0].charAt(0).toUpperCase()} & ${words[1].charAt(0).toUpperCase()}`,
         names: clean,
@@ -170,13 +176,19 @@ export function getEventLabels(eventOrType?: any): EventLabels {
     };
   }
 
-  if (type === 'alambamento' || title.includes('alambamento')) {
+  if (
+    type === 'casamento_tradicional' ||
+    type === 'alambamento' ||
+    type.includes('tradicional') ||
+    title.includes('alambamento') ||
+    title.includes('casamento tradicional')
+  ) {
     return {
-      title: 'Alambamento',
-      invitation: 'Convite de Alambamento',
-      details: 'Detalhes do Alambamento',
-      theme: 'Tema do Alambamento',
-      rsvpQuestion: 'comparecer ao nosso alambamento',
+      title: 'Casamento Tradicional',
+      invitation: 'Convite de Casamento Tradicional',
+      details: 'Detalhes do Casamento Tradicional',
+      theme: 'Tema do Casamento Tradicional',
+      rsvpQuestion: 'comparecer ao nosso casamento tradicional',
     };
   }
 
