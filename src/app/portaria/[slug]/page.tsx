@@ -415,10 +415,13 @@ function PortariaContent({ slug }: { slug: string }) {
         <div className="max-w-md w-full mx-auto my-auto space-y-6 animate-in fade-in">
           {/* Logo & Brand Header */}
           <div className="text-center space-y-2">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-[#D4AF37] to-[#8A7348] text-black shadow-xl shadow-[#D4AF37]/20 mb-2">
-              <QrCode className="h-9 w-9 stroke-[2.2]" />
+            <div className="flex justify-center mb-1">
+              <img
+                src="/logo_meu_boda.png"
+                alt="Meu Boda"
+                className="h-16 w-auto object-contain drop-shadow-xl"
+              />
             </div>
-            <h1 className="text-2xl font-black tracking-tight text-white">Meu Boda</h1>
             <p className="text-xs uppercase tracking-widest text-[#D4AF37] font-bold">
               Portaria & Controlo de Acesso
             </p>
@@ -549,8 +552,13 @@ function PortariaContent({ slug }: { slug: string }) {
           </div>
         </div>
 
-        <footer className="text-center text-[10px] text-zinc-600 py-2">
-          Meu Boda • Tecnologia para Eventos de Luxo
+        <footer className="flex items-center justify-center gap-2 text-[10px] text-zinc-500 py-2">
+          <img
+            src="/logo_meu_boda.png"
+            alt="Meu Boda"
+            className="h-3.5 w-auto object-contain opacity-60"
+          />
+          <span>• Tecnologia para Eventos de Luxo</span>
         </footer>
       </div>
     );
@@ -564,15 +572,18 @@ function PortariaContent({ slug }: { slug: string }) {
       {/* Top Header */}
       <header className="sticky top-0 z-40 bg-[#1A1926]/95 backdrop-blur-md border-b border-[#2D2A3E] px-4 py-3">
         <div className="max-w-2xl mx-auto flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#D4AF37] to-[#8A7348] text-black flex items-center justify-center shrink-0 shadow-md">
-              <QrCode className="h-5 w-5 stroke-[2.5]" />
-            </div>
+          <div className="flex items-center gap-3 min-w-0">
+            <img
+              src="/logo_meu_boda.png"
+              alt="Meu Boda"
+              className="h-8 sm:h-9 w-auto object-contain shrink-0"
+            />
+            <div className="h-6 w-px bg-[#2D2A3E] shrink-0" />
             <div className="min-w-0">
-              <h2 className="text-sm font-bold text-white truncate max-w-[200px] sm:max-w-xs">
+              <h2 className="text-sm font-bold text-white truncate max-w-[160px] sm:max-w-xs">
                 {event?.title || 'Portaria do Evento'}
               </h2>
-              <div className="flex items-center gap-1 text-[10px] text-[#D4AF37] font-semibold truncate">
+              <div className="flex items-center gap-1.5 text-[10px] text-[#D4AF37] font-semibold truncate">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 <span>{activeOperator}</span>
               </div>
@@ -967,8 +978,13 @@ function PortariaContent({ slug }: { slug: string }) {
       </main>
 
       {/* Footer */}
-      <footer className="text-center text-[10px] text-zinc-600 py-3 border-t border-[#2D2A3E]/40">
-        Meu Boda • Sistema de Portaria e Controlo de Acesso
+      <footer className="flex items-center justify-center gap-2 text-[10px] text-zinc-500 py-3 border-t border-[#2D2A3E]/40">
+        <img
+          src="/logo_meu_boda.png"
+          alt="Meu Boda"
+          className="h-3.5 w-auto object-contain opacity-60"
+        />
+        <span>• Sistema de Portaria e Controlo de Acesso</span>
       </footer>
     </div>
   );
