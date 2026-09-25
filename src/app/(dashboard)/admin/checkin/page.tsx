@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useEvent } from '@/contexts/EventContext';
 import { GuestRepository } from '@/repositories/guest.repository';
 import { CheckInRepository } from '@/repositories/checkin.repository';
@@ -57,6 +57,12 @@ export default function CheckinPage() {
   const [alertMessage, setAlertMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isScanning, setIsScanning] = useState(false);
 
+  // Prevent duplicate rapid processing in scanner & UI
+  const isScanningBusyRef = useRef(false);
+  const lastScannedTokenRef = useRef<string | null>(null);
+  const lastScanTimestampRef = useRef<number>(0);
+  const processingGuestIdsRef = useRef<Set<string>>(new Set());
+
   // Handle successful camera QR scan
   const handleScanSuccess = async (decodedText: string) => {
     let token = decodedText.trim();
@@ -99,7 +105,28 @@ export default function CheckinPage() {
           qrbox: { width: 250, height: 250 },
         },
         async (decodedText: string) => {
-          await handleScanSuccess(decodedText);
+          const now = Date.now();
+          const text = decodedText.trim();
+
+          if (isScanningBusyRef.current) return;
+          if (
+            lastScannedTokenRef.current === text &&
+            now - lastScanTimestampRef.current < 4000
+          ) {
+            return;
+          }
+
+          isScanningBusyRef.current = true;
+          lastScannedTokenRef.current = text;
+          lastScanTimestampRef.current = now;
+
+          try {
+            await handleScanSuccess(text);
+          } finally {
+            setTimeout(() => {
+              isScanningBusyRef.current = false;
+            }, 2000);
+          }
         },
         () => {} // Quiet frame errors
       ).catch((err: any) => {
@@ -243,6 +270,12 @@ export default function CheckinPage() {
       return;
     }
 
+    // Check if check-in is already in-flight for this guest
+    if (processingGuestIdsRef.current.has(guest.id)) {
+      return;
+    }
+    processingGuestIdsRef.current.add(guest.id);
+
     try {
       const newCheckin = await CheckInRepository.create({
         guest_id: guest.id,
@@ -250,16 +283,29 @@ export default function CheckinPage() {
       });
 
       if (newCheckin) {
+        // Optimistic state update
+        setCheckins((prev) => [newCheckin, ...prev]);
+
         setAlertMessage({
           type: 'success',
           text: `Entrada autorizada! Bem-vindo, ${guest.name} (${1 + guest.companions} pax).`,
         });
         triggerConfetti();
         loadData();
+      } else {
+        setAlertMessage({
+          type: 'error',
+          text: `O convidado '${guest.name}' já efetuou a entrada!`,
+        });
+        loadData();
       }
     } catch (err) {
       console.error(err);
       setAlertMessage({ type: 'error', text: 'Ocorreu um erro ao processar a entrada.' });
+    } finally {
+      setTimeout(() => {
+        processingGuestIdsRef.current.delete(guest.id);
+      }, 2500);
     }
   };
 

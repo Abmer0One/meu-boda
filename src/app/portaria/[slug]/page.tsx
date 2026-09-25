@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, use, Suspense } from 'react';
+import React, { useEffect, useState, useRef, use, Suspense } from 'react';
 import { PortariaRepository } from '@/repositories/portaria.repository';
 import { EventRepository } from '@/repositories/event.repository';
 import { TableRepository } from '@/repositories/table.repository';
@@ -101,6 +101,12 @@ function PortariaContent({ slug }: { slug: string }) {
     previousCheckin?: CheckIn;
   } | null>(null);
 
+  // Prevent duplicate rapid processing in scanner & UI
+  const isScanningBusyRef = useRef(false);
+  const lastScannedTokenRef = useRef<string | null>(null);
+  const lastScanTimestampRef = useRef<number>(0);
+  const processingGuestIdsRef = useRef<Set<string>>(new Set());
+
   // Load event details & portaria config on mount so the PIN screen has the event title & operator stations
   useEffect(() => {
     EventRepository.getBySlug(slug).then(async (evt) => {
@@ -197,7 +203,7 @@ function PortariaContent({ slug }: { slug: string }) {
   const handleProcessCheckin = async (guest: Guest) => {
     if (!event) return;
 
-    // Check if already checked in
+    // Check if already checked in in local state
     const existingCi = checkins.find((ci) => ci.guest_id === guest.id);
     if (existingCi) {
       playFeedbackSound('warning');
@@ -213,9 +219,18 @@ function PortariaContent({ slug }: { slug: string }) {
       return;
     }
 
+    // Mutex: Check if check-in is already in-flight for this guest
+    if (processingGuestIdsRef.current.has(guest.id)) {
+      return;
+    }
+    processingGuestIdsRef.current.add(guest.id);
+
     try {
       const newCi = await PortariaRepository.performCheckin(guest.id, activeOperator);
       if (newCi) {
+        // Optimistically add to local checkins state so subsequent scans know immediately
+        setCheckins((prev) => [newCi, ...prev]);
+
         playFeedbackSound('success');
         confetti({
           particleCount: 70,
@@ -233,7 +248,19 @@ function PortariaContent({ slug }: { slug: string }) {
           table,
         });
 
-        // Refresh data
+        // Background sync
+        loadEventData(event.id);
+      } else {
+        // Returned null because it was already checked in (in DB or concurrent request)
+        playFeedbackSound('warning');
+        const table = tables.find((t) => t.id === guest.table_id);
+        setScanResult({
+          type: 'warning',
+          title: 'Entrada Já Registada!',
+          message: `O convidado '${guest.name}' já efetuou a entrada anteriormente.`,
+          guest,
+          table,
+        });
         loadEventData(event.id);
       }
     } catch (err) {
@@ -243,6 +270,10 @@ function PortariaContent({ slug }: { slug: string }) {
         title: 'Erro ao Registar Entrada',
         message: 'Ocorreu um erro no servidor ao tentar registar a entrada.',
       });
+    } finally {
+      setTimeout(() => {
+        processingGuestIdsRef.current.delete(guest.id);
+      }, 2500);
     }
   };
 
@@ -288,7 +319,32 @@ function PortariaContent({ slug }: { slug: string }) {
               qrbox: { width: 250, height: 250 },
             },
             async (decodedText: string) => {
-              await handleScanSuccess(decodedText);
+              const now = Date.now();
+              const text = decodedText.trim();
+
+              // 1. If currently busy processing a scan, drop frame immediately
+              if (isScanningBusyRef.current) return;
+
+              // 2. Debounce identical QR code within 4 seconds
+              if (
+                lastScannedTokenRef.current === text &&
+                now - lastScanTimestampRef.current < 4000
+              ) {
+                return;
+              }
+
+              isScanningBusyRef.current = true;
+              lastScannedTokenRef.current = text;
+              lastScanTimestampRef.current = now;
+
+              try {
+                await handleScanSuccess(text);
+              } finally {
+                // Keep scanner lock for 2 seconds to let operator move to next guest
+                setTimeout(() => {
+                  isScanningBusyRef.current = false;
+                }, 2000);
+              }
             },
             () => {}
           )
