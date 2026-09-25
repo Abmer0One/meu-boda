@@ -239,3 +239,19 @@ export interface ChatMessage {
   created_at: string;
   proposal?: VendorContract;
 }
+
+export interface PortariaConfig {
+  enabled: boolean;
+  pin: string;
+  access_token: string;
+  operators: string[];
+  allow_manual_search: boolean;
+  updated_at: string;
+}
+
+export interface PortariaSession {
+  event_id: string;
+  operator_name: string;
+  authenticated_at: string;
+}
+

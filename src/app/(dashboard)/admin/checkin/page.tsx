@@ -4,7 +4,11 @@ import React, { useEffect, useState } from 'react';
 import { useEvent } from '@/contexts/EventContext';
 import { GuestRepository } from '@/repositories/guest.repository';
 import { CheckInRepository } from '@/repositories/checkin.repository';
-import { Guest, CheckIn } from '@/types';
+import {
+  PortariaRepository,
+  generatePortariaPin,
+} from '@/repositories/portaria.repository';
+import { Guest, CheckIn, PortariaConfig } from '@/types';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -18,6 +22,17 @@ import {
   Loader2,
   Trash2,
   Camera,
+  KeyRound,
+  Share2,
+  Copy,
+  Check,
+  ExternalLink,
+  RefreshCw,
+  Smartphone,
+  ShieldCheck,
+  ShieldOff,
+  Edit2,
+  MessageCircle,
 } from 'lucide-react';
 
 export default function CheckinPage() {
@@ -25,6 +40,14 @@ export default function CheckinPage() {
   const [guests, setGuests] = useState<Guest[]>([]);
   const [checkins, setCheckins] = useState<CheckIn[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Portaria Team & Access State
+  const [portariaConfig, setPortariaConfig] = useState<PortariaConfig | null>(null);
+  const [isSavingPortaria, setIsSavingPortaria] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [isEditingPin, setIsEditingPin] = useState(false);
+  const [customPinInput, setCustomPinInput] = useState('');
+  const [adminOperatorName, setAdminOperatorName] = useState('Gestor / Painel');
 
   // QR Input state (for scanners that type characters + Enter)
   const [qrInput, setQrInput] = useState('');
@@ -37,6 +60,7 @@ export default function CheckinPage() {
   // Handle successful camera QR scan
   const handleScanSuccess = async (decodedText: string) => {
     let token = decodedText.trim();
+
     // Parse JSON if needed
     try {
       if (token.startsWith('{') && token.endsWith('}')) {
@@ -106,12 +130,15 @@ export default function CheckinPage() {
     if (!currentEvent) return;
     setLoading(true);
     try {
-      const [g, ci] = await Promise.all([
+      const [g, ci, pConfig] = await Promise.all([
         GuestRepository.getAll(currentEvent.id),
         CheckInRepository.getAll(currentEvent.id),
+        PortariaRepository.getConfig(currentEvent.id),
       ]);
       setGuests(g);
       setCheckins(ci);
+      setPortariaConfig(pConfig);
+      setCustomPinInput(pConfig.pin);
     } catch (err) {
       console.error(err);
     } finally {
@@ -123,6 +150,75 @@ export default function CheckinPage() {
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentEvent]);
+
+  // Portaria Handlers
+  const handleTogglePortaria = async () => {
+    if (!currentEvent || !portariaConfig) return;
+    setIsSavingPortaria(true);
+    const updated = {
+      ...portariaConfig,
+      enabled: !portariaConfig.enabled,
+    };
+    await PortariaRepository.saveConfig(currentEvent.id, updated);
+    setPortariaConfig(updated);
+    setIsSavingPortaria(false);
+  };
+
+  const handleGenerateNewPin = async () => {
+    if (!currentEvent || !portariaConfig) return;
+    if (!confirm('Deseja gerar um novo código PIN? O PIN anterior deixará de funcionar imediatamente na portaria.')) return;
+    setIsSavingPortaria(true);
+    const newPin = generatePortariaPin();
+    const updated = {
+      ...portariaConfig,
+      pin: newPin,
+    };
+    await PortariaRepository.saveConfig(currentEvent.id, updated);
+    setPortariaConfig(updated);
+    setCustomPinInput(newPin);
+    setIsSavingPortaria(false);
+  };
+
+  const handleSaveCustomPin = async () => {
+    if (!currentEvent || !portariaConfig) return;
+    const clean = customPinInput.trim();
+    if (!clean || clean.length < 4) {
+      alert('O código PIN deve ter no mínimo 4 dígitos.');
+      return;
+    }
+    setIsSavingPortaria(true);
+    const updated = {
+      ...portariaConfig,
+      pin: clean,
+    };
+    await PortariaRepository.saveConfig(currentEvent.id, updated);
+    setPortariaConfig(updated);
+    setIsEditingPin(false);
+    setIsSavingPortaria(false);
+  };
+
+  const getPortariaUrl = () => {
+    if (!currentEvent) return '';
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const pinParam = portariaConfig?.pin ? `?pin=${portariaConfig.pin}` : '';
+    return `${origin}/portaria/${currentEvent.slug}${pinParam}`;
+  };
+
+  const handleCopyLink = () => {
+    const url = getPortariaUrl();
+    if (!url) return;
+    navigator.clipboard.writeText(url);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2500);
+  };
+
+  const handleShareWhatsApp = () => {
+    if (!currentEvent || !portariaConfig) return;
+    const url = getPortariaUrl();
+    const message = `🎉 *Acesso à Portaria & Check-in*\nEvento: *${currentEvent.title}*\n\n👉 *Link do Leitor:* ${url}\n🔑 *Código PIN:* *${portariaConfig.pin}*\n\nAbre este link no teu telemóvel para começares a ler os QR Codes dos convites!`;
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
+    window.open(whatsappUrl, '_blank');
+  };
 
   // Trigger celebration on successful entry
   const triggerConfetti = () => {
@@ -151,7 +247,7 @@ export default function CheckinPage() {
     try {
       const newCheckin = await CheckInRepository.create({
         guest_id: guest.id,
-        operator: 'Portaria Principal',
+        operator: adminOperatorName || 'Gestor / Painel',
       });
 
       if (newCheckin) {
@@ -239,6 +335,218 @@ export default function CheckinPage() {
           Aponte o leitor de QR Code para os convites ou procure nomes manualmente para validar as entradas no salão.
         </p>
       </div>
+
+      {/* Card de Configuração & Partilha de Acesso da Portaria (Protocolo & Segurança) */}
+      <Card className="bg-card-bg border-border-custom overflow-hidden shadow-sm">
+        <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-5 border-b border-border-custom">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-primary/10 text-primary">
+                  <Smartphone className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+                    Acesso da Equipa de Portaria (Protocolo & Seguranças)
+                  </h3>
+                  <p className="text-xs text-foreground/60">
+                    Permita que os porteiros usem os seus próprios telemóveis para ler QR codes sem terem acesso à sua conta, orçamentos ou dados confidenciais.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 self-end sm:self-center">
+              <Badge
+                variant="default"
+                className={
+                  portariaConfig?.enabled
+                    ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
+                    : 'bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border-zinc-500/30'
+                }
+              >
+                {portariaConfig?.enabled ? (
+                  <span className="flex items-center gap-1.5">
+                    <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" /> Portaria Ativa
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1.5">
+                    <ShieldOff className="h-3.5 w-3.5 text-zinc-400" /> Acesso Desativado
+                  </span>
+                )}
+              </Badge>
+
+              <button
+                type="button"
+                onClick={handleTogglePortaria}
+                disabled={isSavingPortaria || !portariaConfig}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                  portariaConfig?.enabled ? 'bg-primary' : 'bg-secondary/60'
+                }`}
+                title={portariaConfig?.enabled ? 'Desativar acesso da portaria' : 'Ativar acesso da portaria'}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                    portariaConfig?.enabled ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <CardContent className="p-5">
+          {!portariaConfig?.enabled ? (
+            <div className="p-4 bg-secondary/15 rounded-xl border border-dashed border-border-custom flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
+              <div className="space-y-0.5">
+                <p className="text-xs font-semibold text-foreground/80">O acesso rápido da portaria está desativado</p>
+                <p className="text-[11px] text-foreground/50">
+                  Nenhum operador externo conseguirá ler convites ou autenticar-se enquanto estiver desativado.
+                </p>
+              </div>
+              <Button size="sm" onClick={handleTogglePortaria} isLoading={isSavingPortaria}>
+                Ativar Acesso da Portaria
+              </Button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
+              {/* Código PIN */}
+              <div className="md:col-span-4 bg-secondary/15 p-4 rounded-xl border border-border-custom flex flex-col justify-between space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase tracking-wider text-foreground/70 flex items-center gap-1.5">
+                    <KeyRound className="h-3.5 w-3.5 text-primary" /> Código PIN de Acesso
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleGenerateNewPin}
+                    disabled={isSavingPortaria}
+                    className="text-[11px] text-primary hover:underline flex items-center gap-1 cursor-pointer font-medium"
+                    title="Gerar outro código aleatório"
+                  >
+                    <RefreshCw className="h-3 w-3" /> Gerar Novo
+                  </button>
+                </div>
+
+                <div className="py-1">
+                  {isEditingPin ? (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        maxLength={8}
+                        value={customPinInput}
+                        onChange={(e) => setCustomPinInput(e.target.value.replace(/[^0-9a-zA-Z]/g, ''))}
+                        className="w-full bg-card-bg border border-primary rounded-lg px-3 py-1.5 text-center font-mono font-bold text-lg tracking-widest text-primary focus:outline-none"
+                        placeholder="Ex: 849201"
+                        autoFocus
+                      />
+                      <Button size="sm" onClick={handleSaveCustomPin} isLoading={isSavingPortaria}>
+                        Gravar
+                      </Button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsEditingPin(false);
+                          setCustomPinInput(portariaConfig.pin);
+                        }}
+                        className="text-xs text-foreground/50 hover:text-foreground p-1"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between bg-card-bg px-4 py-2.5 rounded-xl border border-border-custom">
+                      <span className="font-mono text-2xl font-black tracking-[0.25em] text-primary">
+                        {portariaConfig.pin}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingPin(true)}
+                        className="p-1.5 rounded-lg text-foreground/50 hover:bg-secondary/40 hover:text-foreground transition-colors cursor-pointer"
+                        title="Personalizar PIN"
+                      >
+                        <Edit2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <p className="text-[10px] text-foreground/50 leading-relaxed">
+                  O porteiro digita este código para abrir o leitor de QR Code no seu próprio telemóvel.
+                </p>
+              </div>
+
+              {/* Link Rápido e Ações de Partilha */}
+              <div className="md:col-span-8 bg-secondary/15 p-4 rounded-xl border border-border-custom flex flex-col justify-between space-y-3">
+                <div>
+                  <span className="text-xs font-bold uppercase tracking-wider text-foreground/70 flex items-center gap-1.5">
+                    <Share2 className="h-3.5 w-3.5 text-primary" /> Link de Acesso para a Equipa
+                  </span>
+                  <p className="text-[11px] text-foreground/60 mt-0.5">
+                    Envie este link aos porteiros. Ao clicarem, a câmara do telemóvel abre automaticamente sem necessidade de login.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 bg-card-bg border border-border-custom rounded-xl p-1.5 pl-3">
+                  <span className="text-xs font-mono text-foreground/80 truncate flex-1 select-all">
+                    {getPortariaUrl()}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleCopyLink}
+                    className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-secondary/40 hover:bg-secondary/70 text-foreground text-xs font-medium rounded-lg transition-colors cursor-pointer"
+                  >
+                    {copiedLink ? (
+                      <>
+                        <Check className="h-3.5 w-3.5 text-emerald-500" />
+                        <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Copiado!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-3.5 w-3.5" />
+                        <span>Copiar</span>
+                      </>
+                    )}
+                  </button>
+                  <a
+                    href={getPortariaUrl()}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="shrink-0 p-1.5 rounded-lg text-foreground/60 hover:bg-secondary/40 hover:text-foreground transition-colors"
+                    title="Abrir ecrã da portaria numa nova aba"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                  </a>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] text-foreground/60">Operador no Painel:</span>
+                    <select
+                      value={adminOperatorName}
+                      onChange={(e) => setAdminOperatorName(e.target.value)}
+                      className="text-xs bg-card-bg border border-border-custom rounded-lg px-2 py-1 text-foreground"
+                    >
+                      <option value="Gestor / Painel">Gestor / Painel</option>
+                      {portariaConfig.operators?.map((op) => (
+                        <option key={op} value={op}>{op}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleShareWhatsApp}
+                    className="flex items-center gap-2 px-4 py-2 bg-[#25D366] hover:bg-[#20BD5A] text-white rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer"
+                  >
+                    <MessageCircle className="h-4 w-4 fill-white" />
+                    <span>Enviar Acesso por WhatsApp</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left column: Scan Area */}
@@ -386,6 +694,7 @@ export default function CheckinPage() {
                       <tr className="bg-secondary/30 text-foreground/70 font-semibold border-b border-border-custom">
                         <th className="p-3">Convidado</th>
                         <th className="p-3">Hora Entrada</th>
+                        <th className="p-3">Operador / Posto</th>
                         <th className="p-3 text-center">Ações</th>
                       </tr>
                     </thead>
@@ -399,6 +708,11 @@ export default function CheckinPage() {
                               minute: '2-digit',
                               second: '2-digit',
                             })}
+                          </td>
+                          <td className="p-3">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] bg-secondary/60 font-medium text-foreground/80">
+                              {ci.operator || 'Portaria'}
+                            </span>
                           </td>
                           <td className="p-3 text-center">
                             <button
