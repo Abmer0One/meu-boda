@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useEffect, useState, use, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
 import { PortariaRepository } from '@/repositories/portaria.repository';
+import { EventRepository } from '@/repositories/event.repository';
 import { TableRepository } from '@/repositories/table.repository';
 import { Event, Guest, CheckIn, PortariaConfig, Table } from '@/types';
 import confetti from 'canvas-confetti';
@@ -71,16 +71,13 @@ const playFeedbackSound = (type: 'success' | 'warning' | 'error') => {
 };
 
 function PortariaContent({ slug }: { slug: string }) {
-  const searchParams = useSearchParams();
-  const queryPin = searchParams.get('pin') || '';
-  const queryToken = searchParams.get('token') || '';
-
   // Auth & Event state
   const [event, setEvent] = useState<Event | null>(null);
   const [config, setConfig] = useState<PortariaConfig | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [activeOperator, setActiveOperator] = useState('Portão Principal');
-  const [pinInput, setPinInput] = useState(queryPin || queryToken);
+  const [isCustomOperator, setIsCustomOperator] = useState(false);
+  const [pinInput, setPinInput] = useState('');
   const [authError, setAuthError] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
 
@@ -104,25 +101,20 @@ function PortariaContent({ slug }: { slug: string }) {
     previousCheckin?: CheckIn;
   } | null>(null);
 
-  // 1. Check existing session in sessionStorage or auto-authenticate via query param
+  // Load event details & portaria config on mount so the PIN screen has the event title & operator stations
   useEffect(() => {
-    const sessionKey = `portaria_session_${slug}`;
-    const stored = typeof window !== 'undefined' ? sessionStorage.getItem(sessionKey) : null;
-
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        if (parsed.authenticated && parsed.pin) {
-          handleAuthenticate(parsed.pin, parsed.operator || 'Portão Principal');
-          return;
+    EventRepository.getBySlug(slug).then(async (evt) => {
+      if (evt) {
+        setEvent(evt);
+        const cfg = await PortariaRepository.getConfig(evt.id);
+        if (cfg) {
+          setConfig(cfg);
+          if (cfg.operators && cfg.operators.length > 0) {
+            setActiveOperator(cfg.operators[0]);
+          }
         }
-      } catch (e) {}
-    }
-
-    if (queryPin || queryToken) {
-      handleAuthenticate(queryPin || queryToken, 'Portão Principal');
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+      }
+    });
   }, [slug]);
 
   // Handle Authentication with PIN
@@ -198,6 +190,7 @@ function PortariaContent({ slug }: { slug: string }) {
     setIsAuthenticated(false);
     setIsScanning(false);
     setScanResult(null);
+    setPinInput('');
   };
 
   // Perform Check-in
@@ -352,6 +345,11 @@ function PortariaContent({ slug }: { slug: string }) {
   const totalGuests = guests.length;
   const pendingCount = Math.max(0, totalGuests - checkedInCount);
 
+  const availableOperators =
+    config?.operators && config.operators.length > 0
+      ? config.operators
+      : ['Portão Principal', 'Entrada VIP', 'Protocolo 1', 'Protocolo 2'];
+
   // -------------------------------------------------------------
   // ECRÃ 1: AUTENTICAÇÃO COM CÓDIGO PIN (QUANDO NÃO AUTENTICADO)
   // -------------------------------------------------------------
@@ -368,6 +366,20 @@ function PortariaContent({ slug }: { slug: string }) {
             <p className="text-xs uppercase tracking-widest text-[#D4AF37] font-bold">
               Portaria & Controlo de Acesso
             </p>
+            {event?.title ? (
+              <div className="pt-1">
+                <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-[#D4AF37]/10 border border-[#D4AF37]/30 text-xs font-bold text-[#D4AF37]">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  <span>{event.title}</span>
+                </span>
+              </div>
+            ) : (
+              <div className="pt-1">
+                <span className="inline-block px-3 py-1 rounded-full bg-zinc-800/80 border border-zinc-700/50 text-[11px] text-zinc-400 font-mono">
+                  /{slug}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Login Card */}
@@ -419,13 +431,41 @@ function PortariaContent({ slug }: { slug: string }) {
                 <label className="text-xs font-semibold text-zinc-300 block mb-1.5 text-center">
                   Posto de Leitura / Nome do Operador
                 </label>
-                <input
-                  type="text"
-                  placeholder="Ex: Portão Principal, Protocolo 1..."
-                  value={activeOperator}
-                  onChange={(e) => setActiveOperator(e.target.value)}
-                  className="w-full bg-[#0F0E17] border border-[#2D2A3E] focus:border-[#D4AF37] rounded-xl py-2.5 px-4 text-sm text-center text-white focus:outline-none transition-all placeholder:text-zinc-600"
-                />
+                <div className="space-y-2">
+                  <select
+                    value={isCustomOperator ? '__custom__' : activeOperator}
+                    onChange={(e) => {
+                      if (e.target.value === '__custom__') {
+                        setIsCustomOperator(true);
+                        setActiveOperator('');
+                      } else {
+                        setIsCustomOperator(false);
+                        setActiveOperator(e.target.value);
+                      }
+                    }}
+                    className="w-full bg-[#0F0E17] border border-[#2D2A3E] focus:border-[#D4AF37] rounded-xl py-2.5 px-3 text-sm text-white focus:outline-none transition-all cursor-pointer text-center"
+                  >
+                    {availableOperators.map((op) => (
+                      <option key={op} value={op} className="bg-[#1A1926] text-white">
+                        {op}
+                      </option>
+                    ))}
+                    <option value="__custom__" className="bg-[#1A1926] text-white">
+                      ✍️ Outro Posto / Nome personalizado...
+                    </option>
+                  </select>
+
+                  {isCustomOperator && (
+                    <input
+                      type="text"
+                      placeholder="Ex: Portão Traseiro, Sala VIP..."
+                      value={activeOperator}
+                      onChange={(e) => setActiveOperator(e.target.value)}
+                      autoFocus
+                      className="w-full bg-[#0F0E17] border border-[#D4AF37]/60 focus:border-[#D4AF37] rounded-xl py-2 px-3 text-xs text-center text-white focus:outline-none transition-all placeholder:text-zinc-600 animate-in fade-in"
+                    />
+                  )}
+                </div>
               </div>
 
               <button

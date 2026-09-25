@@ -200,8 +200,7 @@ export default function CheckinPage() {
   const getPortariaUrl = () => {
     if (!currentEvent) return '';
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
-    const pinParam = portariaConfig?.pin ? `?pin=${portariaConfig.pin}` : '';
-    return `${origin}/portaria/${currentEvent.slug}${pinParam}`;
+    return `${origin}/portaria/${currentEvent.slug}`;
   };
 
   const handleCopyLink = () => {
@@ -215,7 +214,7 @@ export default function CheckinPage() {
   const handleShareWhatsApp = () => {
     if (!currentEvent || !portariaConfig) return;
     const url = getPortariaUrl();
-    const message = `🎉 *Acesso à Portaria & Check-in*\nEvento: *${currentEvent.title}*\n\n👉 *Link do Leitor:* ${url}\n🔑 *Código PIN:* *${portariaConfig.pin}*\n\nAbre este link no teu telemóvel para começares a ler os QR Codes dos convites!`;
+    const message = `🎉 *Acesso à Portaria & Check-in*\nEvento: *${currentEvent.title}*\n\n👉 *Link do Leitor:* ${url}\n🔑 *Código PIN:* *${portariaConfig.pin}*\n\nAbre o link no teu telemóvel e introduz o código PIN para começares a ler os QR Codes dos convites!`;
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, '_blank');
   };
@@ -482,7 +481,7 @@ export default function CheckinPage() {
                     <Share2 className="h-3.5 w-3.5 text-primary" /> Link de Acesso para a Equipa
                   </span>
                   <p className="text-[11px] text-foreground/60 mt-0.5">
-                    Envie este link aos porteiros. Ao clicarem, a câmara do telemóvel abre automaticamente sem necessidade de login.
+                    Envie este link aos porteiros. Ao acederem, deverão introduzir o código PIN para iniciar a validação dos convites.
                   </p>
                 </div>
 
