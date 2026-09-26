@@ -255,3 +255,41 @@ export interface PortariaSession {
   authenticated_at: string;
 }
 
+export interface SystemBroadcast {
+  id: string;
+  title: string;
+  message: string;
+  type: 'info' | 'warning' | 'success' | 'urgent';
+  is_active: boolean;
+  link?: string | null;
+  created_at: string;
+  created_by?: string | null;
+}
+
+export interface PlatformPayment {
+  id: string;
+  user_id: string;
+  user_email: string;
+  event_id?: string | null;
+  event_title?: string | null;
+  plan_type: string;
+  amount: number;
+  payment_method?: string | null;
+  reference_code?: string | null;
+  receipt_url?: string | null;
+  status: 'Pendente' | 'Aprovado' | 'Recusado';
+  notes?: string | null;
+  created_at: string;
+  reviewed_at?: string | null;
+  reviewed_by?: string | null;
+}
+
+export interface LiveCheckinFeed {
+  id: string;
+  guest_name: string;
+  guest_companions: number;
+  event_id: string;
+  event_title: string;
+  checked_at: string;
+  operator: string;
+}

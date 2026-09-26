@@ -9,6 +9,8 @@ import { Button } from '@/components/ui/Button';
 import { Dialog } from '@/components/ui/Dialog';
 import { Input } from '@/components/ui/Input';
 import { EventRepository } from '@/repositories/event.repository';
+import { SuperAdminRepository } from '@/repositories/superadmin.repository';
+import { SystemBroadcast } from '@/types';
 import NotificationBell from '@/components/notifications/NotificationBell';
 import {
   LayoutDashboard,
@@ -34,6 +36,13 @@ import {
   AlertCircle,
   AlertTriangle,
   CheckCircle2,
+  CalendarDays,
+  Activity,
+  Store,
+  ShieldCheck,
+  Receipt,
+  Megaphone,
+  Award,
 } from 'lucide-react';
 
 interface SidebarItem {
@@ -59,6 +68,20 @@ const menuItems: SidebarItem[] = [
   { name: 'Consola Admin', href: '/admin/super', icon: ShieldAlert },
 ];
 
+const superAdminMenuItems: SidebarItem[] = [
+  { name: 'Visão Geral', href: '/admin/super', icon: LayoutDashboard },
+  { name: 'Gestão de Eventos', href: '/admin/super/eventos', icon: CalendarDays },
+  { name: 'Radar Portaria Live', href: '/admin/super/portaria-live', icon: Activity },
+  { name: 'Utilizadores & Noivos', href: '/admin/super/utilizadores', icon: Users },
+  { name: 'Planners B2B & Slots', href: '/admin/super/planners', icon: Award },
+  { name: 'Fornecedores', href: '/admin/super/fornecedores', icon: Store },
+  { name: 'Fila de Moderação', href: '/admin/super/fornecedores/pendentes', icon: ShieldCheck },
+  { name: 'Comprovativos & Pagam.', href: '/admin/super/pagamentos', icon: Receipt },
+  { name: 'Avisos Globais', href: '/admin/super/avisos', icon: Megaphone },
+  { name: 'Exportação & Logs', href: '/admin/super/relatorios', icon: FileSpreadsheet },
+  { name: 'Meu Perfil', href: '/admin/perfil', icon: User },
+];
+
 const vendorMenuItems: SidebarItem[] = [
   { name: 'Meu Perfil', href: '/admin/fornecedores/perfil', icon: User },
   { name: 'Portfólio', href: '/admin/fornecedores/portfolio', icon: Briefcase },
@@ -80,21 +103,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const pathname = usePathname();
 
   const isAdmin = user?.app_metadata?.role === 'admin'
-    || user?.email?.includes('admin')
     || user?.email === 'amota@example.com';
 
   const isVendor = user?.app_metadata?.role === 'vendor' || user?.user_metadata?.role === 'vendor';
 
   const visibleMenuItems = isAdmin
-    ? menuItems.filter(item => item.href === '/admin/super' || item.href === '/admin/perfil')
+    ? superAdminMenuItems
     : isVendor
     ? vendorMenuItems
     : menuItems.filter(item => item.href !== '/admin/super');
 
   const visibleMobileTabItems = isAdmin
     ? [
-        { name: 'Consola', href: '/admin/super', icon: ShieldAlert },
-        { name: 'Perfil', href: '/admin/perfil', icon: User },
+        { name: 'Visão Geral', href: '/admin/super', icon: LayoutDashboard },
+        { name: 'Eventos', href: '/admin/super/eventos', icon: CalendarDays },
+        { name: 'Radar Live', href: '/admin/super/portaria-live', icon: Activity },
+        { name: 'Fornecedores', href: '/admin/super/fornecedores/pendentes', icon: ShieldCheck },
+        { name: 'Pagamentos', href: '/admin/super/pagamentos', icon: Receipt },
       ]
     : isVendor
     ? [
@@ -104,6 +129,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         { name: 'Contratos', href: '/admin/fornecedores/contratos', icon: FileText },
       ]
     : mobileTabItems;
+
+  const [activeBroadcast, setActiveBroadcast] = useState<SystemBroadcast | null>(null);
+  const [broadcastDismissed, setBroadcastDismissed] = useState(false);
+
+  // Fetch active system broadcast
+  useEffect(() => {
+    SuperAdminRepository.getActiveBroadcasts().then((broadcasts) => {
+      if (broadcasts && broadcasts.length > 0) {
+        setActiveBroadcast(broadcasts[0]);
+      }
+    });
+  }, [pathname]);
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [newEventModalOpen, setNewEventModalOpen] = useState(false);
@@ -123,7 +160,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       if (!user) {
         router.push('/login');
       } else if (isAdmin && (pathname === '/admin/dashboard' || pathname === '/admin')) {
-        router.push('/admin/super');
+        const inSupportMode = typeof window !== 'undefined' && localStorage.getItem('meuboda_support_mode') === 'true';
+        if (!inSupportMode) {
+          router.push('/admin/super');
+        }
       } else if (isVendor && (pathname === '/admin/dashboard' || pathname === '/admin' || !pathname.startsWith('/admin/fornecedores'))) {
         router.push('/admin/fornecedores/perfil');
       }
@@ -400,6 +440,39 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* MAIN PAGE BODY */}
         <main className="flex-1 overflow-y-auto p-4 pb-24 md:p-8 bg-background relative">
+          {/* SYSTEM BROADCAST BANNER */}
+          {activeBroadcast && !broadcastDismissed && (
+            <div className={`mb-5 p-3.5 sm:p-4 rounded-2xl border flex items-center justify-between gap-3 text-xs shadow-sm animate-in fade-in ${
+              activeBroadcast.type === 'urgent'
+                ? 'bg-error/15 border-error/30 text-error'
+                : activeBroadcast.type === 'warning'
+                ? 'bg-amber-500/15 border-amber-500/30 text-amber-600 dark:text-amber-400'
+                : activeBroadcast.type === 'success'
+                ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
+                : 'bg-primary/10 border-primary/25 text-primary'
+            }`}>
+              <div className="flex items-center gap-2.5 min-w-0">
+                <Megaphone className="h-4 w-4 shrink-0" />
+                <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                  <span className="font-bold">{activeBroadcast.title}:</span>
+                  <span className="opacity-90">{activeBroadcast.message}</span>
+                  {activeBroadcast.link && (
+                    <a href={activeBroadcast.link} target="_blank" rel="noopener noreferrer" className="underline font-bold ml-1 hover:opacity-80">
+                      Saber mais &rarr;
+                    </a>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={() => setBroadcastDismissed(true)}
+                className="p-1 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 transition-colors shrink-0"
+                title="Fechar aviso"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+
           {events.length === 0 && !eventLoading && !isAdmin && !isVendor ? (
             <div className="flex h-[70vh] flex-col items-center justify-center text-center max-w-md mx-auto">
               <Heart className="h-16 w-16 text-accent animate-pulse mb-4" />
