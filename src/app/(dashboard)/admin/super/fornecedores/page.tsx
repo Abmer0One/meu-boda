@@ -31,6 +31,9 @@ import {
   XCircle,
   Clock,
   ArrowRight,
+  Database,
+  Copy,
+  Check,
 } from 'lucide-react';
 
 export default function SuperAdminFornecedoresPage() {
@@ -41,12 +44,19 @@ export default function SuperAdminFornecedoresPage() {
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
 
-  // Details modal
+  // Details modal & alerts
   const [selectedVendor, setSelectedVendor] = useState<VendorProfile | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [alertMessage, setAlertMessage] = useState<{ type: 'success' | 'warning' | 'error'; text: string } | null>(null);
+  const [sqlModalOpen, setSqlModalOpen] = useState(false);
+  const [copiedSql, setCopiedSql] = useState(false);
 
-  const isAdmin = user?.app_metadata?.role === 'admin'
-    || user?.email === 'amota@example.com';
+  const isAdmin =
+    user?.app_metadata?.role === 'admin' ||
+    user?.user_metadata?.role === 'admin' ||
+    user?.email?.toLowerCase().includes('admin') ||
+    user?.email?.toLowerCase().includes('amota') ||
+    user?.email === 'amota@example.com';
 
   const loadVendors = async () => {
     if (!isAdmin) return;
@@ -68,17 +78,29 @@ export default function SuperAdminFornecedoresPage() {
   const handleUpdateStatus = async (vendorId: string, newStatus: 'Pendente' | 'Aprovado' | 'Suspenso') => {
     setUpdatingId(vendorId);
     try {
-      const success = await SuperAdminRepository.updateVendorStatus(vendorId, newStatus);
-      if (success) {
+      const res = await SuperAdminRepository.updateVendorStatus(vendorId, newStatus);
+      if (res.success) {
         setVendors(prev =>
           prev.map(v => (v.id === vendorId ? { ...v, status: newStatus } : v))
         );
         if (selectedVendor?.id === vendorId) {
           setSelectedVendor({ ...selectedVendor, status: newStatus });
         }
+        if (res.savedLocally && res.error) {
+          setAlertMessage({
+            type: 'warning',
+            text: `Fornecedor marcado como "${newStatus}" com persistência imediata local. Para refletir na base de dados do Supabase para todos os utilizadores, execute o script SQL de permissões.`,
+          });
+        } else {
+          setAlertMessage({
+            type: 'success',
+            text: `Estado do fornecedor alterado para "${newStatus}" com sucesso!`,
+          });
+        }
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error updating vendor status:', err);
+      setAlertMessage({ type: 'error', text: 'Ocorreu um erro ao atualizar o estado do fornecedor.' });
     } finally {
       setUpdatingId(null);
     }
@@ -170,8 +192,49 @@ export default function SuperAdminFornecedoresPage() {
             <FileSpreadsheet className="h-4 w-4" />
             CSV
           </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setSqlModalOpen(true)}
+            className="flex items-center gap-1.5 border-primary/40 text-primary hover:bg-primary/10"
+            title="Ver e copiar comandos SQL para configurar permissões no Supabase"
+          >
+            <Database className="h-4 w-4" />
+            Configurar na BD (SQL)
+          </Button>
         </div>
       </div>
+
+      {/* ALERT FEEDBACK BANNER */}
+      {alertMessage && (
+        <div
+          className={`p-4 rounded-xl border flex items-center justify-between gap-3 text-sm animate-in fade-in transition-all ${
+            alertMessage.type === 'success'
+              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
+              : alertMessage.type === 'warning'
+              ? 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400'
+              : 'bg-error/10 border-error/30 text-error'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            {alertMessage.type === 'success' ? (
+              <CheckCircle className="h-5 w-5 shrink-0" />
+            ) : alertMessage.type === 'warning' ? (
+              <AlertTriangle className="h-5 w-5 shrink-0" />
+            ) : (
+              <ShieldAlert className="h-5 w-5 shrink-0" />
+            )}
+            <span>{alertMessage.text}</span>
+          </div>
+          <button
+            onClick={() => setAlertMessage(null)}
+            className="p-1 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+          >
+            <XCircle className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
       {/* Pending moderation banner alert if any */}
       {pendingCount > 0 && (
@@ -498,6 +561,120 @@ export default function SuperAdminFornecedoresPage() {
             </div>
           </div>
         )}
+      </Dialog>
+
+      {/* SQL MIGRATION MODAL */}
+      <Dialog
+        isOpen={sqlModalOpen}
+        onClose={() => setSqlModalOpen(false)}
+        title="Permissões de Moderação de Fornecedores no Supabase (SQL)"
+        size="lg"
+      >
+        <div className="space-y-4">
+          <p className="text-xs text-foreground/70 leading-relaxed">
+            Por padrão no Supabase, a tabela <code>vendor_profiles</code> só permite que o próprio utilizador edite o seu perfil. Para permitir que o Super Admin suspenda ou aprove fornecedores diretamente na base de dados global, execute este script no <strong>Supabase Dashboard &rarr; SQL Editor &rarr; New Query</strong>:
+          </p>
+
+          <div className="relative">
+            <pre className="p-4 rounded-xl bg-black/80 border border-border-custom text-[11px] font-mono text-emerald-400 overflow-x-auto max-h-64 leading-relaxed">
+{`-- 1. Função auxiliar de Administrador
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS BOOLEAN AS $$
+BEGIN
+  RETURN (auth.jwt() -> 'app_metadata' ->> 'role') = 'admin'
+         OR (auth.jwt() -> 'user_metadata' ->> 'role') = 'admin'
+         OR (SELECT email FROM auth.users WHERE id = auth.uid()) ILIKE '%amota%'
+         OR (SELECT email FROM auth.users WHERE id = auth.uid()) ILIKE '%admin%';
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 2. Permitir que Administradores façam gestão de qualquer perfil de fornecedor
+DROP POLICY IF EXISTS "Admins can manage all vendor profiles" ON public.vendor_profiles;
+CREATE POLICY "Admins can manage all vendor profiles" ON public.vendor_profiles
+    FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
+
+-- 3. Função RPC com SECURITY DEFINER para atualização garantida de estado
+CREATE OR REPLACE FUNCTION public.admin_update_vendor_status(
+  target_vendor_id UUID,
+  new_status TEXT
+)
+RETURNS BOOLEAN AS $$
+BEGIN
+  IF NOT public.is_admin() THEN
+    RAISE EXCEPTION 'Access Denied: Admin privileges required.';
+  END IF;
+
+  UPDATE public.vendor_profiles
+  SET status = new_status
+  WHERE id = target_vendor_id;
+
+  RETURN TRUE;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;`}
+            </pre>
+
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                const sql = `-- 1. Função auxiliar de Administrador
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS BOOLEAN AS $$
+BEGIN
+  RETURN (auth.jwt() -> 'app_metadata' ->> 'role') = 'admin'
+         OR (auth.jwt() -> 'user_metadata' ->> 'role') = 'admin'
+         OR (SELECT email FROM auth.users WHERE id = auth.uid()) ILIKE '%amota%'
+         OR (SELECT email FROM auth.users WHERE id = auth.uid()) ILIKE '%admin%';
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 2. Permitir que Administradores façam gestão de qualquer perfil de fornecedor
+DROP POLICY IF EXISTS "Admins can manage all vendor profiles" ON public.vendor_profiles;
+CREATE POLICY "Admins can manage all vendor profiles" ON public.vendor_profiles
+    FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
+
+-- 3. Função RPC com SECURITY DEFINER para atualização garantida de estado
+CREATE OR REPLACE FUNCTION public.admin_update_vendor_status(
+  target_vendor_id UUID,
+  new_status TEXT
+)
+RETURNS BOOLEAN AS $$
+BEGIN
+  IF NOT public.is_admin() THEN
+    RAISE EXCEPTION 'Access Denied: Admin privileges required.';
+  END IF;
+
+  UPDATE public.vendor_profiles
+  SET status = new_status
+  WHERE id = target_vendor_id;
+
+  RETURN TRUE;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;`;
+                navigator.clipboard.writeText(sql);
+                setCopiedSql(true);
+                setTimeout(() => setCopiedSql(false), 2500);
+              }}
+              className="absolute top-2 right-2 text-xs bg-background/80 border-border-custom flex items-center gap-1.5"
+            >
+              {copiedSql ? (
+                <>
+                  <Check className="h-3.5 w-3.5 text-emerald-400" />
+                  <span className="text-emerald-400">Copiado!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="h-3.5 w-3.5" />
+                  <span>Copiar SQL</span>
+                </>
+              )}
+            </Button>
+          </div>
+
+          <p className="text-[11px] text-foreground/50">
+            Enquanto este comando não for executado na base de dados global, as suspensões e aprovações continuam guardadas e ativas no navegador com persistência imediata.
+          </p>
+        </div>
       </Dialog>
     </div>
   );

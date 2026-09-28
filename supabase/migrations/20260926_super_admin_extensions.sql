@@ -150,3 +150,28 @@ BEGIN
   LIMIT limit_count;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 7. RLS policy to allow Admins to manage all vendor profiles
+DROP POLICY IF EXISTS "Admins can manage all vendor profiles" ON public.vendor_profiles;
+CREATE POLICY "Admins can manage all vendor profiles" ON public.vendor_profiles
+    FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
+
+-- 8. RPC to update vendor status (Aprovado / Suspenso / Pendente)
+CREATE OR REPLACE FUNCTION public.admin_update_vendor_status(
+  target_vendor_id UUID,
+  new_status TEXT
+)
+RETURNS BOOLEAN AS $$
+BEGIN
+  IF NOT public.is_admin() THEN
+    RAISE EXCEPTION 'Access Denied: Admin privileges required.';
+  END IF;
+
+  UPDATE public.vendor_profiles
+  SET status = new_status
+  WHERE id = target_vendor_id;
+
+  RETURN TRUE;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+

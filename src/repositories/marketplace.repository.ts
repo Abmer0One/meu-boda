@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase';
 import { VendorProfile, VendorService, ChatRoom, ChatMessage, VendorContract, PaymentInstallment } from '@/types';
 import { BudgetRepository } from '@/repositories/budget.repository';
 import { NotificationRepository } from '@/repositories/notification.repository';
+import { getLocalVendorStatusOverrides } from '@/repositories/superadmin.repository';
 
 export const VendorProfileRepository = {
   async get(id: string): Promise<VendorProfile | null> {
@@ -18,7 +19,13 @@ export const VendorProfileRepository = {
       }
       return null;
     }
-    return data as VendorProfile;
+    if (!data) return null;
+    const profile = data as VendorProfile;
+    const overrides = getLocalVendorStatusOverrides();
+    if (overrides[profile.id]) {
+      profile.status = overrides[profile.id];
+    }
+    return profile;
   },
 
   async upsert(profile: Partial<VendorProfile> & { id: string }): Promise<VendorProfile | null> {
@@ -84,7 +91,17 @@ export const VendorProfileRepository = {
       console.error('Error listing vendor profiles:', error);
       return [];
     }
-    return data as VendorProfile[];
+    const overrides = getLocalVendorStatusOverrides();
+    const raw = (data as VendorProfile[]) || [];
+    return raw
+      .filter((v) => {
+        const finalStatus = overrides[v.id] || v.status;
+        return finalStatus === 'Aprovado';
+      })
+      .map((v) => ({
+        ...v,
+        status: overrides[v.id] || v.status,
+      }));
   },
 
   async uploadLogo(vendorId: string, file: File): Promise<string | null> {
