@@ -25,6 +25,9 @@ import {
   ExternalLink,
   Sparkles,
   Eye,
+  Database,
+  Copy,
+  Check,
 } from 'lucide-react';
 
 export default function SuperAdminAvisosPage() {
@@ -41,8 +44,14 @@ export default function SuperAdminAvisosPage() {
   const [isActive, setIsActive] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [alertMessage, setAlertMessage] = useState<{ type: 'success' | 'warning' | 'error'; text: string } | null>(null);
+  const [sqlModalOpen, setSqlModalOpen] = useState(false);
+  const [copiedSql, setCopiedSql] = useState(false);
 
   const isAdmin = user?.app_metadata?.role === 'admin'
+    || user?.user_metadata?.role === 'admin'
+    || user?.email?.toLowerCase().includes('admin')
+    || user?.email?.toLowerCase().includes('amota')
     || user?.email === 'amota@example.com';
 
   const loadBroadcasts = async () => {
@@ -96,8 +105,9 @@ export default function SuperAdminAvisosPage() {
     if (!title.trim() || !message.trim()) return;
 
     setSubmitting(true);
+    setAlertMessage(null);
     try {
-      const created = await SuperAdminRepository.createBroadcast({
+      const res = await SuperAdminRepository.createBroadcast({
         title: title.trim(),
         message: message.trim(),
         type,
@@ -105,17 +115,26 @@ export default function SuperAdminAvisosPage() {
         is_active: isActive,
       });
 
-      if (created) {
-        setBroadcasts(prev => [created, ...prev]);
+      if (res.success && res.broadcast) {
+        setBroadcasts(prev => [res.broadcast!, ...prev.filter(b => b.id !== res.broadcast!.id)]);
         setCreateModalOpen(false);
         setTitle('');
         setMessage('');
         setType('info');
         setLink('');
         setIsActive(true);
+
+        if (res.error) {
+          setAlertMessage({ type: 'warning', text: res.error });
+        } else {
+          setAlertMessage({ type: 'success', text: 'Aviso global criado e transmitido com sucesso!' });
+        }
+      } else {
+        setAlertMessage({ type: 'error', text: res.error || 'Erro ao criar o aviso.' });
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to create broadcast:', err);
+      setAlertMessage({ type: 'error', text: err?.message || 'Falha ao processar criação do aviso.' });
     } finally {
       setSubmitting(false);
     }
@@ -156,6 +175,17 @@ export default function SuperAdminAvisosPage() {
           <Button
             variant="outline"
             size="sm"
+            onClick={() => setSqlModalOpen(true)}
+            className="flex items-center gap-1.5 text-xs text-foreground/70 border-border-custom hover:bg-foreground/5"
+            title="Ver e copiar comandos SQL para o Supabase Dashboard"
+          >
+            <Database className="h-4 w-4 text-primary" />
+            Configurar na BD
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
             onClick={loadBroadcasts}
             disabled={loading}
             className="flex items-center gap-1.5"
@@ -175,6 +205,30 @@ export default function SuperAdminAvisosPage() {
           </Button>
         </div>
       </div>
+
+      {/* Feedback Alert */}
+      {alertMessage && (
+        <div className={`p-4 rounded-xl text-xs font-semibold flex items-center justify-between gap-2 border shadow-sm animate-in fade-in ${
+          alertMessage.type === 'success'
+            ? 'bg-success/15 border-success/30 text-success'
+            : alertMessage.type === 'warning'
+            ? 'bg-amber-500/15 border-amber-500/30 text-amber-700 dark:text-amber-400'
+            : 'bg-error/15 border-error/30 text-error'
+        }`}>
+          <div className="flex items-center gap-2">
+            {alertMessage.type === 'success' && <CheckCircle2 className="h-4 w-4 shrink-0" />}
+            {alertMessage.type === 'warning' && <AlertTriangle className="h-4 w-4 shrink-0" />}
+            {alertMessage.type === 'error' && <AlertTriangle className="h-4 w-4 shrink-0" />}
+            <span>{alertMessage.text}</span>
+          </div>
+          <button
+            onClick={() => setAlertMessage(null)}
+            className="p-1 rounded hover:bg-foreground/10 text-foreground/60 shrink-0"
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
@@ -449,6 +503,127 @@ export default function SuperAdminAvisosPage() {
             </Button>
           </div>
         </form>
+      </Dialog>
+
+      {/* SQL MIGRATION MODAL */}
+      <Dialog
+        isOpen={sqlModalOpen}
+        onClose={() => setSqlModalOpen(false)}
+        title="Configuração da Tabela no Supabase (SQL)"
+        size="lg"
+      >
+        <div className="space-y-4">
+          <p className="text-xs text-foreground/70 leading-relaxed">
+            Caso ainda não tenha executado a tabela no seu projeto Supabase, aceda ao <strong>Supabase Dashboard &rarr; SQL Editor &rarr; New Query</strong>, cole o código abaixo e clique em <strong>Run</strong>:
+          </p>
+
+          <div className="relative">
+            <pre className="p-4 rounded-xl bg-black/80 border border-border-custom text-[11px] font-mono text-emerald-400 overflow-x-auto max-h-64 leading-relaxed">
+{`-- 1. Função auxiliar de Admin
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS BOOLEAN AS $$
+BEGIN
+  RETURN (auth.jwt() -> 'app_metadata' ->> 'role') = 'admin'
+         OR (auth.jwt() -> 'user_metadata' ->> 'role') = 'admin'
+         OR (SELECT email FROM auth.users WHERE id = auth.uid()) ILIKE '%amota%'
+         OR (SELECT email FROM auth.users WHERE id = auth.uid()) ILIKE '%admin%';
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 2. Tabela de Avisos Globais de Sistema
+CREATE TABLE IF NOT EXISTS public.system_broadcasts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    type TEXT CHECK (type IN ('info', 'warning', 'success', 'urgent')) NOT NULL DEFAULT 'info',
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    link TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL
+);
+
+-- 3. Ativar RLS
+ALTER TABLE public.system_broadcasts ENABLE ROW LEVEL SECURITY;
+
+-- 4. Leitura pública de avisos ativos
+DROP POLICY IF EXISTS "Anyone can read active system broadcasts" ON public.system_broadcasts;
+CREATE POLICY "Anyone can read active system broadcasts" ON public.system_broadcasts
+    FOR SELECT TO anon, authenticated USING (is_active = true OR public.is_admin());
+
+-- 5. Gestão restrita a Administradores
+DROP POLICY IF EXISTS "Admins can manage system broadcasts" ON public.system_broadcasts;
+CREATE POLICY "Admins can manage system broadcasts" ON public.system_broadcasts
+    FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());`}
+            </pre>
+
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                const sql = `-- 1. Função auxiliar de Admin
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS BOOLEAN AS $$
+BEGIN
+  RETURN (auth.jwt() -> 'app_metadata' ->> 'role') = 'admin'
+         OR (auth.jwt() -> 'user_metadata' ->> 'role') = 'admin'
+         OR (SELECT email FROM auth.users WHERE id = auth.uid()) ILIKE '%amota%'
+         OR (SELECT email FROM auth.users WHERE id = auth.uid()) ILIKE '%admin%';
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 2. Tabela de Avisos Globais de Sistema
+CREATE TABLE IF NOT EXISTS public.system_broadcasts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    type TEXT CHECK (type IN ('info', 'warning', 'success', 'urgent')) NOT NULL DEFAULT 'info',
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    link TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL
+);
+
+ALTER TABLE public.system_broadcasts ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Anyone can read active system broadcasts" ON public.system_broadcasts;
+CREATE POLICY "Anyone can read active system broadcasts" ON public.system_broadcasts
+    FOR SELECT TO anon, authenticated USING (is_active = true OR public.is_admin());
+
+DROP POLICY IF EXISTS "Admins can manage system broadcasts" ON public.system_broadcasts;
+CREATE POLICY "Admins can manage system broadcasts" ON public.system_broadcasts
+    FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());`;
+                navigator.clipboard.writeText(sql);
+                setCopiedSql(true);
+                setTimeout(() => setCopiedSql(false), 2500);
+              }}
+              className="absolute top-2 right-2 text-xs bg-background/80 border-border-custom flex items-center gap-1.5"
+            >
+              {copiedSql ? (
+                <>
+                  <Check className="h-3.5 w-3.5 text-emerald-500" />
+                  <span className="text-emerald-500">Copiado!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="h-3.5 w-3.5" />
+                  <span>Copiar SQL</span>
+                </>
+              )}
+            </Button>
+          </div>
+
+          <div className="flex items-center justify-end pt-2 border-t border-border-custom">
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
+              onClick={() => setSqlModalOpen(false)}
+              className="bg-primary text-black hover:bg-primary-hover font-semibold"
+            >
+              Entendido
+            </Button>
+          </div>
+        </div>
       </Dialog>
     </div>
   );

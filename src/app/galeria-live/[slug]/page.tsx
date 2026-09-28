@@ -7,6 +7,7 @@ import { Event } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Camera, Loader2, Play, Heart } from 'lucide-react';
+import GlobalBroadcastBanner from '@/components/common/GlobalBroadcastBanner';
 
 interface LiveGalleryProps {
   params: Promise<{ slug: string }>;
@@ -167,6 +168,8 @@ export default function PublicLiveGalleryPage({ params }: LiveGalleryProps) {
           <span>{mediaList.length} momentos partilhados</span>
         </div>
       </header>
+
+      <GlobalBroadcastBanner className="mt-3 relative z-20" />
 
       {/* Main Slide Presentation Area */}
       <main className="flex-1 flex items-center justify-center relative py-6">

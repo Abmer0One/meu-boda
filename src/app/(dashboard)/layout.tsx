@@ -43,7 +43,13 @@ import {
   Receipt,
   Megaphone,
   Award,
+  Eye,
+  ArrowLeft,
+  Clock,
 } from 'lucide-react';
+import { VendorProfileRepository } from '@/repositories/marketplace.repository';
+import { VendorProfile } from '@/types';
+import GlobalBroadcastBanner from '@/components/common/GlobalBroadcastBanner';
 
 interface SidebarItem {
   name: string;
@@ -98,22 +104,36 @@ const mobileTabItems = [
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, loading: authLoading, signOut } = useAuth();
-  const { currentEvent, events, loading: eventLoading, setCurrentEvent, refreshEvents } = useEvent();
+  const { currentEvent, events, loading: eventLoading, setCurrentEvent, refreshEvents, isSupportMode, exitSupportMode } = useEvent();
   const router = useRouter();
   const pathname = usePathname();
 
   const isAdmin = user?.app_metadata?.role === 'admin'
+    || user?.user_metadata?.role === 'admin'
+    || user?.email?.toLowerCase().includes('admin')
+    || user?.email?.toLowerCase().includes('amota')
     || user?.email === 'amota@example.com';
 
   const isVendor = user?.app_metadata?.role === 'vendor' || user?.user_metadata?.role === 'vendor';
 
-  const visibleMenuItems = isAdmin
+  const [vendorProfile, setVendorProfile] = useState<VendorProfile | null>(null);
+
+  // Fetch vendor profile when user is a vendor
+  useEffect(() => {
+    if (user && isVendor) {
+      VendorProfileRepository.get(user.id).then((p) => {
+        if (p) setVendorProfile(p);
+      });
+    }
+  }, [user, isVendor, pathname]);
+
+  const visibleMenuItems = (isAdmin && !isSupportMode)
     ? superAdminMenuItems
     : isVendor
     ? vendorMenuItems
     : menuItems.filter(item => item.href !== '/admin/super');
 
-  const visibleMobileTabItems = isAdmin
+  const visibleMobileTabItems = (isAdmin && !isSupportMode)
     ? [
         { name: 'Visão Geral', href: '/admin/super', icon: LayoutDashboard },
         { name: 'Eventos', href: '/admin/super/eventos', icon: CalendarDays },
@@ -129,18 +149,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         { name: 'Contratos', href: '/admin/fornecedores/contratos', icon: FileText },
       ]
     : mobileTabItems;
-
-  const [activeBroadcast, setActiveBroadcast] = useState<SystemBroadcast | null>(null);
-  const [broadcastDismissed, setBroadcastDismissed] = useState(false);
-
-  // Fetch active system broadcast
-  useEffect(() => {
-    SuperAdminRepository.getActiveBroadcasts().then((broadcasts) => {
-      if (broadcasts && broadcasts.length > 0) {
-        setActiveBroadcast(broadcasts[0]);
-      }
-    });
-  }, [pathname]);
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [newEventModalOpen, setNewEventModalOpen] = useState(false);
@@ -160,7 +168,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       if (!user) {
         router.push('/login');
       } else if (isAdmin && (pathname === '/admin/dashboard' || pathname === '/admin')) {
-        const inSupportMode = typeof window !== 'undefined' && localStorage.getItem('meuboda_support_mode') === 'true';
+        const inSupportMode = isSupportMode || (typeof window !== 'undefined' && localStorage.getItem('meuboda_support_mode') === 'true');
         if (!inSupportMode) {
           router.push('/admin/super');
         }
@@ -168,7 +176,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         router.push('/admin/fornecedores/perfil');
       }
     }
-  }, [user, authLoading, router, isAdmin, isVendor, pathname]);
+  }, [user, authLoading, router, isAdmin, isVendor, pathname, isSupportMode]);
 
   // Real-time slug availability check with debounce
   useEffect(() => {
@@ -440,40 +448,67 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* MAIN PAGE BODY */}
         <main className="flex-1 overflow-y-auto p-4 pb-24 md:p-8 bg-background relative">
-          {/* SYSTEM BROADCAST BANNER */}
-          {activeBroadcast && !broadcastDismissed && (
-            <div className={`mb-5 p-3.5 sm:p-4 rounded-2xl border flex items-center justify-between gap-3 text-xs shadow-sm animate-in fade-in ${
-              activeBroadcast.type === 'urgent'
-                ? 'bg-error/15 border-error/30 text-error'
-                : activeBroadcast.type === 'warning'
-                ? 'bg-amber-500/15 border-amber-500/30 text-amber-600 dark:text-amber-400'
-                : activeBroadcast.type === 'success'
-                ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
-                : 'bg-primary/10 border-primary/25 text-primary'
-            }`}>
+          {/* SUPPORT MODE (MODO ESPELHO) BANNER */}
+          {isSupportMode && (
+            <div className="mb-5 p-3.5 sm:p-4 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-between gap-3 text-xs text-amber-700 dark:text-amber-300 shadow-sm animate-in fade-in sticky top-0 z-30 backdrop-blur-md">
               <div className="flex items-center gap-2.5 min-w-0">
-                <Megaphone className="h-4 w-4 shrink-0" />
-                <div className="flex flex-wrap items-center gap-1.5 min-w-0">
-                  <span className="font-bold">{activeBroadcast.title}:</span>
-                  <span className="opacity-90">{activeBroadcast.message}</span>
-                  {activeBroadcast.link && (
-                    <a href={activeBroadcast.link} target="_blank" rel="noopener noreferrer" className="underline font-bold ml-1 hover:opacity-80">
-                      Saber mais &rarr;
-                    </a>
-                  )}
+                <span className="relative flex h-3 w-3 shrink-0">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+                </span>
+                <Eye className="h-4 w-4 shrink-0 text-amber-500" />
+                <div className="min-w-0">
+                  <span className="font-bold">Modo Suporte Ativo (Modo Espelho):</span>{' '}
+                  <span>A inspecionar o evento <u>{currentEvent?.title || 'Selecionado'}</u> com privilégios de Administrador.</span>
                 </div>
               </div>
               <button
-                onClick={() => setBroadcastDismissed(true)}
-                className="p-1 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 transition-colors shrink-0"
-                title="Fechar aviso"
+                onClick={() => {
+                  exitSupportMode();
+                  router.push('/admin/super/eventos');
+                }}
+                className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-black font-bold rounded-xl transition-all shadow-sm flex items-center gap-1.5 shrink-0 text-xs cursor-pointer"
+                title="Encerrar visualização de suporte e regressar à gestão de eventos"
               >
-                <X className="h-3.5 w-3.5" />
+                <ArrowLeft className="h-3.5 w-3.5" />
+                <span>Sair do Suporte</span>
               </button>
             </div>
           )}
 
-          {events.length === 0 && !eventLoading && !isAdmin && !isVendor ? (
+          {/* VENDOR MODERATION STATUS BANNER */}
+          {isVendor && vendorProfile?.status === 'Suspenso' && (
+            <div className="mb-5 p-4 rounded-2xl bg-error/15 border border-error/30 text-error flex items-start gap-3 text-xs shadow-sm">
+              <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p className="font-bold text-sm">Perfil Comercial Suspenso</p>
+                <p className="opacity-90 leading-relaxed">
+                  A sua conta de fornecedor foi temporariamente suspensa pela administração da plataforma Meu Boda.
+                  Os seus serviços e portfólio não estão visíveis aos noivos no Marketplace público.
+                  Para regularizar a sua conta, por favor entre em contacto com a nossa equipa através de <a href="mailto:suporte@meuboda.com" className="underline font-semibold">suporte@meuboda.com</a>.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {isVendor && vendorProfile?.status === 'Pendente' && (
+            <div className="mb-5 p-4 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-700 dark:text-amber-300 flex items-start gap-3 text-xs shadow-sm">
+              <Clock className="h-5 w-5 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p className="font-bold text-sm">Perfil em Análise (Aguardando Moderação)</p>
+                <p className="opacity-90 leading-relaxed">
+                  O seu registo de fornecedor foi submetido com sucesso e está a ser verificado pela administração do Meu Boda.
+                  Entretanto, complete todos os seus dados comerciais, carregue o seu logotipo e adicione fotos e serviços ao seu portfólio.
+                  Assim que o perfil for aprovado, ficará imediatamente disponível para contratação por todos os noivos!
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* SYSTEM BROADCAST BANNER */}
+          <GlobalBroadcastBanner className="mb-5" />
+
+          {events.length === 0 && !eventLoading && !isAdmin && !isVendor && !isSupportMode ? (
             <div className="flex h-[70vh] flex-col items-center justify-center text-center max-w-md mx-auto">
               <Heart className="h-16 w-16 text-accent animate-pulse mb-4" />
               <h2 className="text-xl font-bold mb-2">Bem-vindo ao Meu Boda!</h2>

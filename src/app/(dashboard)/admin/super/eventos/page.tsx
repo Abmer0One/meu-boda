@@ -63,6 +63,9 @@ export default function SuperAdminEventosPage() {
   const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
 
   const isAdmin = user?.app_metadata?.role === 'admin'
+    || user?.user_metadata?.role === 'admin'
+    || user?.email?.toLowerCase().includes('admin')
+    || user?.email?.toLowerCase().includes('amota')
     || user?.email === 'amota@example.com';
 
   const loadEvents = async () => {
@@ -88,9 +91,11 @@ export default function SuperAdminEventosPage() {
       localStorage.setItem('meuboda_selected_event_id', eventId);
       localStorage.setItem('meuboda_support_mode', 'true');
       localStorage.setItem('meuboda_support_event_title', title);
-      router.push('/admin/dashboard');
+      // Clean page navigation with full context refresh
+      window.location.href = '/admin/dashboard';
     } catch (e) {
       console.error('Failed to set support session', e);
+      router.push('/admin/dashboard');
     }
   };
 

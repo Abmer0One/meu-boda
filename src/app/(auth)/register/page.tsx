@@ -133,7 +133,7 @@ export default function RegisterPage() {
           id: signUpData.user.id,
           company_name: 'Minha Empresa de Serviços',
           category: 'Fotografia',
-          status: 'Aprovado',
+          status: 'Pendente',
           email: data.email,
           phone: data.phone,
         });
@@ -142,7 +142,11 @@ export default function RegisterPage() {
         }
       }
 
-      setSuccessMessage('Conta criada com sucesso! Redirecionando...');
+      setSuccessMessage(
+        data.role === 'vendor'
+          ? 'Registo submetido com sucesso! O seu perfil foi enviado para validação pela equipa Meu Boda.'
+          : 'Conta criada com sucesso! Redirecionando...'
+      );
       setTimeout(() => {
         if (data.role === 'vendor') {
           router.push('/admin/fornecedores/perfil');

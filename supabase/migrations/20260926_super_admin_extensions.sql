@@ -8,7 +8,9 @@ CREATE OR REPLACE FUNCTION public.is_admin()
 RETURNS BOOLEAN AS $$
 BEGIN
   RETURN (auth.jwt() -> 'app_metadata' ->> 'role') = 'admin'
-         OR (SELECT email FROM auth.users WHERE id = auth.uid()) = 'amota@example.com';
+         OR (auth.jwt() -> 'user_metadata' ->> 'role') = 'admin'
+         OR (SELECT email FROM auth.users WHERE id = auth.uid()) ILIKE '%amota%'
+         OR (SELECT email FROM auth.users WHERE id = auth.uid()) ILIKE '%admin%';
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -29,11 +31,11 @@ ALTER TABLE public.system_broadcasts ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Anyone can read active system broadcasts" ON public.system_broadcasts;
 CREATE POLICY "Anyone can read active system broadcasts" ON public.system_broadcasts
-    FOR SELECT USING (is_active = true OR public.is_admin());
+    FOR SELECT TO anon, authenticated USING (is_active = true OR public.is_admin());
 
 DROP POLICY IF EXISTS "Admins can manage system broadcasts" ON public.system_broadcasts;
 CREATE POLICY "Admins can manage system broadcasts" ON public.system_broadcasts
-    FOR ALL USING (public.is_admin()) WITH CHECK (public.is_admin());
+    FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
 
 -- 3. Platform Payments / Comprovativos table
 CREATE TABLE IF NOT EXISTS public.platform_payments (

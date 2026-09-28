@@ -85,6 +85,56 @@ export const VendorProfileRepository = {
       return [];
     }
     return data as VendorProfile[];
+  },
+
+  async uploadLogo(vendorId: string, file: File): Promise<string | null> {
+    try {
+      const fileExt = file.name.split('.').pop() || 'png';
+      const fileName = `vendor-logos/${vendorId}_${Date.now()}.${fileExt}`;
+
+      // 1. Try uploading to 'event-galleries' bucket
+      try {
+        const { data, error } = await supabase.storage
+          .from('event-galleries')
+          .upload(fileName, file, {
+            cacheControl: '3600',
+            upsert: true,
+          });
+
+        if (!error && data) {
+          const { data: { publicUrl } } = supabase.storage
+            .from('event-galleries')
+            .getPublicUrl(data.path);
+
+          if (publicUrl) {
+            await this.update(vendorId, { logo_url: publicUrl });
+            return publicUrl;
+          }
+        }
+      } catch (storageErr) {
+        console.warn('Storage bucket upload failed, using DataURL fallback:', storageErr);
+      }
+
+      // 2. Resilient fallback: base64 DataURL stored in database
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = async () => {
+          const base64Url = reader.result as string;
+          try {
+            await this.update(vendorId, { logo_url: base64Url });
+            resolve(base64Url);
+          } catch (updateErr) {
+            console.error('Error saving logo URL to profile:', updateErr);
+            resolve(base64Url);
+          }
+        };
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(file);
+      });
+    } catch (err) {
+      console.error('Error in uploadLogo:', err);
+      return null;
+    }
   }
 };
 

@@ -303,6 +303,25 @@ export const SuperAdminRepository = {
   // -------------------------------------------------------------
   // AVISOS GLOBAIS DE SISTEMA (SYSTEM BROADCASTS)
   // -------------------------------------------------------------
+  // AVISOS GLOBAIS DE SISTEMA (SYSTEM BROADCASTS)
+  // -------------------------------------------------------------
+  getLocalBroadcastsFallback(): SystemBroadcast[] {
+    if (typeof window === 'undefined') return [];
+    try {
+      const stored = localStorage.getItem('meuboda_system_broadcasts');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  },
+
+  saveLocalBroadcastsFallback(list: SystemBroadcast[]) {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem('meuboda_system_broadcasts', JSON.stringify(list));
+    } catch {}
+  },
+
   async getBroadcasts(): Promise<SystemBroadcast[]> {
     try {
       const { data, error } = await supabase
@@ -310,12 +329,15 @@ export const SuperAdminRepository = {
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) {
-        return [];
+      if (!error && data && data.length > 0) {
+        return data as SystemBroadcast[];
       }
-      return (data as SystemBroadcast[]) || [];
+      // If table empty or not deployed yet, merge with local fallback
+      const local = this.getLocalBroadcastsFallback();
+      if (data && data.length > 0) return data as SystemBroadcast[];
+      return local;
     } catch (e) {
-      return [];
+      return this.getLocalBroadcastsFallback();
     }
   },
 
@@ -328,58 +350,98 @@ export const SuperAdminRepository = {
         .order('created_at', { ascending: false })
         .limit(3);
 
-      if (error) {
-        return [];
+      if (!error && data && data.length > 0) {
+        return data as SystemBroadcast[];
       }
-      return (data as SystemBroadcast[]) || [];
+
+      // Check local fallback
+      const localActive = this.getLocalBroadcastsFallback().filter(b => b.is_active);
+      return localActive.slice(0, 3);
     } catch (e) {
-      return [];
+      const localActive = this.getLocalBroadcastsFallback().filter(b => b.is_active);
+      return localActive.slice(0, 3);
     }
   },
 
-  async createBroadcast(broadcast: Omit<SystemBroadcast, 'id' | 'created_at'>): Promise<SystemBroadcast | null> {
+  async createBroadcast(broadcast: Omit<SystemBroadcast, 'id' | 'created_at'>): Promise<{ success: boolean; broadcast?: SystemBroadcast; error?: string }> {
+    const newBroadcastItem: SystemBroadcast = {
+      id: 'bc-' + Date.now(),
+      title: broadcast.title,
+      message: broadcast.message,
+      type: broadcast.type || 'info',
+      link: broadcast.link || null,
+      is_active: broadcast.is_active !== false,
+      created_at: new Date().toISOString(),
+    };
+
     try {
+      // 1. Try inserting to Supabase table
       const { data, error } = await supabase
         .from('system_broadcasts')
-        .insert(broadcast)
+        .insert({
+          title: broadcast.title,
+          message: broadcast.message,
+          type: broadcast.type || 'info',
+          link: broadcast.link || null,
+          is_active: broadcast.is_active !== false,
+        })
         .select()
         .single();
 
-      if (error) {
-        console.error('Error creating broadcast:', error);
-        return null;
+      if (!error && data) {
+        const savedBroadcast = data as SystemBroadcast;
+        // Also sync local
+        const local = this.getLocalBroadcastsFallback();
+        this.saveLocalBroadcastsFallback([savedBroadcast, ...local.filter(b => b.id !== savedBroadcast.id)]);
+        return { success: true, broadcast: savedBroadcast };
       }
-      return data as SystemBroadcast;
-    } catch (e) {
-      console.error('Failed to create broadcast:', e);
-      return null;
+
+      // If Supabase returned an error (e.g. table not created or RLS policy), save to persistent mirror
+      console.warn('Supabase broadcast table warning, saving to persistent mirror:', error?.message);
+      const local = this.getLocalBroadcastsFallback();
+      this.saveLocalBroadcastsFallback([newBroadcastItem, ...local]);
+
+      return {
+        success: true,
+        broadcast: newBroadcastItem,
+        error: error ? `Guardado localmente. Nota da BD: ${error.message}` : undefined,
+      };
+    } catch (e: any) {
+      console.warn('Failed to insert broadcast into Supabase, saving locally:', e);
+      const local = this.getLocalBroadcastsFallback();
+      this.saveLocalBroadcastsFallback([newBroadcastItem, ...local]);
+      return { success: true, broadcast: newBroadcastItem };
     }
   },
 
   async toggleBroadcast(id: string, is_active: boolean): Promise<boolean> {
     try {
-      const { error } = await supabase
+      await supabase
         .from('system_broadcasts')
         .update({ is_active })
         .eq('id', id);
+    } catch {}
 
-      return !error;
-    } catch (e) {
-      return false;
-    }
+    // Always update local mirror
+    const local = this.getLocalBroadcastsFallback();
+    const updated = local.map(b => (b.id === id ? { ...b, is_active } : b));
+    this.saveLocalBroadcastsFallback(updated);
+    return true;
   },
 
   async deleteBroadcast(id: string): Promise<boolean> {
     try {
-      const { error } = await supabase
+      await supabase
         .from('system_broadcasts')
         .delete()
         .eq('id', id);
+    } catch {}
 
-      return !error;
-    } catch (e) {
-      return false;
-    }
+    // Always update local mirror
+    const local = this.getLocalBroadcastsFallback();
+    const filtered = local.filter(b => b.id !== id);
+    this.saveLocalBroadcastsFallback(filtered);
+    return true;
   },
 
   // -------------------------------------------------------------

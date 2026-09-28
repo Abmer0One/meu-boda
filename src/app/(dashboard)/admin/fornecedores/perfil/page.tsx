@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { VendorProfile } from '@/types';
 import { VendorProfileRepository } from '@/repositories/marketplace.repository';
@@ -19,7 +19,13 @@ import {
   Loader2,
   Phone,
   Mail,
-  Globe 
+  Globe,
+  Camera,
+  Upload,
+  ShieldCheck,
+  AlertTriangle,
+  Clock,
+  Image as ImageIcon
 } from 'lucide-react';
 
 const CATEGORIES = ['Fotografia', 'Decoração', 'Buffet', 'DJ', 'Espaço', 'Vestuário', 'Outro'];
@@ -29,11 +35,14 @@ export default function VendorProfilePage() {
   const [profile, setProfile] = useState<VendorProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Form states
   const [companyName, setCompanyName] = useState('');
   const [category, setCategory] = useState('');
+  const [logoUrl, setLogoUrl] = useState('');
   const [nif, setNif] = useState('');
   const [iban, setIban] = useState('');
   const [phone, setPhone] = useState('');
@@ -54,6 +63,7 @@ export default function VendorProfilePage() {
           setProfile(fetched);
           setCompanyName(fetched.company_name);
           setCategory(fetched.category || 'Fotografia');
+          setLogoUrl(fetched.logo_url || '');
           setNif(fetched.nif || '');
           setIban(fetched.iban || '');
           setPhone(fetched.phone || user.user_metadata?.phone || '');
@@ -66,6 +76,7 @@ export default function VendorProfilePage() {
           // Initialize defaults in form state without failing
           setCompanyName(user.user_metadata?.full_name || 'Minha Empresa de Serviços');
           setCategory('Fotografia');
+          setLogoUrl('');
           setPhone(user.user_metadata?.phone || '');
           setEmail(user.email || '');
           setWebsite('');
@@ -82,6 +93,34 @@ export default function VendorProfilePage() {
     fetchProfile();
   }, [user]);
 
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    if (!file.type.startsWith('image/')) {
+      setMessage({ type: 'error', text: 'Por favor selecione um ficheiro de imagem válido (PNG, JPG, WebP).' });
+      return;
+    }
+
+    setUploadingLogo(true);
+    setMessage(null);
+    try {
+      const url = await VendorProfileRepository.uploadLogo(user.id, file);
+      if (url) {
+        setLogoUrl(url);
+        setProfile(prev => prev ? { ...prev, logo_url: url } : null);
+        setMessage({ type: 'success', text: 'Logotipo atualizado e gravado na base de dados com sucesso!' });
+      } else {
+        setMessage({ type: 'error', text: 'Não foi possível carregar o logotipo. Tente novamente.' });
+      }
+    } catch (err: any) {
+      console.error('Error uploading logo:', err);
+      setMessage({ type: 'error', text: err?.message || 'Erro no upload do logotipo.' });
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) {
@@ -96,6 +135,7 @@ export default function VendorProfilePage() {
         id: user.id,
         company_name: companyName || 'Minha Empresa de Serviços',
         category: category || 'Outro',
+        logo_url: logoUrl || profile?.logo_url || null,
         nif: nif || null,
         iban: iban || null,
         phone: phone || null,
@@ -104,7 +144,7 @@ export default function VendorProfilePage() {
         description: description || null,
         daily_limit: Number(dailyLimit) || 1,
         blocked_dates: blockedDates,
-        status: profile?.status || 'Aprovado',
+        status: profile?.status || 'Pendente',
       });
 
       if (saved) {
@@ -170,14 +210,75 @@ export default function VendorProfilePage() {
         <div className="md:col-span-1 space-y-6">
           <Card className="bg-card-bg border border-border-custom text-center p-5">
             <div className="flex flex-col items-center">
-              <div className="h-16 w-16 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-2xl font-bold text-primary mb-3">
-                {companyName ? companyName.substring(0, 2).toUpperCase() : 'FO'}
+              {/* Logo / Avatar with Upload Button */}
+              <div className="relative group mb-3">
+                <div className="h-20 w-20 rounded-2xl bg-foreground/5 border-2 border-border-custom flex items-center justify-center overflow-hidden shadow-inner">
+                  {logoUrl ? (
+                    <img src={logoUrl} alt={companyName} className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="text-2xl font-bold text-primary">
+                      {companyName ? companyName.substring(0, 2).toUpperCase() : 'FO'}
+                    </span>
+                  )}
+                </div>
+
+                {/* Upload Trigger Button */}
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingLogo}
+                  className="absolute -bottom-1.5 -right-1.5 p-1.5 rounded-xl bg-primary text-black hover:bg-primary-hover shadow-md transition-transform hover:scale-105 cursor-pointer disabled:opacity-50"
+                  title="Alterar Logotipo da Empresa"
+                >
+                  {uploadingLogo ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Camera className="h-3.5 w-3.5" />
+                  )}
+                </button>
               </div>
+
+              {/* Hidden file input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleLogoUpload}
+                className="hidden"
+              />
+
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingLogo}
+                className="text-xs text-primary hover:underline font-semibold flex items-center gap-1 mb-2 cursor-pointer"
+              >
+                <Upload className="h-3 w-3" />
+                {logoUrl ? 'Substituir Logotipo' : 'Carregar Logotipo'}
+              </button>
+
               <h3 className="font-bold text-base">{companyName || 'Empresa de Serviços'}</h3>
               <span className="text-[10px] font-bold text-primary/80 uppercase tracking-wider bg-primary/10 px-2.5 py-0.5 rounded-full mt-1.5">
                 {category}
               </span>
-              <p className="text-[10px] text-foreground/50 mt-3">Estado de Moderação: <span className="font-extrabold text-success">{profile?.status}</span></p>
+
+              {/* Status Badge */}
+              <div className="mt-3 pt-3 border-t border-border-custom/50 w-full flex flex-col items-center gap-1">
+                <span className="text-[10px] text-foreground/50 uppercase font-bold tracking-wider">Estado da Conta:</span>
+                {profile?.status === 'Aprovado' ? (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-success/15 text-success border border-success/30">
+                    <ShieldCheck className="h-3.5 w-3.5" /> Aprovado & Ativo
+                  </span>
+                ) : profile?.status === 'Suspenso' ? (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-error/15 text-error border border-error/30">
+                    <AlertTriangle className="h-3.5 w-3.5" /> Conta Suspensa
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                    <Clock className="h-3.5 w-3.5" /> Aguarda Aprovação
+                  </span>
+                )}
+              </div>
             </div>
           </Card>
 

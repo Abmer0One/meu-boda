@@ -34,6 +34,7 @@ import {
 import DefaultTemplate from '@/components/templates/invitations/DefaultTemplate';
 import ModernTicketTemplate from '@/components/templates/invitations/ModernTicketTemplate';
 import RoyalParisienneTemplate from '@/components/templates/invitations/RoyalParisienneTemplate';
+import GlobalBroadcastBanner from '@/components/common/GlobalBroadcastBanner';
 
 interface RSVPPageProps {
   params: Promise<{ token: string }>;
@@ -443,5 +444,12 @@ export default function PublicRSVPPage({ params }: RSVPPageProps) {
     return <DefaultTemplate {...templateProps}>{galleryChildren}</DefaultTemplate>;
   };
 
-  return renderTemplate();
+  return (
+    <>
+      <div className="fixed top-3 inset-x-3 z-50 max-w-xl mx-auto pointer-events-auto">
+        <GlobalBroadcastBanner className="backdrop-blur-md shadow-xl" />
+      </div>
+      {renderTemplate()}
+    </>
+  );
 }

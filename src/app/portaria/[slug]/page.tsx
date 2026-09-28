@@ -26,6 +26,8 @@ import {
   UtensilsCrossed,
 } from 'lucide-react';
 
+import GlobalBroadcastBanner from '@/components/common/GlobalBroadcastBanner';
+
 interface PortariaPageProps {
   params: Promise<{ slug: string }>;
 }
@@ -413,6 +415,7 @@ function PortariaContent({ slug }: { slug: string }) {
     return (
       <div className="min-h-screen bg-[#0F0E17] text-white flex flex-col justify-between p-4 sm:p-6 font-sans">
         <div className="max-w-md w-full mx-auto my-auto space-y-6 animate-in fade-in">
+          <GlobalBroadcastBanner className="mb-4" />
           {/* Logo & Brand Header */}
           <div className="text-center space-y-2">
             <div className="flex justify-center mb-1">
@@ -604,6 +607,8 @@ function PortariaContent({ slug }: { slug: string }) {
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-2xl w-full mx-auto p-4 space-y-4">
+        <GlobalBroadcastBanner />
+
         {/* Metric Cards Bar */}
         <div className="grid grid-cols-3 gap-2 text-center">
           <div className="bg-[#1A1926] border border-[#2D2A3E] p-2.5 rounded-2xl">
