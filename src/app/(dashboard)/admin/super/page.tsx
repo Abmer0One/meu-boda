@@ -151,7 +151,7 @@ export default function SuperAdminOverviewPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {pendingVendorsCount > 0 && (
             <Link
-              href="/admin/super/fornecedores/pendentes"
+              href="/admin/super/fornecedores?tab=pendentes"
               className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-3 text-amber-600 dark:text-amber-400 hover:bg-amber-500/15 transition-all group"
             >
               <div className="flex items-center gap-3">
@@ -347,17 +347,17 @@ export default function SuperAdminOverviewPage() {
             </Link>
 
             <Link
-              href="/admin/super/planners"
+              href="/admin/super/utilizadores?tab=planners"
               className="p-5 rounded-2xl bg-card-bg border border-border-custom hover:border-primary/50 transition-all space-y-2 group"
             >
               <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary group-hover:scale-105 transition-transform">
                 <Award className="h-5 w-5" />
               </div>
               <h4 className="text-sm font-bold text-foreground group-hover:text-primary transition-colors">
-                Planners B2B & Slots
+                Planners B2B & Licenças
               </h4>
               <p className="text-xs text-foreground/60 leading-relaxed">
-                Configurar limites de eventos simultâneos e gerir organizadores parceiros da plataforma.
+                Configurar limites de eventos simultâneos e gerir agências e organizadores parceiros.
               </p>
             </Link>
 
@@ -369,10 +369,10 @@ export default function SuperAdminOverviewPage() {
                 <Store className="h-5 w-5" />
               </div>
               <h4 className="text-sm font-bold text-foreground group-hover:text-primary transition-colors">
-                Marketplace
+                Marketplace & Fornecedores
               </h4>
               <p className="text-xs text-foreground/60 leading-relaxed">
-                Supervisionar catálogo, conceder selos oficiais de verificação e aprovar novos parceiros.
+                Supervisionar catálogo, validar documentação pendente e moderar novos parceiros.
               </p>
             </Link>
           </div>
@@ -445,6 +445,13 @@ export default function SuperAdminOverviewPage() {
               >
                 Exportar Eventos (CSV)
               </Button>
+              <Link
+                href="/admin/super/relatorios"
+                className="w-full pt-2 mt-2 border-t border-border-custom flex items-center justify-between text-xs text-primary hover:underline font-medium transition-colors"
+              >
+                <span>Central de Exportações & Auditoria</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
             </CardContent>
           </Card>
         </div>

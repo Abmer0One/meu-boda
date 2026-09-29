@@ -55,6 +55,7 @@ interface SidebarItem {
   name: string;
   href: string;
   icon: React.ComponentType<any>;
+  badgeKey?: 'pendingVendors' | 'pendingPayments';
 }
 
 const menuItems: SidebarItem[] = [
@@ -78,13 +79,10 @@ const superAdminMenuItems: SidebarItem[] = [
   { name: 'Visão Geral', href: '/admin/super', icon: LayoutDashboard },
   { name: 'Gestão de Eventos', href: '/admin/super/eventos', icon: CalendarDays },
   { name: 'Radar Portaria Live', href: '/admin/super/portaria-live', icon: Activity },
-  { name: 'Utilizadores & Noivos', href: '/admin/super/utilizadores', icon: Users },
-  { name: 'Planners B2B & Slots', href: '/admin/super/planners', icon: Award },
-  { name: 'Fornecedores', href: '/admin/super/fornecedores', icon: Store },
-  { name: 'Fila de Moderação', href: '/admin/super/fornecedores/pendentes', icon: ShieldCheck },
-  { name: 'Comprovativos & Pagam.', href: '/admin/super/pagamentos', icon: Receipt },
+  { name: 'Utilizadores & B2B', href: '/admin/super/utilizadores', icon: Users },
+  { name: 'Fornecedores & Moderação', href: '/admin/super/fornecedores', icon: Store, badgeKey: 'pendingVendors' },
+  { name: 'Comprovativos & Pagam.', href: '/admin/super/pagamentos', icon: Receipt, badgeKey: 'pendingPayments' },
   { name: 'Avisos Globais', href: '/admin/super/avisos', icon: Megaphone },
-  { name: 'Exportação & Logs', href: '/admin/super/relatorios', icon: FileSpreadsheet },
   { name: 'Meu Perfil', href: '/admin/perfil', icon: User },
 ];
 
@@ -127,6 +125,29 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   }, [user, isVendor, pathname]);
 
+  const [pendingVendorsCount, setPendingVendorsCount] = useState<number>(0);
+  const [pendingPaymentsCount, setPendingPaymentsCount] = useState<number>(0);
+
+  // Fetch pending moderation & payment counters for Super Admin
+  useEffect(() => {
+    if (!isAdmin || isSupportMode) return;
+    const fetchCounters = async () => {
+      try {
+        const [v, p] = await Promise.all([
+          SuperAdminRepository.getVendors(),
+          SuperAdminRepository.getPlatformPayments(),
+        ]);
+        setPendingVendorsCount(v.filter((item) => item.status === 'Pendente').length);
+        setPendingPaymentsCount(p.filter((item) => item.status === 'Pendente').length);
+      } catch (err) {
+        console.warn('Super admin sidebar counter fetch warning:', err);
+      }
+    };
+    fetchCounters();
+    const interval = setInterval(fetchCounters, 15000);
+    return () => clearInterval(interval);
+  }, [isAdmin, isSupportMode, pathname]);
+
   const visibleMenuItems = (isAdmin && !isSupportMode)
     ? superAdminMenuItems
     : isVendor
@@ -138,8 +159,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         { name: 'Visão Geral', href: '/admin/super', icon: LayoutDashboard },
         { name: 'Eventos', href: '/admin/super/eventos', icon: CalendarDays },
         { name: 'Radar Live', href: '/admin/super/portaria-live', icon: Activity },
-        { name: 'Fornecedores', href: '/admin/super/fornecedores/pendentes', icon: ShieldCheck },
-        { name: 'Pagamentos', href: '/admin/super/pagamentos', icon: Receipt },
+        { name: 'Utilizadores', href: '/admin/super/utilizadores', icon: Users },
+        { name: 'Fornecedores', href: '/admin/super/fornecedores', icon: Store },
       ]
     : isVendor
     ? [
@@ -341,18 +362,40 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {visibleMenuItems.map((item) => {
             const isActive = pathname === item.href;
             const Icon = item.icon;
+            const badgeCount =
+              item.badgeKey === 'pendingVendors'
+                ? pendingVendorsCount
+                : item.badgeKey === 'pendingPayments'
+                ? pendingPaymentsCount
+                : 0;
+
             return (
               <Link
                 key={item.name}
                 href={item.href}
-                className={`group flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-xl transition-all duration-200 ${
+                className={`group flex items-center justify-between px-3 py-2 text-sm font-medium rounded-xl transition-all duration-200 ${
                   isActive
                     ? 'bg-primary text-white shadow-sm shadow-primary/20'
                     : 'text-foreground/75 hover:bg-secondary hover:text-primary'
                 }`}
               >
-                <Icon className={`h-4 w-4 shrink-0 ${isActive ? 'text-white' : 'text-foreground/50 group-hover:text-primary'}`} />
-                {item.name}
+                <div className="flex items-center gap-3 min-w-0">
+                  <Icon className={`h-4 w-4 shrink-0 ${isActive ? 'text-white' : 'text-foreground/50 group-hover:text-primary'}`} />
+                  <span className="truncate">{item.name}</span>
+                </div>
+                {badgeCount > 0 && (
+                  <span
+                    className={`px-1.5 py-0.5 text-[10px] font-bold rounded-full shrink-0 ${
+                      isActive
+                        ? 'bg-black/30 text-white'
+                        : item.badgeKey === 'pendingVendors'
+                        ? 'bg-amber-500/20 text-amber-500 border border-amber-500/30'
+                        : 'bg-emerald-500/20 text-emerald-500 border border-emerald-500/30'
+                    }`}
+                  >
+                    {badgeCount}
+                  </span>
+                )}
               </Link>
             );
           })}
@@ -564,19 +607,41 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             {visibleMenuItems.map((item) => {
               const isActive = pathname === item.href;
               const Icon = item.icon;
+              const badgeCount =
+                item.badgeKey === 'pendingVendors'
+                  ? pendingVendorsCount
+                  : item.badgeKey === 'pendingPayments'
+                  ? pendingPaymentsCount
+                  : 0;
+
               return (
                 <Link
                   key={item.name}
                   href={item.href}
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3.5 py-2.5 text-sm font-medium rounded-xl transition-all ${
+                  className={`flex items-center justify-between px-3.5 py-2.5 text-sm font-medium rounded-xl transition-all ${
                     isActive
                       ? 'bg-primary text-white'
                       : 'text-foreground/75 hover:bg-secondary hover:text-primary'
                   }`}
                 >
-                  <Icon className="h-4 w-4" />
-                  {item.name}
+                  <div className="flex items-center gap-3">
+                    <Icon className="h-4 w-4" />
+                    <span>{item.name}</span>
+                  </div>
+                  {badgeCount > 0 && (
+                    <span
+                      className={`px-1.5 py-0.5 text-[10px] font-bold rounded-full ${
+                        isActive
+                          ? 'bg-black/30 text-white'
+                          : item.badgeKey === 'pendingVendors'
+                          ? 'bg-amber-500/20 text-amber-500'
+                          : 'bg-emerald-500/20 text-emerald-500'
+                      }`}
+                    >
+                      {badgeCount}
+                    </span>
+                  )}
                 </Link>
               );
             })}
