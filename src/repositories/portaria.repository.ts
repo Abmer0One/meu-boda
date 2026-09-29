@@ -204,11 +204,67 @@ export const PortariaRepository = {
   /**
    * Perform a check-in for a guest with the designated operator station
    */
-  async performCheckin(guestId: string, operator: string): Promise<CheckIn | null> {
-    return CheckInRepository.create({
+  async performCheckin(
+    guestId: string,
+    operator: string,
+    extraData?: {
+      guestName?: string;
+      companions?: number;
+      eventId?: string;
+      eventTitle?: string;
+    }
+  ): Promise<CheckIn | null> {
+    const res = await CheckInRepository.create({
       guest_id: guestId,
       operator: operator || 'Portaria',
     });
+
+    if (res) {
+      const feedPayload = {
+        id: res.id,
+        guest_name: extraData?.guestName || 'Convidado',
+        guest_companions: extraData?.companions || 0,
+        event_id: extraData?.eventId || '',
+        event_title: extraData?.eventTitle || 'Evento',
+        checked_at: res.checked_at || new Date().toISOString(),
+        operator: operator || 'Portaria',
+      };
+
+      // 1. Broadcast over Supabase Realtime channel (instant sub-second delivery to Radar Live)
+      try {
+        const streamChannel = supabase.channel('portaria-live-stream');
+        streamChannel.subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            streamChannel.send({
+              type: 'broadcast',
+              event: 'new-checkin',
+              payload: feedPayload,
+            }).finally(() => {
+              // Detach channel after broadcast
+              setTimeout(() => {
+                try {
+                  supabase.removeChannel(streamChannel);
+                } catch {}
+              }, 1000);
+            });
+          }
+        });
+      } catch (broadcastErr) {
+        console.warn('Realtime broadcast warning:', broadcastErr);
+      }
+
+      // 2. Persist to shared localStorage cache for instant local mirror reflection
+      if (typeof window !== 'undefined') {
+        try {
+          const raw = localStorage.getItem('meuboda_live_checkins_cache');
+          const currentList = raw ? JSON.parse(raw) : [];
+          const updated = [feedPayload, ...currentList.filter((item: any) => item.id !== feedPayload.id)].slice(0, 50);
+          localStorage.setItem('meuboda_live_checkins_cache', JSON.stringify(updated));
+        } catch {}
+      }
+    }
+
+    return res;
   },
 
   /**

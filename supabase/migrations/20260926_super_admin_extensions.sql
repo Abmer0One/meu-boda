@@ -175,3 +175,82 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- 9. Checkins & Notifications Realtime Publication
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' AND tablename = 'checkins'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.checkins;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' AND tablename = 'notifications'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' AND tablename = 'system_broadcasts'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.system_broadcasts;
+  END IF;
+EXCEPTION WHEN OTHERS THEN
+  NULL;
+END;
+$$;
+
+DROP POLICY IF EXISTS "Admins can view all checkins" ON public.checkins;
+CREATE POLICY "Admins can view all checkins" ON public.checkins
+    FOR SELECT TO authenticated USING (public.is_admin());
+
+-- 10. RPC to broadcast notification to all platform users
+CREATE OR REPLACE FUNCTION public.admin_broadcast_notification(
+  broadcast_title TEXT,
+  broadcast_message TEXT,
+  broadcast_type TEXT DEFAULT 'info',
+  broadcast_link TEXT DEFAULT NULL
+)
+RETURNS INT AS $$
+DECLARE
+  inserted_count INT := 0;
+BEGIN
+  IF NOT public.is_admin() THEN
+    RAISE EXCEPTION 'Access Denied: Admin privileges required.';
+  END IF;
+
+  INSERT INTO public.notifications (user_id, title, message, type, link, read)
+  SELECT DISTINCT u.id, broadcast_title, broadcast_message, broadcast_type, broadcast_link, false
+  FROM auth.users u;
+
+  GET DIAGNOSTICS inserted_count = ROW_COUNT;
+  RETURN inserted_count;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 11. RPC to update user role and planner slots (B2B Licensing)
+CREATE OR REPLACE FUNCTION public.admin_update_user_meta(
+  target_user_id UUID,
+  new_role TEXT,
+  new_slots INT
+)
+RETURNS BOOLEAN AS $$
+BEGIN
+  IF NOT public.is_admin() THEN
+    RAISE EXCEPTION 'Access Denied: Admin privileges required.';
+  END IF;
+
+  UPDATE auth.users
+  SET raw_app_meta_data = 
+    COALESCE(raw_app_meta_data, '{}'::jsonb) || 
+    jsonb_build_object('role', new_role, 'planner_slots', new_slots)
+  WHERE id = target_user_id;
+
+  RETURN TRUE;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+

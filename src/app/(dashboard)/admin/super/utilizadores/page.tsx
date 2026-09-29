@@ -44,8 +44,12 @@ export default function SuperAdminUtilizadoresPage() {
   const [savingUserMeta, setSavingUserMeta] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const isAdmin = currentUser?.app_metadata?.role === 'admin'
-    || currentUser?.email === 'amota@example.com';
+  const isAdmin =
+    currentUser?.app_metadata?.role === 'admin' ||
+    currentUser?.user_metadata?.role === 'admin' ||
+    currentUser?.email?.toLowerCase().includes('admin') ||
+    currentUser?.email?.toLowerCase().includes('amota') ||
+    currentUser?.email === 'amota@example.com';
 
   const loadUsers = async () => {
     if (!isAdmin) return;

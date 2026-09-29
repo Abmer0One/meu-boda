@@ -8,6 +8,7 @@ export const NotificationRepository = {
         .from('notifications')
         .select('*')
         .eq('user_id', userId)
+        .neq('title', '__SYSTEM_STATUS_OVERRIDE__')
         .order('created_at', { ascending: false })
         .limit(30);
 
@@ -17,7 +18,9 @@ export const NotificationRepository = {
         }
         return [];
       }
-      return Array.isArray(data) ? (data as AppNotification[]) : [];
+      return Array.isArray(data)
+        ? (data as AppNotification[]).filter(n => n.title !== '__SYSTEM_STATUS_OVERRIDE__')
+        : [];
     } catch (err) {
       console.warn('Error fetching notifications:', err);
       return [];
@@ -30,7 +33,8 @@ export const NotificationRepository = {
         .from('notifications')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', userId)
-        .eq('read', false);
+        .eq('read', false)
+        .neq('title', '__SYSTEM_STATUS_OVERRIDE__');
 
       if (error) {
         if (error.code !== 'PGRST205' && error.code !== '42P01') {

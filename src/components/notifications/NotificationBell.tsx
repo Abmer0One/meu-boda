@@ -75,12 +75,18 @@ export default function NotificationBell() {
       console.warn('Failed to start notification realtime channel:', e);
     }
 
+    // 15-second heartbeat poll ensuring fresh notifications even across network interruptions
+    const pollInterval = setInterval(() => {
+      fetchNotifications();
+    }, 15000);
+
     return () => {
       if (channel) {
         try {
           supabase.removeChannel(channel);
         } catch {}
       }
+      clearInterval(pollInterval);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);

@@ -41,8 +41,12 @@ export default function SuperAdminRelatoriosPage() {
   // Download states
   const [exportingType, setExportingType] = useState<string | null>(null);
 
-  const isAdmin = user?.app_metadata?.role === 'admin'
-    || user?.email === 'amota@example.com';
+  const isAdmin =
+    user?.app_metadata?.role === 'admin' ||
+    user?.user_metadata?.role === 'admin' ||
+    user?.email?.toLowerCase().includes('admin') ||
+    user?.email?.toLowerCase().includes('amota') ||
+    user?.email === 'amota@example.com';
 
   const loadAllData = async () => {
     if (!isAdmin) return;

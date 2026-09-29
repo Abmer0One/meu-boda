@@ -228,7 +228,12 @@ function PortariaContent({ slug }: { slug: string }) {
     processingGuestIdsRef.current.add(guest.id);
 
     try {
-      const newCi = await PortariaRepository.performCheckin(guest.id, activeOperator);
+      const newCi = await PortariaRepository.performCheckin(guest.id, activeOperator, {
+        guestName: guest.name,
+        companions: guest.companions,
+        eventId: event?.id,
+        eventTitle: event?.title,
+      });
       if (newCi) {
         // Optimistically add to local checkins state so subsequent scans know immediately
         setCheckins((prev) => [newCi, ...prev]);

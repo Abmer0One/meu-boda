@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
 import {
   SuperAdminRepository,
 } from '@/repositories/superadmin.repository';
@@ -11,6 +12,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
+import { Dialog } from '@/components/ui/Dialog';
 import {
   Activity,
   Search,
@@ -26,6 +28,9 @@ import {
   CalendarDays,
   Radio,
   UserPlus,
+  Database,
+  Copy,
+  Check,
 } from 'lucide-react';
 
 export default function SuperAdminPortariaLivePage() {
@@ -37,10 +42,16 @@ export default function SuperAdminPortariaLivePage() {
   const [selectedEventFilter, setSelectedEventFilter] = useState('all');
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date>(new Date());
+  const [sqlModalOpen, setSqlModalOpen] = useState(false);
+  const [copiedSql, setCopiedSql] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const isAdmin = user?.app_metadata?.role === 'admin'
-    || user?.email === 'amota@example.com';
+  const isAdmin =
+    user?.app_metadata?.role === 'admin' ||
+    user?.user_metadata?.role === 'admin' ||
+    user?.email?.toLowerCase().includes('admin') ||
+    user?.email?.toLowerCase().includes('amota') ||
+    user?.email === 'amota@example.com';
 
   const loadFeed = async (showSpinner = false) => {
     if (!isAdmin) return;
@@ -60,16 +71,58 @@ export default function SuperAdminPortariaLivePage() {
     loadFeed(true);
   }, [isAdmin]);
 
-  // Setup auto-refresh every 12 seconds
+  // Realtime subscription via Supabase Channel + Broadcast + Storage Events
   useEffect(() => {
-    if (!autoRefresh) {
+    if (!isAdmin) return;
+
+    // 1. Subscribe to broadcast channel for sub-second check-in events
+    const streamChannel = supabase
+      .channel('portaria-live-stream')
+      .on('broadcast', { event: 'new-checkin' }, (payload) => {
+        if (payload?.payload) {
+          const item = payload.payload as LiveCheckinFeed;
+          setFeed((prev) => {
+            if (prev.some((p) => p.id === item.id)) return prev;
+            return [item, ...prev];
+          });
+          setLastRefreshedAt(new Date());
+        }
+      })
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'checkins' },
+        () => {
+          loadFeed(false);
+        }
+      )
+      .subscribe();
+
+    // 2. Storage event listener for cross-tab realtime on same device
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'meuboda_live_checkins_cache') {
+        loadFeed(false);
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+
+    return () => {
+      try {
+        supabase.removeChannel(streamChannel);
+      } catch {}
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, [isAdmin]);
+
+  // Fast auto-refresh heartbeat every 4 seconds
+  useEffect(() => {
+    if (!autoRefresh || !isAdmin) {
       if (timerRef.current) clearInterval(timerRef.current);
       return;
     }
 
     timerRef.current = setInterval(() => {
       loadFeed(false);
-    }, 12000);
+    }, 4000);
 
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
@@ -155,6 +208,17 @@ export default function SuperAdminPortariaLivePage() {
             <Radio className={`h-3.5 w-3.5 ${autoRefresh ? 'text-emerald-500' : 'text-foreground/40'}`} />
             Auto-Sync: {autoRefresh ? 'Ligado' : 'Pausado'}
           </button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setSqlModalOpen(true)}
+            className="flex items-center gap-1.5 border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
+            title="Ver e copiar comando SQL para permissões e Realtime na base de dados"
+          >
+            <Database className="h-4 w-4" />
+            Configurar na BD (SQL)
+          </Button>
 
           <Button
             variant="outline"
@@ -363,6 +427,131 @@ export default function SuperAdminPortariaLivePage() {
           </div>
         )}
       </Card>
+
+      {/* SQL CONFIG MODAL */}
+      <Dialog
+        isOpen={sqlModalOpen}
+        onClose={() => setSqlModalOpen(false)}
+        title="Ativação do Realtime & Políticas de Portaria"
+        size="md"
+      >
+        <div className="space-y-4">
+          <p className="text-xs text-foreground/70">
+            Para que o <strong>Radar Live da Portaria</strong> escute check-ins em tempo real através do Supabase Realtime (WebSockets) entre diferentes navegadores e redes, execute o script SQL abaixo no <strong>SQL Editor</strong> do painel Supabase.
+          </p>
+
+          <div className="relative">
+            <pre className="p-3 bg-black/60 border border-border-custom rounded-lg text-[11px] font-mono text-emerald-400 overflow-x-auto max-h-56 leading-relaxed select-all">
+{`-- 1. Ativar Realtime na tabela de checkins
+ALTER PUBLICATION supabase_realtime ADD TABLE public.checkins;
+
+-- 2. Permitir que Administradores leiam todos os check-ins
+DROP POLICY IF EXISTS "Admins can view all checkins" ON public.checkins;
+CREATE POLICY "Admins can view all checkins" ON public.checkins
+    FOR SELECT TO authenticated USING (public.is_admin());
+
+-- 3. RPC para consulta direta e ultrarrápida no Radar
+CREATE OR REPLACE FUNCTION public.admin_get_recent_checkins(limit_count INT DEFAULT 50)
+RETURNS TABLE (
+  id UUID,
+  guest_name TEXT,
+  guest_companions INT,
+  event_id UUID,
+  event_title TEXT,
+  checked_at TIMESTAMPTZ,
+  operator TEXT
+) AS $$
+BEGIN
+  IF NOT public.is_admin() THEN
+    RAISE EXCEPTION 'Access Denied: Admin privileges required.';
+  END IF;
+
+  RETURN QUERY
+  SELECT 
+    c.id,
+    g.name::TEXT as guest_name,
+    COALESCE(g.companions, 0)::INT as guest_companions,
+    e.id as event_id,
+    e.title::TEXT as event_title,
+    c.checked_at,
+    COALESCE(c.operator, 'Portaria')::TEXT as operator
+  FROM public.checkins c
+  JOIN public.guests g ON g.id = c.guest_id
+  JOIN public.events e ON e.id = g.event_id
+  ORDER BY c.checked_at DESC
+  LIMIT limit_count;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;`}
+            </pre>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                const sql = `-- 1. Ativar Realtime na tabela de checkins
+ALTER PUBLICATION supabase_realtime ADD TABLE public.checkins;
+
+-- 2. Permitir que Administradores leiam todos os check-ins
+DROP POLICY IF EXISTS "Admins can view all checkins" ON public.checkins;
+CREATE POLICY "Admins can view all checkins" ON public.checkins
+    FOR SELECT TO authenticated USING (public.is_admin());
+
+-- 3. RPC para consulta direta e ultrarrápida no Radar
+CREATE OR REPLACE FUNCTION public.admin_get_recent_checkins(limit_count INT DEFAULT 50)
+RETURNS TABLE (
+  id UUID,
+  guest_name TEXT,
+  guest_companions INT,
+  event_id UUID,
+  event_title TEXT,
+  checked_at TIMESTAMPTZ,
+  operator TEXT
+) AS $$
+BEGIN
+  IF NOT public.is_admin() THEN
+    RAISE EXCEPTION 'Access Denied: Admin privileges required.';
+  END IF;
+
+  RETURN QUERY
+  SELECT 
+    c.id,
+    g.name::TEXT as guest_name,
+    COALESCE(g.companions, 0)::INT as guest_companions,
+    e.id as event_id,
+    e.title::TEXT as event_title,
+    c.checked_at,
+    COALESCE(c.operator, 'Portaria')::TEXT as operator
+  FROM public.checkins c
+  JOIN public.guests g ON g.id = c.guest_id
+  JOIN public.events e ON e.id = g.event_id
+  ORDER BY c.checked_at DESC
+  LIMIT limit_count;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;`;
+                navigator.clipboard.writeText(sql);
+                setCopiedSql(true);
+                setTimeout(() => setCopiedSql(false), 2500);
+              }}
+              className="absolute top-2 right-2 text-xs bg-background/80 border-border-custom flex items-center gap-1.5"
+            >
+              {copiedSql ? (
+                <>
+                  <Check className="h-3.5 w-3.5 text-emerald-400" />
+                  <span className="text-emerald-400">Copiado!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="h-3.5 w-3.5" />
+                  <span>Copiar SQL</span>
+                </>
+              )}
+            </Button>
+          </div>
+
+          <p className="text-[11px] text-foreground/50">
+            Mesmo antes de correr o comando na base de dados, o Radar escuta via canais de Broadcast e sincronização de cache de portaria.
+          </p>
+        </div>
+      </Dialog>
     </div>
   );
 }

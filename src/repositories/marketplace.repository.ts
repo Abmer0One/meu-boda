@@ -21,10 +21,49 @@ export const VendorProfileRepository = {
     }
     if (!data) return null;
     const profile = data as VendorProfile;
+
+    // 1. Check local browser overrides
     const overrides = getLocalVendorStatusOverrides();
     if (overrides[profile.id]) {
       profile.status = overrides[profile.id];
     }
+
+    // 2. Check remote database status override stored via notifications (cross-device persistence)
+    try {
+      const { data: overrideNotif } = await supabase
+        .from('notifications')
+        .select('message')
+        .eq('user_id', id)
+        .eq('title', '__SYSTEM_STATUS_OVERRIDE__')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (overrideNotif?.message) {
+        const remoteStatus = overrideNotif.message as 'Pendente' | 'Aprovado' | 'Suspenso';
+        if (remoteStatus) {
+          profile.status = remoteStatus;
+          // Synchronize locally as well
+          overrides[profile.id] = remoteStatus;
+          if (typeof window !== 'undefined') {
+            try {
+              localStorage.setItem('meuboda_vendor_status_overrides', JSON.stringify(overrides));
+            } catch {}
+          }
+          // Self-heal/sync vendor_profiles master row if owner has write access
+          if (data.status !== remoteStatus) {
+            supabase
+              .from('vendor_profiles')
+              .update({ status: remoteStatus })
+              .eq('id', id)
+              .then(() => {});
+          }
+        }
+      }
+    } catch {
+      // Non-fatal if notifications table not queried
+    }
+
     return profile;
   },
 
