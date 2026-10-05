@@ -5,8 +5,8 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import { EventProvider } from '@/contexts/EventContext';
 
 export const metadata: Metadata = {
-  title: 'Meu Boda - Gestor de Casamentos',
-  description: 'A plataforma definitiva para planeamento, organização e gestão do seu casamento.',
+  title: 'Meu Boda - Gestor de Eventos',
+  description: 'A plataforma definitiva para planeamento, organização e gestão do seu evento.',
 };
 
 export default function RootLayout({
