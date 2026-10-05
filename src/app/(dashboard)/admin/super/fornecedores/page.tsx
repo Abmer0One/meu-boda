@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import {
   SuperAdminRepository,
 } from '@/repositories/superadmin.repository';
+import { isSuperAdmin } from '@/utils/admin';
 import { VendorProfile } from '@/types';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -57,12 +58,7 @@ function FornecedoresContent() {
   const [sqlModalOpen, setSqlModalOpen] = useState(false);
   const [copiedSql, setCopiedSql] = useState(false);
 
-  const isAdmin =
-    user?.app_metadata?.role === 'admin' ||
-    user?.user_metadata?.role === 'admin' ||
-    user?.email?.toLowerCase().includes('admin') ||
-    user?.email?.toLowerCase().includes('amota') ||
-    user?.email === 'amota@example.com';
+  const isAdmin = isSuperAdmin(user);
 
   useEffect(() => {
     const tab = searchParams.get('tab');

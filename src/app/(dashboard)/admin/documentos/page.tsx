@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Dialog } from '@/components/ui/Dialog';
 import { supabase } from '@/lib/supabase';
+import { validateFileForUpload } from '@/utils/uploadSecurity';
 import {
   FileText,
   Upload,
@@ -66,10 +67,20 @@ export default function DocumentosPage() {
     e.preventDefault();
     if (!currentEvent || !fileToUpload || !docTitle) return;
 
+    const validation = validateFileForUpload(fileToUpload, {
+      maxSizeMB: 15,
+      allowedExtensions: ['pdf', 'docx', 'doc', 'png', 'jpg', 'jpeg', 'xlsx', 'xls'],
+    });
+
+    if (!validation.valid || !validation.sanitizedName) {
+      alert(validation.error || 'Ficheiro inválido.');
+      return;
+    }
+
     setUploading(true);
     try {
       const fileExt = fileToUpload.name.split('.').pop() || '';
-      const filePath = `${currentEvent.id}/${Date.now()}_${fileToUpload.name}`;
+      const filePath = `${currentEvent.id}/${validation.sanitizedName}`;
 
       // Upload file to Supabase Storage
       const { data, error } = await supabase.storage

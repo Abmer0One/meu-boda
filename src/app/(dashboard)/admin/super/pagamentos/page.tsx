@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import {
   SuperAdminRepository,
 } from '@/repositories/superadmin.repository';
+import { isSuperAdmin } from '@/utils/admin';
 import { PlatformPayment } from '@/types';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -41,12 +42,7 @@ export default function SuperAdminPagamentosPage() {
   const [selectedPayment, setSelectedPayment] = useState<PlatformPayment | null>(null);
   const [processingId, setProcessingId] = useState<string | null>(null);
 
-  const isAdmin =
-    user?.app_metadata?.role === 'admin' ||
-    user?.user_metadata?.role === 'admin' ||
-    user?.email?.toLowerCase().includes('admin') ||
-    user?.email?.toLowerCase().includes('amota') ||
-    user?.email === 'amota@example.com';
+  const isAdmin = isSuperAdmin(user);
 
   const loadPayments = async () => {
     if (!isAdmin) return;

@@ -50,6 +50,7 @@ import {
 import { VendorProfileRepository } from '@/repositories/marketplace.repository';
 import { VendorProfile } from '@/types';
 import GlobalBroadcastBanner from '@/components/common/GlobalBroadcastBanner';
+import { isSuperAdmin } from '@/utils/admin';
 
 interface SidebarItem {
   name: string;
@@ -106,11 +107,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter();
   const pathname = usePathname();
 
-  const isAdmin = user?.app_metadata?.role === 'admin'
-    || user?.user_metadata?.role === 'admin'
-    || user?.email?.toLowerCase().includes('admin')
-    || user?.email?.toLowerCase().includes('amota')
-    || user?.email === 'amota@example.com';
+  const isAdmin = isSuperAdmin(user);
 
   const isVendor = user?.app_metadata?.role === 'vendor' || user?.user_metadata?.role === 'vendor';
 

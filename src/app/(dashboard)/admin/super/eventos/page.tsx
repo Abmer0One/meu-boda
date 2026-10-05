@@ -10,6 +10,7 @@ import {
   AdminTask,
   AdminCheckin,
 } from '@/repositories/superadmin.repository';
+import { isSuperAdmin } from '@/utils/admin';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -62,11 +63,7 @@ export default function SuperAdminEventosPage() {
   // Status updating state
   const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
 
-  const isAdmin = user?.app_metadata?.role === 'admin'
-    || user?.user_metadata?.role === 'admin'
-    || user?.email?.toLowerCase().includes('admin')
-    || user?.email?.toLowerCase().includes('amota')
-    || user?.email === 'amota@example.com';
+  const isAdmin = isSuperAdmin(user);
 
   const loadEvents = async () => {
     if (!isAdmin) return;

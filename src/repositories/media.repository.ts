@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { validateFileForUpload } from '@/utils/uploadSecurity';
 
 export interface EventMedia {
   id: string;
@@ -85,8 +86,17 @@ export const MediaRepository = {
 
   async uploadFile(eventId: string, file: File): Promise<string | null> {
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${eventId}/${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
+      const validation = validateFileForUpload(file, {
+        maxSizeMB: 25,
+        allowedExtensions: ['jpg', 'jpeg', 'png', 'webp', 'mp4', 'mov', 'webm'],
+        allowedMimeTypes: ['image/*', 'video/*'],
+      });
+
+      if (!validation.valid || !validation.sanitizedName) {
+        throw new Error(validation.error || 'Ficheiro inválido para a galeria.');
+      }
+
+      const fileName = `${eventId}/${validation.sanitizedName}`;
 
       // Upload file to the 'event-galleries' bucket
       const { data, error } = await supabase.storage

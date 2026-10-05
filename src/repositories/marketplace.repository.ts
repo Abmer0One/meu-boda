@@ -3,6 +3,7 @@ import { VendorProfile, VendorService, ChatRoom, ChatMessage, VendorContract, Pa
 import { BudgetRepository } from '@/repositories/budget.repository';
 import { NotificationRepository } from '@/repositories/notification.repository';
 import { getLocalVendorStatusOverrides } from '@/repositories/superadmin.repository';
+import { validateFileForUpload } from '@/utils/uploadSecurity';
 
 export const VendorProfileRepository = {
   async get(id: string): Promise<VendorProfile | null> {
@@ -139,14 +140,25 @@ export const VendorProfileRepository = {
       })
       .map((v) => ({
         ...v,
+        iban: null, // Redact confidential banking details in public catalog
+        nif: null,  // Redact tax number in public catalog
         status: overrides[v.id] || v.status,
       }));
   },
 
   async uploadLogo(vendorId: string, file: File): Promise<string | null> {
     try {
-      const fileExt = file.name.split('.').pop() || 'png';
-      const fileName = `vendor-logos/${vendorId}_${Date.now()}.${fileExt}`;
+      const validation = validateFileForUpload(file, {
+        maxSizeMB: 5,
+        allowedExtensions: ['jpg', 'jpeg', 'png', 'webp'],
+        allowedMimeTypes: ['image/*'],
+      });
+
+      if (!validation.valid || !validation.sanitizedName) {
+        throw new Error(validation.error || 'Ficheiro de imagem inválido para logótipo.');
+      }
+
+      const fileName = `vendor-logos/${vendorId}_${validation.sanitizedName}`;
 
       // 1. Try uploading to 'event-galleries' bucket
       try {

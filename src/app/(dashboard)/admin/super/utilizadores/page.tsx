@@ -7,6 +7,7 @@ import {
   SuperAdminRepository,
   AdminUser,
 } from '@/repositories/superadmin.repository';
+import { isSuperAdmin } from '@/utils/admin';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -81,12 +82,7 @@ function UtilizadoresContent() {
   const [sqlModalOpen, setSqlModalOpen] = useState(false);
   const [copiedSql, setCopiedSql] = useState(false);
 
-  const isAdmin =
-    currentUser?.app_metadata?.role === 'admin' ||
-    currentUser?.user_metadata?.role === 'admin' ||
-    currentUser?.email?.toLowerCase().includes('admin') ||
-    currentUser?.email?.toLowerCase().includes('amota') ||
-    currentUser?.email === 'amota@example.com';
+  const isAdmin = isSuperAdmin(currentUser);
 
   useEffect(() => {
     const tab = searchParams.get('tab');
