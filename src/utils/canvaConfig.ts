@@ -19,6 +19,15 @@ export interface CanvaTemplateConfig {
   qr_locations_coords?: QrCoordinates;
   qr_access_coords?: QrCoordinates;
   is_basic_template?: boolean;
+  // Guest Name Configuration
+  show_guest_name?: boolean;
+  guest_name_page?: 'page_1' | 'page_2';
+  guest_name_coords?: QrCoordinates;
+  guest_name_font_size?: number;
+  guest_name_color?: string;
+  guest_name_align?: 'left' | 'center' | 'right';
+  guest_name_font_family?: 'serif' | 'sans';
+  guest_name_font_weight?: 'normal' | 'bold';
   [key: string]: any;
 }
 
@@ -48,6 +57,20 @@ export const DEFAULT_PORTRAIT_ACCESS_COORDS: QrCoordinates = {
   top: 79,
   width: 22,
   height: 15.5,
+};
+
+export const DEFAULT_GUEST_NAME_COORDS: QrCoordinates = {
+  left: 15,
+  top: 65,
+  width: 70,
+  height: 6,
+};
+
+export const DEFAULT_PORTRAIT_GUEST_NAME_COORDS: QrCoordinates = {
+  left: 10,
+  top: 65,
+  width: 80,
+  height: 5,
 };
 
 export const DEFAULT_CANVA_COVER = '/templates/canva/page_1.png';
@@ -164,6 +187,14 @@ export function resolveCanvaConfig(
     qr_locations_coords: { ...DEFAULT_LOC_COORDS },
     qr_access_coords: { ...DEFAULT_ACCESS_COORDS },
     is_basic_template: false,
+    show_guest_name: false,
+    guest_name_page: 'page_1',
+    guest_name_coords: { ...DEFAULT_GUEST_NAME_COORDS },
+    guest_name_font_size: 24,
+    guest_name_color: '#1A1A1A',
+    guest_name_align: 'center',
+    guest_name_font_family: 'serif',
+    guest_name_font_weight: 'bold',
   };
 
   // 1. From template_config if present
@@ -181,6 +212,14 @@ export function resolveCanvaConfig(
     if (templateConfig.show_access_qr !== undefined) resolved.show_access_qr = templateConfig.show_access_qr;
     if (templateConfig.qr_locations_coords) resolved.qr_locations_coords = { ...templateConfig.qr_locations_coords };
     if (templateConfig.qr_access_coords) resolved.qr_access_coords = { ...templateConfig.qr_access_coords };
+    if (templateConfig.show_guest_name !== undefined) resolved.show_guest_name = templateConfig.show_guest_name;
+    if (templateConfig.guest_name_page) resolved.guest_name_page = templateConfig.guest_name_page;
+    if (templateConfig.guest_name_coords) resolved.guest_name_coords = { ...templateConfig.guest_name_coords };
+    if (templateConfig.guest_name_font_size !== undefined) resolved.guest_name_font_size = templateConfig.guest_name_font_size;
+    if (templateConfig.guest_name_color) resolved.guest_name_color = templateConfig.guest_name_color;
+    if (templateConfig.guest_name_align) resolved.guest_name_align = templateConfig.guest_name_align;
+    if (templateConfig.guest_name_font_family) resolved.guest_name_font_family = templateConfig.guest_name_font_family;
+    if (templateConfig.guest_name_font_weight) resolved.guest_name_font_weight = templateConfig.guest_name_font_weight;
   }
 
   // 2. From info blocks if present (database persistent config)
@@ -202,6 +241,14 @@ export function resolveCanvaConfig(
         if (parsed.show_access_qr !== undefined) resolved.show_access_qr = parsed.show_access_qr;
         if (parsed.qr_locations_coords) resolved.qr_locations_coords = { ...parsed.qr_locations_coords };
         if (parsed.qr_access_coords) resolved.qr_access_coords = { ...parsed.qr_access_coords };
+        if (parsed.show_guest_name !== undefined) resolved.show_guest_name = parsed.show_guest_name;
+        if (parsed.guest_name_page) resolved.guest_name_page = parsed.guest_name_page;
+        if (parsed.guest_name_coords) resolved.guest_name_coords = { ...parsed.guest_name_coords };
+        if (parsed.guest_name_font_size !== undefined) resolved.guest_name_font_size = parsed.guest_name_font_size;
+        if (parsed.guest_name_color) resolved.guest_name_color = parsed.guest_name_color;
+        if (parsed.guest_name_align) resolved.guest_name_align = parsed.guest_name_align;
+        if (parsed.guest_name_font_family) resolved.guest_name_font_family = parsed.guest_name_font_family;
+        if (parsed.guest_name_font_weight) resolved.guest_name_font_weight = parsed.guest_name_font_weight;
       } catch (err) {
         console.error('Error parsing info_block canva config:', err);
       }
@@ -227,6 +274,14 @@ export function resolveCanvaConfig(
         if (parsed.show_access_qr !== undefined) resolved.show_access_qr = parsed.show_access_qr;
         if (parsed.qr_locations_coords) resolved.qr_locations_coords = { ...parsed.qr_locations_coords };
         if (parsed.qr_access_coords) resolved.qr_access_coords = { ...parsed.qr_access_coords };
+        if (parsed.show_guest_name !== undefined) resolved.show_guest_name = parsed.show_guest_name;
+        if (parsed.guest_name_page) resolved.guest_name_page = parsed.guest_name_page;
+        if (parsed.guest_name_coords) resolved.guest_name_coords = { ...parsed.guest_name_coords };
+        if (parsed.guest_name_font_size !== undefined) resolved.guest_name_font_size = parsed.guest_name_font_size;
+        if (parsed.guest_name_color) resolved.guest_name_color = parsed.guest_name_color;
+        if (parsed.guest_name_align) resolved.guest_name_align = parsed.guest_name_align;
+        if (parsed.guest_name_font_family) resolved.guest_name_font_family = parsed.guest_name_font_family;
+        if (parsed.guest_name_font_weight) resolved.guest_name_font_weight = parsed.guest_name_font_weight;
       }
     } catch (err) {
       console.error('Error reading localStorage canva config:', err);

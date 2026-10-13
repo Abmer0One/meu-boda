@@ -197,6 +197,20 @@ export default function DefaultTemplate({
       height: 18.52,
     };
 
+    const guestNameCoords = canvaConfig.guest_name_coords || {
+      left: 15,
+      top: 65,
+      width: 70,
+      height: 6,
+    };
+    const showGuestName = Boolean(canvaConfig.show_guest_name) && Boolean(guest?.name);
+    const guestNamePage = canvaConfig.guest_name_page || 'page_1';
+    const guestNameAlign = canvaConfig.guest_name_align || 'center';
+    const guestNameColor = canvaConfig.guest_name_color || '#1A1A1A';
+    const guestNameFontSize = canvaConfig.guest_name_font_size || 24;
+    const guestNameFontFamily = canvaConfig.guest_name_font_family === 'sans' ? 'sans-serif' : 'serif';
+    const guestNameFontWeight = canvaConfig.guest_name_font_weight || 'bold';
+
     const initialsData = parseEventInitials(event.title, event.theme);
     const initials = initialsData.initials || 'MB';
 
@@ -214,6 +228,33 @@ export default function DefaultTemplate({
               crossOrigin="anonymous"
               className="w-full h-full object-cover select-none pointer-events-none absolute inset-0 z-0"
             />
+
+            {/* Sobreposição do Nome do Convidado */}
+            {showGuestName && (isSinglePage || guestNamePage === 'page_1') && (
+              <div 
+                className="absolute z-10 flex items-center overflow-hidden pointer-events-none"
+                style={{
+                  left: `${guestNameCoords.left}%`,
+                  top: `${guestNameCoords.top}%`,
+                  width: `${guestNameCoords.width}%`,
+                  height: `${guestNameCoords.height}%`,
+                  justifyContent: guestNameAlign === 'left' ? 'flex-start' : guestNameAlign === 'right' ? 'flex-end' : 'center',
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: `${guestNameFontSize}px`,
+                    color: guestNameColor,
+                    fontFamily: guestNameFontFamily,
+                    fontWeight: guestNameFontWeight,
+                    textAlign: guestNameAlign,
+                  }}
+                  className="truncate w-full leading-tight"
+                >
+                  {guest.name}
+                </span>
+              </div>
+            )}
 
             {/* Em modo Página Única, sobrepõe os códigos QR diretamente na Frente */}
             {isSinglePage && (
@@ -379,6 +420,33 @@ export default function DefaultTemplate({
               crossOrigin="anonymous"
               className="w-full h-full object-cover select-none pointer-events-none absolute inset-0 z-0"
             />
+
+            {/* Sobreposição do Nome do Convidado no Verso */}
+            {showGuestName && guestNamePage === 'page_2' && (
+              <div 
+                className="absolute z-10 flex items-center overflow-hidden pointer-events-none"
+                style={{
+                  left: `${guestNameCoords.left}%`,
+                  top: `${guestNameCoords.top}%`,
+                  width: `${guestNameCoords.width}%`,
+                  height: `${guestNameCoords.height}%`,
+                  justifyContent: guestNameAlign === 'left' ? 'flex-start' : guestNameAlign === 'right' ? 'flex-end' : 'center',
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: `${guestNameFontSize}px`,
+                    color: guestNameColor,
+                    fontFamily: guestNameFontFamily,
+                    fontWeight: guestNameFontWeight,
+                    textAlign: guestNameAlign,
+                  }}
+                  className="truncate w-full leading-tight"
+                >
+                  {guest.name}
+                </span>
+              </div>
+            )}
 
             {/* 1. Código QR Real de Localizações */}
             {locationsQrCodeUrl && (

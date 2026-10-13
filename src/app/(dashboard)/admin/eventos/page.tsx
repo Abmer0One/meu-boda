@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Dialog } from '@/components/ui/Dialog';
-import { Heart, MapPin, Calendar, Palette, Loader2, Plus, Trash2, Clock, Users, Gift, Link2, Shirt, Info, Pencil, Sparkles, Upload, Sliders, CheckCircle2, RotateCcw, QrCode, FileText, AlertCircle, Move, Download, CreditCard } from 'lucide-react';
+import { Heart, MapPin, Calendar, Palette, Loader2, Plus, Trash2, Clock, Users, Gift, Link2, Shirt, Info, Pencil, Sparkles, Upload, Sliders, CheckCircle2, RotateCcw, QrCode, FileText, AlertCircle, Move, Download, CreditCard, User, AlignLeft, AlignCenter, AlignRight, Type } from 'lucide-react';
 import {
   resolveCanvaConfig,
   persistCanvaConfig,
@@ -26,6 +26,8 @@ import {
   DEFAULT_ACCESS_COORDS,
   DEFAULT_PORTRAIT_LOC_COORDS,
   DEFAULT_PORTRAIT_ACCESS_COORDS,
+  DEFAULT_GUEST_NAME_COORDS,
+  DEFAULT_PORTRAIT_GUEST_NAME_COORDS,
 } from '@/utils/canvaConfig';
 import { parseEventInitials } from '@/utils/eventHelpers';
 import { generateGuestPDF } from '@/utils/pdf';
@@ -47,6 +49,20 @@ export default function EventosPage() {
   const [pdfOrientation, setPdfOrientation] = useState<'portrait' | 'landscape'>('landscape');
   const [showLocationsQr, setShowLocationsQr] = useState(true);
   const [showAccessQr, setShowAccessQr] = useState(true);
+  const [showGuestName, setShowGuestName] = useState(false);
+  const [guestNamePage, setGuestNamePage] = useState<'page_1' | 'page_2'>('page_1');
+  const [guestNameCoords, setGuestNameCoords] = useState<{ left: number; top: number; width: number; height: number }>({
+    left: 15,
+    top: 65,
+    width: 70,
+    height: 6,
+  });
+  const [guestNameFontSize, setGuestNameFontSize] = useState<number>(24);
+  const [guestNameColor, setGuestNameColor] = useState<string>('#1A1A1A');
+  const [guestNameAlign, setGuestNameAlign] = useState<'left' | 'center' | 'right'>('center');
+  const [guestNameFontFamily, setGuestNameFontFamily] = useState<'serif' | 'sans'>('serif');
+  const [guestNameFontWeight, setGuestNameFontWeight] = useState<'normal' | 'bold'>('bold');
+
   const [canvaCoverUrl, setCanvaCoverUrl] = useState<string>('');
   const [canvaInfoUrl, setCanvaInfoUrl] = useState<string>('');
   const [qrLocCoords, setQrLocCoords] = useState<{ left: number; top: number; width: number; height: number }>({
@@ -66,7 +82,7 @@ export default function EventosPage() {
   const [isSavingCanva, setIsSavingCanva] = useState(false);
   const [canvaSuccessMessage, setCanvaSuccessMessage] = useState<string | null>(null);
   const [showQrFineTuning, setShowQrFineTuning] = useState(false);
-  const [draggedQr, setDraggedQr] = useState<'loc' | 'access' | null>(null);
+  const [draggedQr, setDraggedQr] = useState<'loc' | 'access' | 'guest_name' | null>(null);
   const [editorPreviewPage, setEditorPreviewPage] = useState<'page_1' | 'page_2'>('page_2');
   const [isGeneratingTestPdf, setIsGeneratingTestPdf] = useState(false);
   const editorStageRef = useRef<HTMLDivElement | null>(null);
@@ -181,6 +197,8 @@ export default function EventosPage() {
       setEditorPreviewPage(resolved.pdf_mode === 'single_page' ? 'page_1' : 'page_2');
       setShowLocationsQr(resolved.show_locations_qr !== false);
       setShowAccessQr(resolved.show_access_qr !== false);
+      setShowGuestName(Boolean(resolved.show_guest_name));
+      setGuestNamePage(resolved.guest_name_page || 'page_1');
       const isPort = resolved.pdf_orientation === 'portrait';
       if (resolved.qr_locations_coords) {
         setQrLocCoords(resolved.qr_locations_coords);
@@ -192,6 +210,16 @@ export default function EventosPage() {
       } else {
         setQrAccessCoords(isPort ? DEFAULT_PORTRAIT_ACCESS_COORDS : DEFAULT_ACCESS_COORDS);
       }
+      if (resolved.guest_name_coords) {
+        setGuestNameCoords(resolved.guest_name_coords);
+      } else {
+        setGuestNameCoords(isPort ? DEFAULT_PORTRAIT_GUEST_NAME_COORDS : DEFAULT_GUEST_NAME_COORDS);
+      }
+      setGuestNameFontSize(resolved.guest_name_font_size || 24);
+      setGuestNameColor(resolved.guest_name_color || '#1A1A1A');
+      setGuestNameAlign(resolved.guest_name_align || 'center');
+      setGuestNameFontFamily(resolved.guest_name_font_family || 'serif');
+      setGuestNameFontWeight(resolved.guest_name_font_weight || 'bold');
     }
   }, [currentEvent, reset]);
 
@@ -240,6 +268,14 @@ export default function EventosPage() {
           if (parsed.pdf_mode) setPdfMode(parsed.pdf_mode);
           if (parsed.show_locations_qr !== undefined) setShowLocationsQr(parsed.show_locations_qr);
           if (parsed.show_access_qr !== undefined) setShowAccessQr(parsed.show_access_qr);
+          if (parsed.show_guest_name !== undefined) setShowGuestName(parsed.show_guest_name);
+          if (parsed.guest_name_page) setGuestNamePage(parsed.guest_name_page);
+          if (parsed.guest_name_coords) setGuestNameCoords(parsed.guest_name_coords);
+          if (parsed.guest_name_font_size !== undefined) setGuestNameFontSize(parsed.guest_name_font_size);
+          if (parsed.guest_name_color) setGuestNameColor(parsed.guest_name_color);
+          if (parsed.guest_name_align) setGuestNameAlign(parsed.guest_name_align);
+          if (parsed.guest_name_font_family) setGuestNameFontFamily(parsed.guest_name_font_family);
+          if (parsed.guest_name_font_weight) setGuestNameFontWeight(parsed.guest_name_font_weight);
         } catch (e) {}
       }
     } catch (err) {
@@ -550,6 +586,7 @@ export default function EventosPage() {
     if (newOrientation === 'portrait') {
       setQrLocCoords(DEFAULT_PORTRAIT_LOC_COORDS);
       setQrAccessCoords(DEFAULT_PORTRAIT_ACCESS_COORDS);
+      setGuestNameCoords(DEFAULT_PORTRAIT_GUEST_NAME_COORDS);
     } else {
       if (pdfMode === 'single_page') {
         setQrLocCoords({ left: 10, top: 76, width: 14, height: 18 });
@@ -558,6 +595,7 @@ export default function EventosPage() {
         setQrLocCoords({ left: 8.76, top: 69.56, width: 11.85, height: 16.76 });
         setQrAccessCoords({ left: 80.99, top: 54.14, width: 13.10, height: 18.52 });
       }
+      setGuestNameCoords(DEFAULT_GUEST_NAME_COORDS);
     }
   };
 
@@ -572,7 +610,7 @@ export default function EventosPage() {
     }
   };
 
-  // Save Canva Template Configuration (including QR coordinates)
+  // Save Canva Template Configuration (including QR and Guest Name coordinates)
   const handleSaveCanvaConfig = async () => {
     if (!currentEvent) return;
     setIsSavingCanva(true);
@@ -589,6 +627,14 @@ export default function EventosPage() {
         pdf_orientation: pdfOrientation,
         show_locations_qr: showLocationsQr,
         show_access_qr: showAccessQr,
+        show_guest_name: showGuestName,
+        guest_name_page: guestNamePage,
+        guest_name_coords: guestNameCoords,
+        guest_name_font_size: guestNameFontSize,
+        guest_name_color: guestNameColor,
+        guest_name_align: guestNameAlign,
+        guest_name_font_family: guestNameFontFamily,
+        guest_name_font_weight: guestNameFontWeight,
       };
       await persistCanvaConfig(currentEvent.id, updatedConfig);
       setCurrentEvent({
@@ -604,33 +650,41 @@ export default function EventosPage() {
     }
   };
 
-  // Reset QR Coordinates to default Canva dimensions
+  // Reset QR & Guest Name Coordinates to default Canva dimensions
   const handleResetCanvaDefaults = () => {
     if (pdfOrientation === 'portrait') {
-      if (!confirm('Deseja repor as posições padrão dos códigos QR para A4 Vertical (Retrato)?')) return;
+      if (!confirm('Deseja repor as posições padrão dos códigos QR e Nome para A4 Vertical (Retrato)?')) return;
       setQrLocCoords(DEFAULT_PORTRAIT_LOC_COORDS);
       setQrAccessCoords(DEFAULT_PORTRAIT_ACCESS_COORDS);
+      setGuestNameCoords(DEFAULT_PORTRAIT_GUEST_NAME_COORDS);
     } else if (pdfMode === 'single_page') {
-      if (!confirm('Deseja repor as posições padrão dos códigos QR para A4 Horizontal - Página Única?')) return;
+      if (!confirm('Deseja repor as posições padrão dos códigos QR e Nome para A4 Horizontal - Página Única?')) return;
       setQrLocCoords({ left: 10, top: 76, width: 14, height: 18 });
       setQrAccessCoords({ left: 76, top: 76, width: 14, height: 18 });
+      setGuestNameCoords(DEFAULT_GUEST_NAME_COORDS);
     } else {
-      if (!confirm('Deseja repor as posições padrão dos códigos QR para A4 Horizontal - Frente e Verso (Tríptico)?')) return;
+      if (!confirm('Deseja repor as posições padrão dos códigos QR e Nome para A4 Horizontal - Frente e Verso (Tríptico)?')) return;
       setQrLocCoords({ left: 8.76, top: 69.56, width: 11.85, height: 16.76 });
       setQrAccessCoords({ left: 80.99, top: 54.14, width: 13.10, height: 18.52 });
+      setGuestNameCoords(DEFAULT_GUEST_NAME_COORDS);
     }
   };
 
-  // Start dragging a QR code box on the interactive stage
+  // Start dragging a QR code box or Guest Name box on the interactive stage
   const handleStartDrag = (
-    qrType: 'loc' | 'access',
+    itemType: 'loc' | 'access' | 'guest_name',
     e: React.PointerEvent<HTMLDivElement>
   ) => {
     e.preventDefault();
     e.stopPropagation();
     if (!editorStageRef.current) return;
     const rect = editorStageRef.current.getBoundingClientRect();
-    const currentCoords = qrType === 'loc' ? qrLocCoords : qrAccessCoords;
+    const currentCoords =
+      itemType === 'loc'
+        ? qrLocCoords
+        : itemType === 'access'
+        ? qrAccessCoords
+        : guestNameCoords;
     const boxPixelX = rect.left + (currentCoords.left / 100) * rect.width;
     const boxPixelY = rect.top + (currentCoords.top / 100) * rect.height;
 
@@ -638,7 +692,7 @@ export default function EventosPage() {
       offsetX: e.clientX - boxPixelX,
       offsetY: e.clientY - boxPixelY,
     };
-    setDraggedQr(qrType);
+    setDraggedQr(itemType);
   };
 
   // Window listeners for smooth, responsive drag-and-drop
@@ -648,7 +702,12 @@ export default function EventosPage() {
     const handlePointerMove = (e: PointerEvent) => {
       if (!editorStageRef.current) return;
       const rect = editorStageRef.current.getBoundingClientRect();
-      const currentCoords = draggedQr === 'loc' ? qrLocCoords : qrAccessCoords;
+      const currentCoords =
+        draggedQr === 'loc'
+          ? qrLocCoords
+          : draggedQr === 'access'
+          ? qrAccessCoords
+          : guestNameCoords;
 
       const rawX = e.clientX - rect.left - dragStartOffsetRef.current.offsetX;
       const rawY = e.clientY - rect.top - dragStartOffsetRef.current.offsetY;
@@ -656,7 +715,7 @@ export default function EventosPage() {
       let pctX = (rawX / rect.width) * 100;
       let pctY = (rawY / rect.height) * 100;
 
-      // Clamp strictly within [0%, 100% - width/height] so QR code cannot go off-screen
+      // Clamp strictly within [0%, 100% - width/height] so element cannot go off-screen
       pctX = Math.max(0, Math.min(100 - currentCoords.width, pctX));
       pctY = Math.max(0, Math.min(100 - currentCoords.height, pctY));
 
@@ -665,8 +724,10 @@ export default function EventosPage() {
 
       if (draggedQr === 'loc') {
         setQrLocCoords((prev) => ({ ...prev, left: pctX, top: pctY }));
-      } else {
+      } else if (draggedQr === 'access') {
         setQrAccessCoords((prev) => ({ ...prev, left: pctX, top: pctY }));
+      } else if (draggedQr === 'guest_name') {
+        setGuestNameCoords((prev) => ({ ...prev, left: pctX, top: pctY }));
       }
     };
 
@@ -680,7 +741,15 @@ export default function EventosPage() {
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
     };
-  }, [draggedQr, qrLocCoords.width, qrLocCoords.height, qrAccessCoords.width, qrAccessCoords.height]);
+  }, [
+    draggedQr,
+    qrLocCoords.width,
+    qrLocCoords.height,
+    qrAccessCoords.width,
+    qrAccessCoords.height,
+    guestNameCoords.width,
+    guestNameCoords.height,
+  ]);
 
   // Apply Quick Positioning Presets
   const handleApplyPreset = (preset: 'corners' | 'triptych' | 'single' | 'bottom_center') => {
@@ -781,6 +850,14 @@ export default function EventosPage() {
         pdf_orientation: pdfOrientation,
         show_locations_qr: showLocationsQr,
         show_access_qr: showAccessQr,
+        show_guest_name: showGuestName,
+        guest_name_page: guestNamePage,
+        guest_name_coords: guestNameCoords,
+        guest_name_font_size: guestNameFontSize,
+        guest_name_color: guestNameColor,
+        guest_name_align: guestNameAlign,
+        guest_name_font_family: guestNameFontFamily,
+        guest_name_font_weight: guestNameFontWeight,
       };
 
       const eventWithTestConfig = {
@@ -1486,6 +1563,228 @@ export default function EventosPage() {
                 </div>
               </div>
 
+              {/* Opção de Mostrar e Personalizar Nome do Convidado */}
+              <div className="bg-secondary/15 p-4 rounded-2xl border border-border-custom space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <User className="h-4 w-4 text-amber-500" />
+                      <label className="text-xs font-bold text-foreground uppercase tracking-wider">
+                        Nome do Convidado no Convite (PDF / Impressão)
+                      </label>
+                    </div>
+                    <p className="text-[11px] text-foreground/60 mt-0.5">
+                      Imprime dinamicamente o nome de cada convidado individual sobre a arte do Canva (ideal para convites nominais personalizados).
+                    </p>
+                  </div>
+
+                  <label className="flex items-center gap-2 cursor-pointer select-none bg-card-bg px-3.5 py-2 rounded-xl border border-border-custom shadow-sm shrink-0 hover:border-amber-500/50 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={showGuestName}
+                      onChange={(e) => setShowGuestName(e.target.checked)}
+                      className="rounded border-border-custom text-amber-600 focus:ring-amber-500 h-4 w-4"
+                    />
+                    <span className="text-xs font-bold text-foreground">
+                      {showGuestName ? '✅ Mostrar Nome Ativo' : 'Mostrar Nome do Convidado'}
+                    </span>
+                  </label>
+                </div>
+
+                {showGuestName && (
+                  <div className="pt-3 border-t border-border-custom/60 space-y-3.5 animate-in fade-in">
+                    {/* Seletor de Página (Frente vs Verso) quando em Modo 2 Páginas */}
+                    {pdfMode === 'double_page' && (
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs bg-card-bg/60 p-2.5 rounded-xl border border-border-custom/60">
+                        <span className="text-[11px] font-semibold text-foreground/75">
+                          Página onde o nome do convidado deve aparecer:
+                        </span>
+                        <div className="inline-flex p-1 bg-secondary/30 rounded-xl border border-border-custom shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setGuestNamePage('page_1');
+                              setEditorPreviewPage('page_1');
+                            }}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                              guestNamePage === 'page_1'
+                                ? 'bg-amber-600 text-white shadow-sm'
+                                : 'text-foreground/70 hover:text-foreground'
+                            }`}
+                          >
+                            📄 Página 1 (Frente / Capa)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setGuestNamePage('page_2');
+                              setEditorPreviewPage('page_2');
+                            }}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                              guestNamePage === 'page_2'
+                                ? 'bg-amber-600 text-white shadow-sm'
+                                : 'text-foreground/70 hover:text-foreground'
+                            }`}
+                          >
+                            📖 Página 2 (Verso / Miolo)
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Controles de Estilo: Alinhamento, Tamanho, Cor e Estilo de Fonte */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
+                      {/* 1. Alinhamento */}
+                      <div className="space-y-1.5">
+                        <span className="text-[11px] font-semibold text-foreground/70 block">Alinhamento do Texto:</span>
+                        <div className="flex bg-card-bg border border-border-custom rounded-xl p-1 gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setGuestNameAlign('left')}
+                            className={`flex-1 py-1 rounded-lg text-xs flex items-center justify-center transition-all cursor-pointer ${
+                              guestNameAlign === 'left' ? 'bg-primary text-white font-bold' : 'text-foreground/60 hover:text-foreground'
+                            }`}
+                            title="Alinhar à Esquerda"
+                          >
+                            <AlignLeft className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setGuestNameAlign('center')}
+                            className={`flex-1 py-1 rounded-lg text-xs flex items-center justify-center transition-all cursor-pointer ${
+                              guestNameAlign === 'center' ? 'bg-primary text-white font-bold' : 'text-foreground/60 hover:text-foreground'
+                            }`}
+                            title="Centralizar"
+                          >
+                            <AlignCenter className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setGuestNameAlign('right')}
+                            className={`flex-1 py-1 rounded-lg text-xs flex items-center justify-center transition-all cursor-pointer ${
+                              guestNameAlign === 'right' ? 'bg-primary text-white font-bold' : 'text-foreground/60 hover:text-foreground'
+                            }`}
+                            title="Alinhar à Direita"
+                          >
+                            <AlignRight className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* 2. Tamanho da Fonte */}
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[11px] font-semibold text-foreground/70">Tamanho da Letra:</span>
+                          <span className="text-[10px] font-mono text-foreground/50">{guestNameFontSize}pt</span>
+                        </div>
+                        <div className="flex bg-card-bg border border-border-custom rounded-xl p-1 gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setGuestNameFontSize(18)}
+                            className={`flex-1 py-1 rounded-lg text-[11px] font-medium transition-all cursor-pointer ${
+                              guestNameFontSize === 18 ? 'bg-primary text-white font-bold' : 'text-foreground/70 hover:text-foreground'
+                            }`}
+                          >
+                            P (18)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setGuestNameFontSize(24)}
+                            className={`flex-1 py-1 rounded-lg text-[11px] font-medium transition-all cursor-pointer ${
+                              guestNameFontSize === 24 ? 'bg-primary text-white font-bold' : 'text-foreground/70 hover:text-foreground'
+                            }`}
+                          >
+                            M (24)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setGuestNameFontSize(32)}
+                            className={`flex-1 py-1 rounded-lg text-[11px] font-medium transition-all cursor-pointer ${
+                              guestNameFontSize === 32 ? 'bg-primary text-white font-bold' : 'text-foreground/70 hover:text-foreground'
+                            }`}
+                          >
+                            G (32)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setGuestNameFontSize(40)}
+                            className={`flex-1 py-1 rounded-lg text-[11px] font-medium transition-all cursor-pointer ${
+                              guestNameFontSize === 40 ? 'bg-primary text-white font-bold' : 'text-foreground/70 hover:text-foreground'
+                            }`}
+                          >
+                            GG (40)
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* 3. Cor da Letra */}
+                      <div className="space-y-1.5">
+                        <span className="text-[11px] font-semibold text-foreground/70 block">Cor do Texto:</span>
+                        <div className="flex items-center gap-1.5 bg-card-bg border border-border-custom rounded-xl p-1 px-1.5">
+                          {[
+                            { color: '#1A1A1A', label: 'Preto' },
+                            { color: '#D4AF37', label: 'Dourado' },
+                            { color: '#FFFFFF', label: 'Branco' },
+                            { color: '#1E3A8A', label: 'Azul' },
+                            { color: '#831843', label: 'Vinho' },
+                          ].map((item) => (
+                            <button
+                              key={item.color}
+                              type="button"
+                              onClick={() => setGuestNameColor(item.color)}
+                              className={`w-6 h-6 rounded-lg border transition-transform cursor-pointer shrink-0 ${
+                                guestNameColor.toLowerCase() === item.color.toLowerCase()
+                                  ? 'ring-2 ring-primary ring-offset-1 scale-110 border-white'
+                                  : 'border-border-custom hover:scale-105'
+                              }`}
+                              style={{ backgroundColor: item.color }}
+                              title={item.label}
+                            />
+                          ))}
+                          <label
+                            className="relative w-6 h-6 rounded-lg border border-dashed border-border-custom cursor-pointer flex items-center justify-center overflow-hidden shrink-0 hover:border-primary"
+                            title="Escolher Cor Livre"
+                          >
+                            <input
+                              type="color"
+                              value={guestNameColor}
+                              onChange={(e) => setGuestNameColor(e.target.value)}
+                              className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                            />
+                            <Palette className="h-3.5 w-3.5 text-foreground/60 pointer-events-none" />
+                          </label>
+                        </div>
+                      </div>
+
+                      {/* 4. Estilo da Fonte */}
+                      <div className="space-y-1.5">
+                        <span className="text-[11px] font-semibold text-foreground/70 block">Estilo Tipográfico:</span>
+                        <div className="flex bg-card-bg border border-border-custom rounded-xl p-1 gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setGuestNameFontFamily('serif')}
+                            className={`flex-1 py-1 rounded-lg text-xs font-serif transition-all cursor-pointer ${
+                              guestNameFontFamily === 'serif' ? 'bg-primary text-white font-bold' : 'text-foreground/70 hover:text-foreground'
+                            }`}
+                          >
+                            Elegante (Serif)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setGuestNameFontFamily('sans')}
+                            className={`flex-1 py-1 rounded-lg text-xs font-sans transition-all cursor-pointer ${
+                              guestNameFontFamily === 'sans' ? 'bg-primary text-white font-bold' : 'text-foreground/70 hover:text-foreground'
+                            }`}
+                          >
+                            Moderna (Sans)
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* 1. Frente do Convite (Capa ou Página Única) */}
                 <div className="space-y-3 bg-secondary/5 p-4 rounded-2xl border border-border-custom flex flex-col justify-between">
@@ -1586,6 +1885,24 @@ export default function EventosPage() {
                             </div>
                           )}
                         </>
+                      )}
+
+                      {/* Sobreposição do Nome do Convidado no preview da Capa / Página Única */}
+                      {showGuestName && (pdfMode === 'single_page' || guestNamePage === 'page_1') && (templateSource === 'custom' && (canvaCoverUrl || isMarinela)) && (
+                        <div
+                          className="absolute border border-amber-500 bg-white/95 text-amber-900 rounded-sm flex items-center justify-center p-0.5 shadow-md select-none transition-all z-20 pointer-events-none overflow-hidden"
+                          style={{
+                            left: `${guestNameCoords.left}%`,
+                            top: `${guestNameCoords.top}%`,
+                            width: `${guestNameCoords.width}%`,
+                            height: `${guestNameCoords.height}%`,
+                          }}
+                          title="Posição do Nome do Convidado"
+                        >
+                          <span className="text-[7px] font-bold text-amber-800 leading-tight truncate px-0.5">
+                            👤 Nome do Convidado
+                          </span>
+                        </div>
                       )}
 
                       <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-md text-white px-2 py-0.5 rounded text-[10px] font-medium z-30">
@@ -1781,6 +2098,24 @@ export default function EventosPage() {
                                 QR Acesso
                               </span>
                             </div>
+
+                            {/* Caixa 3: Nome do Convidado (se configurado no Verso) */}
+                            {showGuestName && guestNamePage === 'page_2' && (
+                              <div
+                                className="absolute border border-amber-500 bg-white/95 text-amber-900 rounded-sm flex items-center justify-center p-0.5 shadow-md select-none transition-all z-20 pointer-events-none overflow-hidden"
+                                style={{
+                                  left: `${guestNameCoords.left}%`,
+                                  top: `${guestNameCoords.top}%`,
+                                  width: `${guestNameCoords.width}%`,
+                                  height: `${guestNameCoords.height}%`,
+                                }}
+                                title="Posição do Nome do Convidado"
+                              >
+                                <span className="text-[7px] font-bold text-amber-800 leading-tight truncate px-0.5">
+                                  👤 Nome do Convidado
+                                </span>
+                              </div>
+                            )}
                           </>
                         )}
 
@@ -2064,6 +2399,53 @@ export default function EventosPage() {
                       </span>
                     </div>
                   )}
+
+                  {/* 3. Nome do Convidado Arrastável */}
+                  {showGuestName && (pdfMode === 'single_page' || editorPreviewPage === guestNamePage) && (
+                    <div
+                      onPointerDown={(e) => handleStartDrag('guest_name', e)}
+                      className={`absolute z-30 select-none touch-none rounded-xl bg-white/95 backdrop-blur-sm border-2 border-amber-500 shadow-xl flex flex-col items-center justify-between p-1.5 cursor-grab active:cursor-grabbing transition-shadow ${
+                        draggedQr === 'guest_name' ? 'ring-4 ring-amber-400 shadow-2xl scale-105' : 'hover:scale-[1.02]'
+                      }`}
+                      style={{
+                        left: `${guestNameCoords.left}%`,
+                        top: `${guestNameCoords.top}%`,
+                        width: `${guestNameCoords.width}%`,
+                        height: `${guestNameCoords.height}%`,
+                      }}
+                    >
+                      <div className="w-full flex items-center justify-between px-1.5 mb-0.5 text-[9px] font-bold text-amber-900 bg-amber-50 rounded">
+                        <span className="flex items-center gap-1 truncate">
+                          <User className="h-2.5 w-2.5 text-amber-600" /> Nome do Convidado
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <span className="text-[8px] font-mono text-amber-700 font-semibold bg-amber-100/70 px-1 rounded">
+                            {guestNameCoords.left.toFixed(1)}%, {guestNameCoords.top.toFixed(1)}%
+                          </span>
+                          <Move className="h-2.5 w-2.5 text-amber-500 shrink-0" />
+                        </div>
+                      </div>
+                      <div
+                        className="flex-1 w-full flex items-center px-2 overflow-hidden"
+                        style={{
+                          justifyContent: guestNameAlign === 'left' ? 'flex-start' : guestNameAlign === 'right' ? 'flex-end' : 'center',
+                        }}
+                      >
+                        <span
+                          style={{
+                            color: guestNameColor,
+                            fontFamily: guestNameFontFamily === 'sans' ? 'sans-serif' : 'serif',
+                            fontWeight: guestNameFontWeight,
+                            textAlign: guestNameAlign,
+                            fontSize: `${Math.max(11, Math.min(18, guestNameFontSize * 0.65))}px`,
+                          }}
+                          className="truncate w-full font-bold select-none"
+                        >
+                          Convidado de Demonstração
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* BOTÕES DE PRESET RÁPIDO & TAMANHO */}
@@ -2245,6 +2627,65 @@ export default function EventosPage() {
                           </div>
                         </div>
                       </div>
+
+                      {/* Inputs Nome do Convidado */}
+                      {showGuestName && (
+                        <div className="p-3 bg-secondary/10 rounded-xl border border-amber-500/20 space-y-2 md:col-span-2">
+                          <span className="text-xs font-bold text-amber-600 flex items-center gap-1">
+                            <User className="h-3.5 w-3.5" /> Nome do Convidado (Coordenadas & Caixa)
+                          </span>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                            <div>
+                              <label className="text-[10px] text-foreground/60 block">Posição X (%):</label>
+                              <input
+                                type="number"
+                                min="0"
+                                max="95"
+                                step="0.1"
+                                value={guestNameCoords.left}
+                                onChange={(e) => setGuestNameCoords({ ...guestNameCoords, left: Math.max(0, Math.min(95, parseFloat(e.target.value) || 0)) })}
+                                className="w-full bg-card-bg border border-border-custom rounded-lg px-2 py-1 text-xs"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] text-foreground/60 block">Posição Y (%):</label>
+                              <input
+                                type="number"
+                                min="0"
+                                max="95"
+                                step="0.1"
+                                value={guestNameCoords.top}
+                                onChange={(e) => setGuestNameCoords({ ...guestNameCoords, top: Math.max(0, Math.min(95, parseFloat(e.target.value) || 0)) })}
+                                className="w-full bg-card-bg border border-border-custom rounded-lg px-2 py-1 text-xs"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] text-foreground/60 block">Largura da Caixa (%):</label>
+                              <input
+                                type="number"
+                                min="10"
+                                max="98"
+                                step="0.1"
+                                value={guestNameCoords.width}
+                                onChange={(e) => setGuestNameCoords({ ...guestNameCoords, width: Math.max(10, Math.min(98, parseFloat(e.target.value) || 50)) })}
+                                className="w-full bg-card-bg border border-border-custom rounded-lg px-2 py-1 text-xs"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] text-foreground/60 block">Altura da Caixa (%):</label>
+                              <input
+                                type="number"
+                                min="3"
+                                max="30"
+                                step="0.1"
+                                value={guestNameCoords.height}
+                                onChange={(e) => setGuestNameCoords({ ...guestNameCoords, height: Math.max(3, Math.min(30, parseFloat(e.target.value) || 6)) })}
+                                className="w-full bg-card-bg border border-border-custom rounded-lg px-2 py-1 text-xs"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

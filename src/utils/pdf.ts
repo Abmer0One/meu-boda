@@ -10,6 +10,8 @@ import {
   DEFAULT_ACCESS_COORDS,
   DEFAULT_PORTRAIT_LOC_COORDS,
   DEFAULT_PORTRAIT_ACCESS_COORDS,
+  DEFAULT_GUEST_NAME_COORDS,
+  DEFAULT_PORTRAIT_GUEST_NAME_COORDS,
 } from '@/utils/canvaConfig';
 
 /**
@@ -1025,6 +1027,16 @@ async function renderBasicInvitationCanvas(
   return canvas.toDataURL('image/jpeg', 0.95);
 }
 
+export interface CanvasTextOverlay {
+  text: string;
+  coords: { left: number; top: number; width?: number; height?: number };
+  fontSize?: number;
+  color?: string;
+  align?: 'left' | 'center' | 'right';
+  fontFamily?: 'serif' | 'sans';
+  fontWeight?: 'normal' | 'bold';
+}
+
 /**
  * Renders a full invitation page directly to a high-resolution Canvas 2D
  * on top of a custom Canva template background image.
@@ -1036,7 +1048,8 @@ async function renderInvitationPage(
     qrDataUrl: string;
     coords: { left: number; top: number; width: number; height: number };
   }>,
-  targetOrientation: 'portrait' | 'landscape' = 'landscape'
+  targetOrientation: 'portrait' | 'landscape' = 'landscape',
+  textOverlays: CanvasTextOverlay[] = []
 ): Promise<string> {
   // 1. Draw Background Image
   let bgImg: HTMLImageElement | null = null;
@@ -1121,6 +1134,66 @@ async function renderInvitationPage(
     }
   }
 
+  // 3. Draw Text overlays (e.g. Guest Name)
+  for (const overlay of textOverlays) {
+    if (!overlay.text) continue;
+    try {
+      let left = Number(overlay.coords?.left);
+      let top = Number(overlay.coords?.top);
+      let width = Number(overlay.coords?.width);
+      let height = Number(overlay.coords?.height);
+
+      if (isNaN(width) || width < 5 || width > 98) width = 70;
+      if (isNaN(height) || height < 2 || height > 50) height = 6;
+      if (isNaN(left)) left = 15;
+      if (isNaN(top)) top = 65;
+
+      left = Math.max(0, Math.min(left, 100 - width));
+      top = Math.max(0, Math.min(top, 100 - height));
+
+      const x = (left / 100) * canvasWidth;
+      const y = (top / 100) * canvasHeight;
+      const w = (width / 100) * canvasWidth;
+      const h = (height / 100) * canvasHeight;
+
+      const align = overlay.align || 'center';
+      const color = overlay.color || '#1A1A1A';
+      const fontFamily = overlay.fontFamily === 'sans' ? 'sans-serif' : 'Cinzel, "Playfair Display", Georgia, serif';
+      const fontWeight = overlay.fontWeight || 'bold';
+
+      // Base font size scaling relative to canvas resolution (e.g. 2240px wide canvas)
+      const baseFontSize = overlay.fontSize || 24;
+      const scaledFontSize = Math.round(baseFontSize * (canvasWidth / 1000));
+
+      ctx.save();
+      ctx.fillStyle = color;
+      ctx.textAlign = align;
+      ctx.textBaseline = 'middle';
+
+      let currentFontSize = scaledFontSize;
+      ctx.font = `${fontWeight} ${currentFontSize}px ${fontFamily}`;
+
+      // Measure text width and scale down if longer than bounding box
+      const measured = ctx.measureText(overlay.text).width;
+      if (measured > w && w > 40) {
+        const scale = (w * 0.95) / measured;
+        currentFontSize = Math.max(16, Math.floor(currentFontSize * scale));
+        ctx.font = `${fontWeight} ${currentFontSize}px ${fontFamily}`;
+      }
+
+      let textX = x + w / 2;
+      if (align === 'left') textX = x;
+      if (align === 'right') textX = x + w;
+
+      const textY = y + h / 2;
+
+      ctx.fillText(overlay.text, textX, textY);
+      ctx.restore();
+    } catch (err) {
+      console.error('Falha ao desenhar texto sobre o canvas:', err);
+    }
+  }
+
   // Return high-quality JPEG
   return canvas.toDataURL('image/jpeg', 0.95);
 }
@@ -1188,6 +1261,21 @@ export async function generateGuestPDF(
   const locCoords = canvaConfig.qr_locations_coords || (isPortrait ? DEFAULT_PORTRAIT_LOC_COORDS : DEFAULT_LOC_COORDS);
   const accessCoords = canvaConfig.qr_access_coords || (isPortrait ? DEFAULT_PORTRAIT_ACCESS_COORDS : DEFAULT_ACCESS_COORDS);
 
+  // Guest Name Overlay Config
+  const guestNamePage = canvaConfig.guest_name_page || 'page_1';
+  const showGuestName = Boolean(canvaConfig.show_guest_name) && Boolean(guest.name);
+  const guestNameOverlay: CanvasTextOverlay | null = showGuestName
+    ? {
+        text: guest.name,
+        coords: canvaConfig.guest_name_coords || (isPortrait ? DEFAULT_PORTRAIT_GUEST_NAME_COORDS : DEFAULT_GUEST_NAME_COORDS),
+        fontSize: canvaConfig.guest_name_font_size || 24,
+        color: canvaConfig.guest_name_color || '#1A1A1A',
+        align: canvaConfig.guest_name_align || 'center',
+        fontFamily: canvaConfig.guest_name_font_family || 'serif',
+        fontWeight: canvaConfig.guest_name_font_weight || 'bold',
+      }
+    : null;
+
   const isCustomMode = canvaConfig.template_source === 'custom' && !canvaConfig.is_basic_template;
   const hasCustomCover = isCustomMode && Boolean(canvaConfig.canva_cover_url);
   const hasCustomInfo = isCustomMode && Boolean(canvaConfig.canva_info_url);
@@ -1211,7 +1299,12 @@ export async function generateGuestPDF(
       }
     }
 
-    coverDataUrl = await renderInvitationPage(canvaConfig.canva_cover_url!, DEFAULT_CANVA_COVER, page1Overlays, orientation);
+    const page1TextOverlays: CanvasTextOverlay[] = [];
+    if (guestNameOverlay && (isSinglePage || guestNamePage === 'page_1')) {
+      page1TextOverlays.push(guestNameOverlay);
+    }
+
+    coverDataUrl = await renderInvitationPage(canvaConfig.canva_cover_url!, DEFAULT_CANVA_COVER, page1Overlays, orientation, page1TextOverlays);
   } else {
     // Dynamic Basic Template for events without custom Canva uploads
     coverDataUrl = await renderBasicInvitationCanvas(
@@ -1241,7 +1334,12 @@ export async function generateGuestPDF(
         page2Overlays.push({ qrDataUrl: finalAccessQr, coords: accessCoords });
       }
 
-      infoDataUrl = await renderInvitationPage(canvaConfig.canva_info_url!, DEFAULT_CANVA_INFO, page2Overlays, orientation);
+      const page2TextOverlays: CanvasTextOverlay[] = [];
+      if (guestNameOverlay && guestNamePage === 'page_2') {
+        page2TextOverlays.push(guestNameOverlay);
+      }
+
+      infoDataUrl = await renderInvitationPage(canvaConfig.canva_info_url!, DEFAULT_CANVA_INFO, page2Overlays, orientation, page2TextOverlays);
     } else {
       // Dynamic Basic Template Info Page for events without custom Canva uploads
       infoDataUrl = await renderBasicInvitationCanvas(
