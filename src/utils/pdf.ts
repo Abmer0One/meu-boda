@@ -1198,13 +1198,18 @@ async function renderInvitationPage(
   return canvas.toDataURL('image/jpeg', 0.95);
 }
 
+export interface GenerateGuestPdfOptions {
+  includeGuestName?: boolean;
+}
+
 export async function generateGuestPDF(
   guest: Guest,
   event: Event,
   tableName: string,
   qrCodeDataUrl: string,
   schedules: EventSchedule[] = [],
-  infoBlocks: EventInfoBlock[] = []
+  infoBlocks: EventInfoBlock[] = [],
+  options?: GenerateGuestPdfOptions
 ): Promise<jsPDF> {
   const canvaConfig = resolveCanvaConfig(event.id, event.template_config, infoBlocks, null, event);
   const isSinglePage = canvaConfig.pdf_mode === 'single_page';
@@ -1263,7 +1268,10 @@ export async function generateGuestPDF(
 
   // Guest Name Overlay Config
   const guestNamePage = canvaConfig.guest_name_page || 'page_1';
-  const showGuestName = Boolean(canvaConfig.show_guest_name) && Boolean(guest.name);
+  const shouldIncludeName = options?.includeGuestName !== undefined
+    ? options.includeGuestName
+    : Boolean(canvaConfig.show_guest_name);
+  const showGuestName = shouldIncludeName && Boolean(guest.name);
   const guestNameOverlay: CanvasTextOverlay | null = showGuestName
     ? {
         text: guest.name,
@@ -1276,6 +1284,7 @@ export async function generateGuestPDF(
       }
     : null;
 
+  const effectiveGuest = shouldIncludeName ? guest : { ...guest, name: '' };
   const isCustomMode = canvaConfig.template_source === 'custom' && !canvaConfig.is_basic_template;
   const hasCustomCover = isCustomMode && Boolean(canvaConfig.canva_cover_url);
   const hasCustomInfo = isCustomMode && Boolean(canvaConfig.canva_info_url);
@@ -1309,7 +1318,7 @@ export async function generateGuestPDF(
     // Dynamic Basic Template for events without custom Canva uploads
     coverDataUrl = await renderBasicInvitationCanvas(
       event,
-      guest,
+      effectiveGuest,
       tableName,
       finalAccessQr,
       locationsQrCodeUrl,
@@ -1344,7 +1353,7 @@ export async function generateGuestPDF(
       // Dynamic Basic Template Info Page for events without custom Canva uploads
       infoDataUrl = await renderBasicInvitationCanvas(
         event,
-        guest,
+        effectiveGuest,
         tableName,
         finalAccessQr,
         locationsQrCodeUrl,

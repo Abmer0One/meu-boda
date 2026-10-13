@@ -30,6 +30,7 @@ import {
   Send,
   MessageSquare,
   Mail,
+  Printer,
 } from 'lucide-react';
 
 export default function ConvitesPage() {
@@ -42,6 +43,8 @@ export default function ConvitesPage() {
   const [uploading, setUploading] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [bulkDownloading, setBulkDownloading] = useState(false);
+  const [downloadingGeneric, setDownloadingGeneric] = useState(false);
+  const [exportWithName, setExportWithName] = useState<boolean>(true);
 
   const canvaConfig = currentEvent ? resolveCanvaConfig(currentEvent.id, currentEvent.template_config, infoBlocks, null) : null;
   const isSinglePage = canvaConfig?.pdf_mode === 'single_page';
@@ -72,6 +75,12 @@ export default function ConvitesPage() {
       setPrintTheme(savedTheme as 'dark' | 'light');
     }
   }, [currentEvent]);
+
+  useEffect(() => {
+    if (canvaConfig && canvaConfig.show_guest_name !== undefined) {
+      setExportWithName(Boolean(canvaConfig.show_guest_name));
+    }
+  }, [canvaConfig?.show_guest_name]);
 
   const handleUpdatePrintTheme = async (theme: 'dark' | 'light') => {
     if (!currentEvent) return;
@@ -311,7 +320,7 @@ export default function ConvitesPage() {
   };
 
   // Helper to generate the guest PDF download
-  const handleDownloadPDF = async (guest: Guest) => {
+  const handleDownloadPDF = async (guest: Guest, withName: boolean = exportWithName) => {
     if (!currentEvent) return;
     setDownloadingId(guest.id);
     try {
@@ -321,18 +330,27 @@ export default function ConvitesPage() {
       const qrData = {
         eventId: currentEvent.id,
         guestId: guest.id,
-        name: guest.name,
+        name: withName ? guest.name : '',
         table: tableName,
         companions: guest.companions.toString(),
         event: currentEvent.title,
-        date: currentEvent.date.split('T')[0],
+        date: currentEvent.date ? currentEvent.date.split('T')[0] : '',
         token: guest.qr_token, // for check-in validation
       };
 
       const qrCodeUrl = await generateQRCode(qrData);
-      const pdf = await generateGuestPDF(guest, currentEvent, tableName, qrCodeUrl, schedules, infoBlocks);
+      const pdf = await generateGuestPDF(
+        guest,
+        currentEvent,
+        tableName,
+        qrCodeUrl,
+        schedules,
+        infoBlocks,
+        { includeGuestName: withName }
+      );
       
-      pdf.save(`convite_${guest.name.replace(/\s+/g, '_')}.pdf`);
+      const fileSuffix = withName ? '' : '_sem_nome';
+      pdf.save(`convite_${guest.name.replace(/\s+/g, '_')}${fileSuffix}.pdf`);
 
       // Mark as sent
       if (!guest.invitation_sent) {
@@ -357,13 +375,63 @@ export default function ConvitesPage() {
       // Loop over guests and download sequentially (with slight delay to avoid browser blocking)
       for (const guest of guests) {
         if (guest.status === 'Declined') continue;
-        await handleDownloadPDF(guest);
+        await handleDownloadPDF(guest, exportWithName);
         await new Promise((resolve) => setTimeout(resolve, 500));
       }
     } catch (err) {
       console.error(err);
     } finally {
       setBulkDownloading(false);
+    }
+  };
+
+  // Download single generic template PDF (e.g. for printing backup copies without guest name)
+  const handleDownloadGenericPDF = async () => {
+    if (!currentEvent) return;
+    setDownloadingGeneric(true);
+    try {
+      const dummyGuest: Guest = {
+        id: 'generico',
+        event_id: currentEvent.id,
+        name: '',
+        companions: 0,
+        table_id: null,
+        status: 'Confirmed',
+        invitation_sent: false,
+        notes: null,
+        email: null,
+        phone: null,
+        family_group: null,
+        qr_token: 'convite-reserva',
+        created_at: new Date().toISOString(),
+      };
+
+      const sampleQrData = {
+        eventId: currentEvent.id,
+        guestId: 'reserva',
+        name: 'Convidado de Honra',
+        table: 'Mesa de Reserva',
+        companions: '0',
+        event: currentEvent.title,
+        date: currentEvent.date ? currentEvent.date.split('T')[0] : '',
+        token: 'convite-reserva',
+      };
+      const qrCodeUrl = await generateQRCode(sampleQrData);
+      const pdf = await generateGuestPDF(
+        dummyGuest,
+        currentEvent,
+        'Mesa de Reserva',
+        qrCodeUrl,
+        schedules,
+        infoBlocks,
+        { includeGuestName: false }
+      );
+
+      pdf.save(`convite_modelo_generico_${currentEvent.slug || 'evento'}.pdf`);
+    } catch (err) {
+      console.error('Erro ao gerar convite genérico:', err);
+    } finally {
+      setDownloadingGeneric(false);
     }
   };
 
@@ -388,7 +456,34 @@ export default function ConvitesPage() {
           </p>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Segmented Control for Guest Name on PDF */}
+          <div className="flex items-center gap-1 bg-secondary/30 p-1 rounded-xl border border-border-custom text-xs">
+            <span className="text-foreground/70 px-2 font-medium hidden sm:inline">Nome no PDF:</span>
+            <button
+              type="button"
+              onClick={() => setExportWithName(true)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                exportWithName
+                  ? 'bg-primary text-white shadow-sm'
+                  : 'text-foreground/60 hover:text-foreground'
+              }`}
+            >
+              Com Nome
+            </button>
+            <button
+              type="button"
+              onClick={() => setExportWithName(false)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                !exportWithName
+                  ? 'bg-primary text-white shadow-sm'
+                  : 'text-foreground/60 hover:text-foreground'
+              }`}
+            >
+              Sem Nome (Genérico)
+            </button>
+          </div>
+
           <Button
             variant="outline"
             leftIcon={<Send className="h-4 w-4" />}
@@ -404,7 +499,7 @@ export default function ConvitesPage() {
             disabled={bulkDownloading || guests.length === 0}
             size="sm"
           >
-            Gerar Todos PDFs
+            {exportWithName ? 'Gerar Todos PDFs' : 'Gerar Todos (Sem Nome)'}
           </Button>
         </div>
       </div>
@@ -502,13 +597,25 @@ export default function ConvitesPage() {
                 </div>
               </div>
 
-              <Button
-                variant="outline"
-                className="w-full justify-center mt-2 border-primary/30 text-primary hover:bg-primary/5"
-                onClick={() => setPreviewOpen(true)}
-              >
-                Visualizar Preview Interativo
-              </Button>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+                <Button
+                  variant="outline"
+                  className="w-full justify-center text-xs border-primary/30 text-primary hover:bg-primary/5"
+                  onClick={() => setPreviewOpen(true)}
+                >
+                  Ver Preview
+                </Button>
+                <Button
+                  variant="secondary"
+                  className="w-full justify-center text-xs border border-border-custom"
+                  leftIcon={downloadingGeneric ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Printer className="h-3.5 w-3.5" />}
+                  onClick={handleDownloadGenericPDF}
+                  disabled={downloadingGeneric}
+                  title="Descarregar modelo em branco A4 sem nome para gráfica ou reserva"
+                >
+                  PDF em Branco
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -522,6 +629,22 @@ export default function ConvitesPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
+              {!exportWithName && (
+                <div className="mb-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-xs text-amber-700 dark:text-amber-300 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold shrink-0">Modo Sem Nome Ativo:</span>
+                    <span>Os PDFs serão gerados sem o nome impresso (ideal para convites com caligrafia manual).</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setExportWithName(true)}
+                    className="underline text-xs font-semibold hover:opacity-80 shrink-0 self-start sm:self-auto"
+                  >
+                    Mudar para Com Nome
+                  </button>
+                </div>
+              )}
+
               {loading ? (
                 <div className="flex h-32 items-center justify-center">
                   <Loader2 className="h-6 w-6 animate-spin text-primary" />
@@ -538,7 +661,7 @@ export default function ConvitesPage() {
                         <th className="p-3 text-center">Ações</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-border-custom">
+                    <tbody className="divide-y border-border-custom">
                       {guests.map((guest) => (
                         <tr key={guest.id} className="hover:bg-secondary/15 transition-colors">
                           <td className="p-3 font-medium">{guest.name}</td>
@@ -569,8 +692,9 @@ export default function ConvitesPage() {
                                 }
                                 onClick={() => handleDownloadPDF(guest)}
                                 disabled={downloadingId !== null || guest.status === 'Declined'}
+                                title={exportWithName ? 'Baixar PDF com nome do convidado' : 'Baixar PDF sem nome do convidado'}
                               >
-                                Baixar PDF
+                                {exportWithName ? 'Baixar PDF' : 'Baixar (Sem Nome)'}
                               </Button>
                               <Button
                                 variant="outline"
