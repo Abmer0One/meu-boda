@@ -31,6 +31,9 @@ import {
   MessageSquare,
   Mail,
   Printer,
+  Sparkles,
+  CheckSquare,
+  Square,
 } from 'lucide-react';
 
 export default function ConvitesPage() {
@@ -45,6 +48,9 @@ export default function ConvitesPage() {
   const [bulkDownloading, setBulkDownloading] = useState(false);
   const [downloadingGeneric, setDownloadingGeneric] = useState(false);
   const [exportWithName, setExportWithName] = useState<boolean>(true);
+  const [guestNameOptions, setGuestNameOptions] = useState<Record<string, boolean>>({});
+  const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [bulkExportProgress, setBulkExportProgress] = useState<{ current: number; total: number } | null>(null);
 
   const canvaConfig = currentEvent ? resolveCanvaConfig(currentEvent.id, currentEvent.template_config, infoBlocks, null) : null;
   const isSinglePage = canvaConfig?.pdf_mode === 'single_page';
@@ -81,6 +87,35 @@ export default function ConvitesPage() {
       setExportWithName(Boolean(canvaConfig.show_guest_name));
     }
   }, [canvaConfig?.show_guest_name]);
+
+  const activeGuests = guests.filter((g) => g.status !== 'Declined');
+
+  const isGuestNameEnabled = (guestId: string): boolean => {
+    if (guestNameOptions[guestId] !== undefined) {
+      return guestNameOptions[guestId];
+    }
+    return canvaConfig?.show_guest_name ?? true;
+  };
+
+  const toggleGuestNameOption = (guestId: string) => {
+    setGuestNameOptions((prev) => ({
+      ...prev,
+      [guestId]: !isGuestNameEnabled(guestId),
+    }));
+  };
+
+  const handleSelectAllWithName = (withName: boolean) => {
+    const updated: Record<string, boolean> = {};
+    guests.forEach((g) => {
+      updated[g.id] = withName;
+    });
+    setGuestNameOptions(updated);
+  };
+
+  const countWithName = activeGuests.filter((g) => isGuestNameEnabled(g.id)).length;
+  const countWithoutName = activeGuests.length - countWithName;
+  const isAllWithName = activeGuests.length > 0 && countWithName === activeGuests.length;
+  const isAllWithoutName = activeGuests.length > 0 && countWithoutName === activeGuests.length;
 
   const handleUpdatePrintTheme = async (theme: 'dark' | 'light') => {
     if (!currentEvent) return;
@@ -320,17 +355,18 @@ export default function ConvitesPage() {
   };
 
   // Helper to generate the guest PDF download
-  const handleDownloadPDF = async (guest: Guest, withName: boolean = exportWithName) => {
+  const handleDownloadPDF = async (guest: Guest, withName?: boolean) => {
     if (!currentEvent) return;
     setDownloadingId(guest.id);
     try {
       const tableName = getTableName(guest.table_id);
+      const shouldIncludeName = withName !== undefined ? withName : isGuestNameEnabled(guest.id);
 
       // JSON metadata inside the QR Code
       const qrData = {
         eventId: currentEvent.id,
         guestId: guest.id,
-        name: withName ? guest.name : '',
+        name: shouldIncludeName ? guest.name : '',
         table: tableName,
         companions: guest.companions.toString(),
         event: currentEvent.title,
@@ -346,10 +382,10 @@ export default function ConvitesPage() {
         qrCodeUrl,
         schedules,
         infoBlocks,
-        { includeGuestName: withName }
+        { includeGuestName: shouldIncludeName }
       );
       
-      const fileSuffix = withName ? '' : '_sem_nome';
+      const fileSuffix = shouldIncludeName ? '' : '_sem_nome';
       pdf.save(`convite_${guest.name.replace(/\s+/g, '_')}${fileSuffix}.pdf`);
 
       // Mark as sent
@@ -367,21 +403,54 @@ export default function ConvitesPage() {
     }
   };
 
-  // Bulk download PDFs for all Confirmed/Pending guests
-  const handleBulkDownload = async () => {
-    if (!currentEvent || guests.length === 0) return;
+  type BulkExportFilter = 'as_selected' | 'all_with_name' | 'all_without_name' | 'only_with_name' | 'only_without_name';
+
+  // Bulk download PDFs with filtering options
+  const handleBulkDownloadFiltered = async (mode: BulkExportFilter = 'as_selected') => {
+    if (!currentEvent || activeGuests.length === 0) return;
+
+    let targetGuests = activeGuests;
+    if (mode === 'only_with_name') {
+      targetGuests = activeGuests.filter((g) => isGuestNameEnabled(g.id));
+    } else if (mode === 'only_without_name') {
+      targetGuests = activeGuests.filter((g) => !isGuestNameEnabled(g.id));
+    }
+
+    if (targetGuests.length === 0) {
+      alert('Nenhum convidado encontrado para este critério.');
+      return;
+    }
+
     setBulkDownloading(true);
+    setBulkExportProgress({ current: 0, total: targetGuests.length });
     try {
-      // Loop over guests and download sequentially (with slight delay to avoid browser blocking)
-      for (const guest of guests) {
-        if (guest.status === 'Declined') continue;
-        await handleDownloadPDF(guest, exportWithName);
-        await new Promise((resolve) => setTimeout(resolve, 500));
+      for (let i = 0; i < targetGuests.length; i++) {
+        const guest = targetGuests[i];
+        setBulkExportProgress({ current: i + 1, total: targetGuests.length });
+
+        let shouldIncludeName: boolean;
+        if (mode === 'all_with_name') {
+          shouldIncludeName = true;
+        } else if (mode === 'all_without_name') {
+          shouldIncludeName = false;
+        } else if (mode === 'only_with_name') {
+          shouldIncludeName = true;
+        } else if (mode === 'only_without_name') {
+          shouldIncludeName = false;
+        } else {
+          // 'as_selected'
+          shouldIncludeName = isGuestNameEnabled(guest.id);
+        }
+
+        await handleDownloadPDF(guest, shouldIncludeName);
+        await new Promise((resolve) => setTimeout(resolve, 450));
       }
     } catch (err) {
-      console.error(err);
+      console.error('Erro ao gerar PDFs em massa:', err);
     } finally {
       setBulkDownloading(false);
+      setBulkExportProgress(null);
+      setExportModalOpen(false);
     }
   };
 
@@ -457,33 +526,6 @@ export default function ConvitesPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
-          {/* Segmented Control for Guest Name on PDF */}
-          <div className="flex items-center gap-1 bg-secondary/30 p-1 rounded-xl border border-border-custom text-xs">
-            <span className="text-foreground/70 px-2 font-medium hidden sm:inline">Nome no PDF:</span>
-            <button
-              type="button"
-              onClick={() => setExportWithName(true)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                exportWithName
-                  ? 'bg-primary text-white shadow-sm'
-                  : 'text-foreground/60 hover:text-foreground'
-              }`}
-            >
-              Com Nome
-            </button>
-            <button
-              type="button"
-              onClick={() => setExportWithName(false)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                !exportWithName
-                  ? 'bg-primary text-white shadow-sm'
-                  : 'text-foreground/60 hover:text-foreground'
-              }`}
-            >
-              Sem Nome (Genérico)
-            </button>
-          </div>
-
           <Button
             variant="outline"
             leftIcon={<Send className="h-4 w-4" />}
@@ -493,13 +535,17 @@ export default function ConvitesPage() {
           >
             Enviar Convites (Massa)
           </Button>
+
           <Button
             leftIcon={bulkDownloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-            onClick={handleBulkDownload}
-            disabled={bulkDownloading || guests.length === 0}
+            onClick={() => setExportModalOpen(true)}
+            disabled={bulkDownloading || activeGuests.length === 0}
             size="sm"
+            className="shadow-sm"
           >
-            {exportWithName ? 'Gerar Todos PDFs' : 'Gerar Todos (Sem Nome)'}
+            {bulkDownloading && bulkExportProgress
+              ? `A Exportar (${bulkExportProgress.current}/${bulkExportProgress.total})...`
+              : `Exportar PDFs em Lote (${activeGuests.length})`}
           </Button>
         </div>
       </div>
@@ -623,28 +669,51 @@ export default function ConvitesPage() {
         {/* Right Side: Guest invite status & download */}
         <div className="lg:col-span-8">
           <Card className="bg-card-bg">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5 text-primary" /> Envio de Convites por Convidado
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {!exportWithName && (
-                <div className="mb-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-xs text-amber-700 dark:text-amber-300 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold shrink-0">Modo Sem Nome Ativo:</span>
-                    <span>Os PDFs serão gerados sem o nome impresso (ideal para convites com caligrafia manual).</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setExportWithName(true)}
-                    className="underline text-xs font-semibold hover:opacity-80 shrink-0 self-start sm:self-auto"
-                  >
-                    Mudar para Com Nome
-                  </button>
-                </div>
-              )}
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-border-custom">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5 text-primary" /> Envio de Convites por Convidado
+                </CardTitle>
+                <p className="text-xs text-foreground/60 mt-0.5">
+                  Marque o checkbox de cada convidado para escolher quem sai com ou sem nome no PDF.
+                </p>
+              </div>
 
+              {/* Status and quick select buttons */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="text-xs text-foreground/70 bg-secondary/30 px-3 py-1 rounded-lg border border-border-custom flex items-center gap-1.5">
+                  <span className="inline-block w-2 h-2 rounded-full bg-primary" />
+                  <span><strong>{countWithName}</strong> com nome</span>
+                  <span className="text-foreground/30">|</span>
+                  <span className="inline-block w-2 h-2 rounded-full bg-amber-500" />
+                  <span><strong>{countWithoutName}</strong> sem nome</span>
+                </div>
+
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs h-7 px-2 border-border-custom hover:bg-secondary/40"
+                    onClick={() => handleSelectAllWithName(true)}
+                    disabled={isAllWithName || activeGuests.length === 0}
+                    title="Marcar todos os convidados para sair com nome impresso"
+                  >
+                    Todos com Nome
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs h-7 px-2 border-border-custom hover:bg-secondary/40"
+                    onClick={() => handleSelectAllWithName(false)}
+                    disabled={isAllWithoutName || activeGuests.length === 0}
+                    title="Desmarcar todos os convidados para sair sem nome (caligrafia manual)"
+                  >
+                    Todos sem Nome
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-4">
               {loading ? (
                 <div className="flex h-32 items-center justify-center">
                   <Loader2 className="h-6 w-6 animate-spin text-primary" />
@@ -654,6 +723,26 @@ export default function ConvitesPage() {
                   <table className="w-full text-left border-collapse text-sm">
                     <thead>
                       <tr className="bg-secondary/30 text-foreground/70 font-semibold border-b border-border-custom text-xs">
+                        <th className="p-3 text-center w-36">
+                          <div
+                            className="flex items-center justify-center gap-1.5 cursor-pointer select-none"
+                            onClick={() => handleSelectAllWithName(!isAllWithName)}
+                            title="Alternar todos com/sem nome"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isAllWithName}
+                              ref={(el) => {
+                                if (el) {
+                                  el.indeterminate = countWithName > 0 && countWithName < activeGuests.length;
+                                }
+                              }}
+                              onChange={(e) => handleSelectAllWithName(e.target.checked)}
+                              className="rounded border-border-custom text-primary focus:ring-primary h-3.5 w-3.5 cursor-pointer"
+                            />
+                            <span>Nome no PDF</span>
+                          </div>
+                        </th>
                         <th className="p-3">Convidado</th>
                         <th className="p-3">Mesa</th>
                         <th className="p-3">Acompanhantes</th>
@@ -662,53 +751,83 @@ export default function ConvitesPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y border-border-custom">
-                      {guests.map((guest) => (
-                        <tr key={guest.id} className="hover:bg-secondary/15 transition-colors">
-                          <td className="p-3 font-medium">{guest.name}</td>
-                          <td className="p-3 text-foreground/75">{getTableName(guest.table_id)}</td>
-                          <td className="p-3 text-center">{guest.companions}</td>
-                          <td className="p-3">
-                            {guest.invitation_sent ? (
-                              <Badge variant="success" className="gap-1">
-                                <CheckCircle className="h-3 w-3" /> Enviado
-                              </Badge>
-                            ) : (
-                              <Badge variant="warning" className="gap-1">
-                                <Clock className="h-3 w-3" /> Pendente
-                              </Badge>
-                            )}
-                          </td>
-                          <td className="p-3 text-center">
-                            <div className="flex items-center justify-center gap-2">
-                              <Button
-                                variant="secondary"
-                                size="sm"
-                                leftIcon={
-                                  downloadingId === guest.id ? (
-                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                  ) : (
-                                    <Download className="h-3.5 w-3.5" />
-                                  )
-                                }
-                                onClick={() => handleDownloadPDF(guest)}
-                                disabled={downloadingId !== null || guest.status === 'Declined'}
-                                title={exportWithName ? 'Baixar PDF com nome do convidado' : 'Baixar PDF sem nome do convidado'}
-                              >
-                                {exportWithName ? 'Baixar PDF' : 'Baixar (Sem Nome)'}
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                leftIcon={<Send className="h-3.5 w-3.5" />}
-                                onClick={() => handleOpenSendModal(guest)}
-                                disabled={guest.status === 'Declined'}
-                              >
-                                Enviar
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
+                      {guests.map((guest) => {
+                        const withName = isGuestNameEnabled(guest.id);
+                        return (
+                          <tr key={guest.id} className="hover:bg-secondary/15 transition-colors">
+                            <td className="p-3 text-center">
+                              <label className="inline-flex items-center gap-2 cursor-pointer select-none">
+                                <input
+                                  type="checkbox"
+                                  checked={withName}
+                                  onChange={() => toggleGuestNameOption(guest.id)}
+                                  disabled={guest.status === 'Declined'}
+                                  className="rounded border-border-custom text-primary focus:ring-primary h-4 w-4 cursor-pointer"
+                                />
+                                <span
+                                  className={`text-[11px] font-semibold px-2 py-0.5 rounded-md transition-colors ${
+                                    withName
+                                      ? 'bg-primary/15 text-primary border border-primary/25'
+                                      : 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/25'
+                                  }`}
+                                >
+                                  {withName ? 'Com Nome' : 'Sem Nome'}
+                                </span>
+                              </label>
+                            </td>
+                            <td className="p-3 font-medium">
+                              <div>
+                                <span>{guest.name}</span>
+                                {guest.status === 'Declined' && (
+                                  <span className="text-[10px] text-error block">Recusado</span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="p-3 text-foreground/75">{getTableName(guest.table_id)}</td>
+                            <td className="p-3 text-center">{guest.companions}</td>
+                            <td className="p-3">
+                              {guest.invitation_sent ? (
+                                <Badge variant="success" className="gap-1">
+                                  <CheckCircle className="h-3 w-3" /> Enviado
+                                </Badge>
+                              ) : (
+                                <Badge variant="warning" className="gap-1">
+                                  <Clock className="h-3 w-3" /> Pendente
+                                </Badge>
+                              )}
+                            </td>
+                            <td className="p-3 text-center">
+                              <div className="flex items-center justify-center gap-2">
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  leftIcon={
+                                    downloadingId === guest.id ? (
+                                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                    ) : (
+                                      <Download className="h-3.5 w-3.5" />
+                                    )
+                                  }
+                                  onClick={() => handleDownloadPDF(guest, withName)}
+                                  disabled={downloadingId !== null || guest.status === 'Declined'}
+                                  title={withName ? 'Baixar PDF personalizado com nome do convidado' : 'Baixar PDF sem nome do convidado'}
+                                >
+                                  {withName ? 'Baixar PDF' : 'Baixar (Sem Nome)'}
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  leftIcon={<Send className="h-3.5 w-3.5" />}
+                                  onClick={() => handleOpenSendModal(guest)}
+                                  disabled={guest.status === 'Declined'}
+                                >
+                                  Enviar
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -1034,6 +1153,172 @@ export default function ConvitesPage() {
           <Button variant="outline" onClick={() => setPreviewOpen(false)}>
             Fechar Preview
           </Button>
+        </div>
+      </Dialog>
+
+      {/* BULK PDF EXPORT MODAL */}
+      <Dialog
+        isOpen={exportModalOpen}
+        onClose={() => !bulkDownloading && setExportModalOpen(false)}
+        title="Exportar Convites em PDF"
+        size="lg"
+      >
+        <div className="space-y-5">
+          {/* Status summary */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="p-3 rounded-xl bg-secondary/20 border border-border-custom text-center">
+              <p className="text-xs text-foreground/60 font-medium">Total de Convidados</p>
+              <p className="text-xl font-bold text-foreground mt-0.5">{activeGuests.length}</p>
+            </div>
+            <div className="p-3 rounded-xl bg-primary/10 border border-primary/20 text-center">
+              <p className="text-xs text-primary font-medium">Marcados Com Nome</p>
+              <p className="text-xl font-bold text-primary mt-0.5">{countWithName}</p>
+            </div>
+            <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-center">
+              <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">Marcados Sem Nome</p>
+              <p className="text-xl font-bold text-amber-600 dark:text-amber-400 mt-0.5">{countWithoutName}</p>
+            </div>
+          </div>
+
+          {bulkDownloading && bulkExportProgress && (
+            <div className="p-4 rounded-xl bg-primary/10 border border-primary/30 space-y-2">
+              <div className="flex items-center justify-between text-xs font-semibold text-primary">
+                <span className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  A exportar convites...
+                </span>
+                <span>{bulkExportProgress.current} de {bulkExportProgress.total} ({Math.round((bulkExportProgress.current / bulkExportProgress.total) * 100)}%)</span>
+              </div>
+              <div className="w-full bg-secondary/40 rounded-full h-2 overflow-hidden">
+                <div
+                  className="bg-primary h-full transition-all duration-300 rounded-full"
+                  style={{ width: `${(bulkExportProgress.current / bulkExportProgress.total) * 100}%` }}
+                />
+              </div>
+              <p className="text-[11px] text-foreground/60 italic text-center">
+                A transferir os PDFs sequencialmente para o seu dispositivo. Por favor, aguarde.
+              </p>
+            </div>
+          )}
+
+          {!bulkDownloading && (
+            <div className="space-y-4">
+              <div>
+                <p className="text-xs font-semibold text-foreground/75 uppercase tracking-wider mb-2">
+                  1. Exportação Principal
+                </p>
+                <div className="p-3.5 rounded-xl border-2 border-primary/40 bg-primary/5 hover:bg-primary/10 transition-colors flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="space-y-0.5">
+                    <p className="font-bold text-sm text-foreground flex items-center gap-1.5">
+                      <Sparkles className="h-4 w-4 text-primary" />
+                      Exportar Todos Conforme Seleção ({activeGuests.length})
+                    </p>
+                    <p className="text-xs text-foreground/60">
+                      Gera cada convite respeitando o checkbox de cada linha ({countWithName} com nome impresso e {countWithoutName} com espaço limpo).
+                    </p>
+                  </div>
+                  <Button
+                    onClick={() => handleBulkDownloadFiltered('as_selected')}
+                    size="sm"
+                    className="shrink-0"
+                    leftIcon={<Download className="h-4 w-4" />}
+                  >
+                    Descarregar Todos ({activeGuests.length})
+                  </Button>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold text-foreground/75 uppercase tracking-wider mb-2">
+                  2. Exportar Separadamente por Grupo
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Only with name */}
+                  <div className="p-3.5 rounded-xl border border-border-custom bg-card-bg hover:border-primary/40 transition-colors flex flex-col justify-between gap-3">
+                    <div className="space-y-1">
+                      <p className="font-bold text-xs text-foreground flex items-center gap-1.5">
+                        <CheckSquare className="h-4 w-4 text-primary" />
+                        Apenas Com Nome ({countWithName})
+                      </p>
+                      <p className="text-[11px] text-foreground/60">
+                        Descarrega apenas os {countWithName} convites nominais para impressão digital direta.
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleBulkDownloadFiltered('only_with_name')}
+                      disabled={countWithName === 0}
+                      className="w-full justify-center text-xs"
+                      leftIcon={<Download className="h-3.5 w-3.5" />}
+                    >
+                      Descarregar Com Nome ({countWithName})
+                    </Button>
+                  </div>
+
+                  {/* Only without name */}
+                  <div className="p-3.5 rounded-xl border border-border-custom bg-card-bg hover:border-amber-500/40 transition-colors flex flex-col justify-between gap-3">
+                    <div className="space-y-1">
+                      <p className="font-bold text-xs text-foreground flex items-center gap-1.5">
+                        <Square className="h-4 w-4 text-amber-500" />
+                        Apenas Sem Nome ({countWithoutName})
+                      </p>
+                      <p className="text-[11px] text-foreground/60">
+                        Descarrega apenas os {countWithoutName} convites sem nome para levar ao calígrafo manual.
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleBulkDownloadFiltered('only_without_name')}
+                      disabled={countWithoutName === 0}
+                      className="w-full justify-center text-xs"
+                      leftIcon={<Download className="h-3.5 w-3.5" />}
+                    >
+                      Descarregar Sem Nome ({countWithoutName})
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold text-foreground/75 uppercase tracking-wider mb-2">
+                  3. Forçar Todos (Ignorar Seleção)
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="justify-center border border-border-custom text-xs text-foreground/75 hover:bg-secondary/30"
+                    onClick={() => handleBulkDownloadFiltered('all_with_name')}
+                    leftIcon={<Download className="h-3.5 w-3.5" />}
+                  >
+                    Forçar Todos Com Nome ({activeGuests.length})
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="justify-center border border-border-custom text-xs text-foreground/75 hover:bg-secondary/30"
+                    onClick={() => handleBulkDownloadFiltered('all_without_name')}
+                    leftIcon={<Download className="h-3.5 w-3.5" />}
+                  >
+                    Forçar Todos Sem Nome ({activeGuests.length})
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end pt-3 border-t border-border-custom">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setExportModalOpen(false)}
+              disabled={bulkDownloading}
+            >
+              Fechar
+            </Button>
+          </div>
         </div>
       </Dialog>
     </div>
