@@ -1504,17 +1504,19 @@ export default function LandingPage() {
               <ul className="space-y-2 text-xs font-semibold text-foreground/60">
                 <li className="flex items-center gap-1.5 flex-wrap">
                   <span>E-mail:</span>
-                  <a href="mailto:suporte@meuboda.co.ao" className="text-foreground/80 hover:text-primary transition-colors">suporte@meuboda.co.ao</a>
+                  <a href="mailto:suporte@meuboda.com" className="text-foreground/80 hover:text-primary transition-colors">suporte@meuboda.com</a>
                 </li>
                 <li className="flex items-center gap-1.5 flex-wrap">
                   <span>Telefone:</span>
-                  <a href="tel:+244948824600" className="text-foreground/80 hover:text-primary transition-colors">+244 948 824 600</a>
+                  <a href="tel:+244936954367" className="text-foreground/80 hover:text-primary transition-colors">+244 936 954 367</a>
                   <span className="text-foreground/30">|</span>
-                  <a href="tel:+244938669825" className="text-foreground/80 hover:text-primary transition-colors">+244 938 669 825</a>
+                  <a href="tel:+244936952391" className="text-foreground/80 hover:text-primary transition-colors">+244 936 952 391</a>
                 </li>
-                <li className="flex items-center gap-1.5">
+                <li className="flex items-center gap-1.5 flex-wrap">
                   <span>WhatsApp:</span>
-                  <a href="https://wa.me/244948824600" target="_blank" className="text-foreground/80 hover:text-primary transition-colors">+244 948 824 600</a>
+                  <a href="https://wa.me/244936954367" target="_blank" rel="noopener noreferrer" className="text-foreground/80 hover:text-primary transition-colors">+244 936 954 367</a>
+                  <span className="text-foreground/30">|</span>
+                  <a href="https://wa.me/244936952391" target="_blank" rel="noopener noreferrer" className="text-foreground/80 hover:text-primary transition-colors">+244 936 952 391</a>
                 </li>
                 <li className="text-[10px] text-foreground/45 mt-1 block">
                   Luanda, Angola
