@@ -1512,10 +1512,8 @@ export default function LandingPage() {
                   <span className="text-foreground/30">|</span>
                   <a href="tel:+244936952391" className="text-foreground/80 hover:text-primary transition-colors">+244 936 952 391</a>
                 </li>
-                <li className="flex items-center gap-1.5 flex-wrap">
+                <li className="flex items-center gap-1.5">
                   <span>WhatsApp:</span>
-                  <a href="https://wa.me/244936954367" target="_blank" rel="noopener noreferrer" className="text-foreground/80 hover:text-primary transition-colors">+244 936 954 367</a>
-                  <span className="text-foreground/30">|</span>
                   <a href="https://wa.me/244936952391" target="_blank" rel="noopener noreferrer" className="text-foreground/80 hover:text-primary transition-colors">+244 936 952 391</a>
                 </li>
                 <li className="text-[10px] text-foreground/45 mt-1 block">
