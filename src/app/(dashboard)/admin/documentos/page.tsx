@@ -28,10 +28,40 @@ export default function DocumentosPage() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
 
-  // Modals state
+  // Modals and loading state
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [docTitle, setDocTitle] = useState('');
   const [fileToUpload, setFileToUpload] = useState<File | null>(null);
+  const [openingDocId, setOpeningDocId] = useState<string | null>(null);
+  const [downloadingDocId, setDownloadingDocId] = useState<string | null>(null);
+
+  const extractStoragePath = (fileUrl: string): string => {
+    if (!fileUrl) return '';
+    if (!fileUrl.startsWith('http://') && !fileUrl.startsWith('https://')) {
+      let clean = fileUrl.replace(/^\/+/, '');
+      if (clean.startsWith('documents/')) {
+        clean = clean.substring('documents/'.length);
+      }
+      return clean;
+    }
+    try {
+      const url = new URL(fileUrl);
+      const match = url.pathname.match(/\/documents\/(.+)$/);
+      if (match && match[1]) {
+        return decodeURIComponent(match[1]);
+      }
+      const parts = url.pathname.split('/documents/');
+      if (parts.length > 1) {
+        return decodeURIComponent(parts.slice(1).join('/documents/'));
+      }
+    } catch {
+      const parts = fileUrl.split('/documents/');
+      if (parts.length > 1) {
+        return decodeURIComponent(parts.slice(1).join('/documents/').split('?')[0]);
+      }
+    }
+    return fileUrl;
+  };
 
   const loadData = async () => {
     if (!currentEvent) return;
@@ -63,6 +93,74 @@ export default function DocumentosPage() {
     }
   };
 
+  const handleOpenDoc = async (doc: Document, isDownload: boolean = false) => {
+    if (isDownload) {
+      setDownloadingDocId(doc.id);
+    } else {
+      setOpeningDocId(doc.id);
+    }
+
+    try {
+      const storagePath = extractStoragePath(doc.file_url);
+      if (!storagePath) {
+        throw new Error('Caminho do documento inválido.');
+      }
+
+      const fileName = `${doc.title || 'documento'}.${(doc.file_type || 'pdf').toLowerCase()}`;
+
+      // 1. Tentar gerar Signed URL segura (expira em 1 hora)
+      const { data: signedData, error: signedError } = await supabase.storage
+        .from('documents')
+        .createSignedUrl(storagePath, 3600, isDownload ? { download: fileName } : undefined);
+
+      if (!signedError && signedData?.signedUrl) {
+        if (isDownload) {
+          const a = document.createElement('a');
+          a.href = signedData.signedUrl;
+          a.download = fileName;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+        } else {
+          window.open(signedData.signedUrl, '_blank', 'noopener,noreferrer');
+        }
+        return;
+      }
+
+      // 2. Fallback para download direto via cliente Supabase
+      const { data: blobData, error: downloadError } = await supabase.storage
+        .from('documents')
+        .download(storagePath);
+
+      if (downloadError || !blobData) {
+        throw downloadError || new Error('Não foi possível transferir o documento.');
+      }
+
+      const blobUrl = URL.createObjectURL(blobData);
+      if (isDownload) {
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+      } else {
+        window.open(blobUrl, '_blank', 'noopener,noreferrer');
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 120000);
+      }
+    } catch (err: any) {
+      console.error('Error opening/downloading document:', err);
+      alert('Não foi possível abrir o documento. Verifique se o ficheiro ainda se encontra no servidor ou se tem permissões.');
+    } finally {
+      if (isDownload) {
+        setDownloadingDocId(null);
+      } else {
+        setOpeningDocId(null);
+      }
+    }
+  };
+
   const handleUploadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentEvent || !fileToUpload || !docTitle) return;
@@ -80,7 +178,7 @@ export default function DocumentosPage() {
     setUploading(true);
     try {
       const fileExt = fileToUpload.name.split('.').pop() || '';
-      const filePath = `${currentEvent.id}/${validation.sanitizedName}`;
+      const filePath = `${currentEvent.id}/${Date.now()}_${validation.sanitizedName}`;
 
       // Upload file to Supabase Storage
       const { data, error } = await supabase.storage
@@ -92,16 +190,11 @@ export default function DocumentosPage() {
 
       if (error) throw error;
 
-      // Get file URL (signed URL or public URL - since the documents bucket is private, we will fetch its signed URL when download is clicked, or we can save its storage path. Saving its path or public URL is fine. Let's get public URL for simplicity in local setups or store path. For local dev we can grab public path or signed path. Let's get public URL).
-      const { data: { publicUrl } } = supabase.storage
-        .from('documents')
-        .getPublicUrl(data.path);
-
-      // Create document entry
+      // Create document entry storing the storage path
       await DocumentRepository.create({
         event_id: currentEvent.id,
-        title: docTitle,
-        file_url: publicUrl,
+        title: docTitle.trim(),
+        file_url: data.path,
         file_type: fileExt.toUpperCase(),
       });
 
@@ -109,21 +202,30 @@ export default function DocumentosPage() {
       setDocTitle('');
       setFileToUpload(null);
       loadData();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error uploading document:', err);
+      alert('Erro ao carregar documento: ' + (err.message || 'Falha no upload'));
     } finally {
       setUploading(false);
     }
   };
 
   const handleDeleteDoc = async (doc: Document) => {
+    if (!confirm(`Tem a certeza que deseja eliminar o documento "${doc.title}"?`)) return;
     try {
-      // 1. Delete from storage (optional but recommended. We extract filepath from URL)
-      // For simplicity, we just delete the db record first
+      const storagePath = extractStoragePath(doc.file_url);
+      if (storagePath) {
+        try {
+          await supabase.storage.from('documents').remove([storagePath]);
+        } catch (e) {
+          console.warn('Erro ao remover ficheiro do storage:', e);
+        }
+      }
       await DocumentRepository.delete(doc.id);
       loadData();
     } catch (err) {
-      console.error(err);
+      console.error('Erro ao eliminar documento:', err);
+      alert('Erro ao eliminar documento.');
     }
   };
 
@@ -181,11 +283,34 @@ export default function DocumentosPage() {
               </div>
 
               <div className="flex items-center gap-1 border-l border-border-custom pl-3">
-                <a href={doc.file_url} target="_blank" rel="noreferrer" title="Visualizar Ficheiro">
-                  <Button variant="ghost" size="sm" className="p-1.5 rounded-full hover:bg-secondary">
-                    <ExternalLink className="h-4 w-4 text-foreground/60" />
-                  </Button>
-                </a>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="p-1.5 rounded-full hover:bg-secondary text-foreground/70"
+                  onClick={() => handleOpenDoc(doc, false)}
+                  disabled={openingDocId === doc.id || downloadingDocId === doc.id}
+                  title="Visualizar Ficheiro"
+                >
+                  {openingDocId === doc.id ? (
+                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                  ) : (
+                    <ExternalLink className="h-4 w-4" />
+                  )}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="p-1.5 rounded-full hover:bg-secondary text-foreground/70"
+                  onClick={() => handleOpenDoc(doc, true)}
+                  disabled={openingDocId === doc.id || downloadingDocId === doc.id}
+                  title="Descarregar Ficheiro"
+                >
+                  {downloadingDocId === doc.id ? (
+                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                  ) : (
+                    <Download className="h-4 w-4" />
+                  )}
+                </Button>
                 <button
                   onClick={() => handleDeleteDoc(doc)}
                   className="p-1.5 rounded-full text-foreground/45 hover:bg-error/15 hover:text-error transition-colors cursor-pointer"

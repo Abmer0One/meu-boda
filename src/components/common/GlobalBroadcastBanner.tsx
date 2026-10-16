@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { SuperAdminRepository } from '@/repositories/superadmin.repository';
+import { NotificationRepository } from '@/repositories/notification.repository';
 import { SystemBroadcast } from '@/types';
 import { Megaphone, X } from 'lucide-react';
 
@@ -13,13 +14,79 @@ export default function GlobalBroadcastBanner({ className = '' }: GlobalBroadcas
   const [broadcast, setBroadcast] = useState<SystemBroadcast | null>(null);
   const [dismissed, setDismissed] = useState(false);
 
+  const getDismissedKeys = (): string[] => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const stored = localStorage.getItem('meuboda_dismissed_broadcasts');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const isBroadcastDismissed = (b: SystemBroadcast): boolean => {
+    const list = getDismissedKeys();
+    if (!list || list.length === 0) return false;
+    const bTitle = (b.title || '').trim().toLowerCase();
+    const bMsg = (b.message || '').trim().toLowerCase();
+    const sig1 = `${bTitle}:${bMsg}`;
+    const sig2 = `${bTitle}:::${bMsg}`;
+    return list.some((k) => {
+      const cleanK = (k || '').trim().toLowerCase();
+      return (
+        cleanK === b.id.toLowerCase() ||
+        cleanK === bTitle ||
+        cleanK === sig1 ||
+        cleanK === sig2
+      );
+    });
+  };
+
   useEffect(() => {
     SuperAdminRepository.getActiveBroadcasts().then((broadcasts) => {
       if (broadcasts && broadcasts.length > 0) {
-        setBroadcast(broadcasts[0]);
+        // Pick first broadcast that hasn't been dismissed by the user
+        const undismissed = broadcasts.find((b) => !isBroadcastDismissed(b));
+        if (undismissed) {
+          setBroadcast(undismissed);
+        }
       }
     });
+
+    const handleDismissedEvent = () => {
+      setDismissed(true);
+    };
+    window.addEventListener('meuboda_broadcast_dismissed', handleDismissedEvent);
+    return () => {
+      window.removeEventListener('meuboda_broadcast_dismissed', handleDismissedEvent);
+    };
   }, []);
+
+  const handleDismiss = async () => {
+    if (!broadcast) return;
+    try {
+      const list = getDismissedKeys();
+      const updated = Array.from(
+        new Set([
+          ...list,
+          broadcast.id,
+          broadcast.title,
+          `${broadcast.title}:${broadcast.message}`,
+          `${broadcast.title}:::${broadcast.message}`,
+        ])
+      );
+      localStorage.setItem('meuboda_dismissed_broadcasts', JSON.stringify(updated));
+      window.dispatchEvent(new Event('meuboda_broadcast_dismissed'));
+
+      // If broadcast corresponds to a notification row, mark as read in DB
+      if (broadcast.id && !broadcast.id.startsWith('bc-')) {
+        await NotificationRepository.markAsRead(broadcast.id);
+      }
+    } catch (e) {
+      console.warn('Error saving dismissed broadcast:', e);
+    }
+    setDismissed(true);
+  };
 
   if (!broadcast || dismissed) return null;
 
@@ -45,6 +112,7 @@ export default function GlobalBroadcastBanner({ className = '' }: GlobalBroadcas
               href={broadcast.link}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={handleDismiss}
               className="underline font-bold ml-1 hover:opacity-80 inline-flex items-center"
             >
               Saber mais &rarr;
@@ -53,7 +121,7 @@ export default function GlobalBroadcastBanner({ className = '' }: GlobalBroadcas
         </div>
       </div>
       <button
-        onClick={() => setDismissed(true)}
+        onClick={handleDismiss}
         className="p-1 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 transition-colors shrink-0 cursor-pointer"
         title="Fechar aviso"
       >

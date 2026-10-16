@@ -609,6 +609,7 @@ export const SuperAdminRepository = {
           .from('notifications')
           .select('*')
           .ilike('title', '[Aviso Geral]%')
+          .eq('read', false)
           .order('created_at', { ascending: false })
           .limit(3);
 

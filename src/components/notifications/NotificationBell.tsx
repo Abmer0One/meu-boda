@@ -107,6 +107,19 @@ export default function NotificationBell() {
     setLoading(true);
     try {
       await NotificationRepository.markAllAsRead(user.id);
+      try {
+        const raw = localStorage.getItem('meuboda_dismissed_broadcasts');
+        const list: string[] = raw ? JSON.parse(raw) : [];
+        const toAdd: string[] = [];
+        notifications.forEach((n) => {
+          if (n.id) toAdd.push(n.id);
+          if (n.title) toAdd.push(n.title);
+          if (n.title || n.message) toAdd.push(`${n.title || ''}:${n.message || ''}`);
+        });
+        const updated = Array.from(new Set([...list, ...toAdd]));
+        localStorage.setItem('meuboda_dismissed_broadcasts', JSON.stringify(updated));
+        window.dispatchEvent(new Event('meuboda_broadcast_dismissed'));
+      } catch {}
       setNotifications((prev) => (Array.isArray(prev) ? prev.map((n) => ({ ...n, read: true })) : []));
       setUnreadCount(0);
     } catch (err) {
@@ -120,6 +133,14 @@ export default function NotificationBell() {
     if (!notif) return;
     if (!notif.read) {
       await NotificationRepository.markAsRead(notif.id);
+      try {
+        const raw = localStorage.getItem('meuboda_dismissed_broadcasts');
+        const list: string[] = raw ? JSON.parse(raw) : [];
+        const toAdd = [notif.id, notif.title, `${notif.title}:${notif.message}`].filter(Boolean) as string[];
+        const updated = Array.from(new Set([...list, ...toAdd]));
+        localStorage.setItem('meuboda_dismissed_broadcasts', JSON.stringify(updated));
+        window.dispatchEvent(new Event('meuboda_broadcast_dismissed'));
+      } catch {}
       setNotifications((prev) =>
         Array.isArray(prev) ? prev.map((n) => (n.id === notif.id ? { ...n, read: true } : n)) : []
       );
