@@ -12,7 +12,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Dialog } from '@/components/ui/Dialog';
-import { generateQRCode } from '@/utils/qr';
+import { generateQRCode, downloadQRCodePNG } from '@/utils/qr';
 import { generateGuestPDF } from '@/utils/pdf';
 import { resolveCanvaConfig } from '@/utils/canvaConfig';
 import { getEventLabels } from '@/utils/eventHelpers';
@@ -34,6 +34,13 @@ import {
   Sparkles,
   CheckSquare,
   Square,
+  QrCode,
+  Copy,
+  Check,
+  ExternalLink,
+  MapPin,
+  Camera,
+  Globe,
 } from 'lucide-react';
 
 export default function ConvitesPage() {
@@ -51,6 +58,74 @@ export default function ConvitesPage() {
   const [guestNameOptions, setGuestNameOptions] = useState<Record<string, boolean>>({});
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [bulkExportProgress, setBulkExportProgress] = useState<{ current: number; total: number } | null>(null);
+
+  // Tabs & Event QR codes state
+  const [activeTab, setActiveTab] = useState<'invitations' | 'qrcodes'>('invitations');
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [downloadingQrKey, setDownloadingQrKey] = useState<string | null>(null);
+  const [eventQrs, setEventQrs] = useState<{
+    gallery: string;
+    location: string;
+    portal: string;
+  }>({ gallery: '', location: '', portal: '' });
+
+  const appOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://www.meuboda.com';
+  const galleryUrl = currentEvent ? `${appOrigin}/galeria-live/${currentEvent.slug}` : '';
+  const mapsDestination = currentEvent?.party_maps_url || currentEvent?.ceremony_maps_url;
+  const locationName = currentEvent?.party_location || currentEvent?.ceremony_location;
+  const locationUrl = mapsDestination && (mapsDestination.startsWith('http://') || mapsDestination.startsWith('https://'))
+    ? mapsDestination
+    : locationName
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationName)}`
+    : '';
+  const portalUrl = currentEvent ? `${appOrigin}/portaria/${currentEvent.slug}` : '';
+
+  useEffect(() => {
+    if (!currentEvent) return;
+    let isMounted = true;
+    const loadEventQrs = async () => {
+      try {
+        const [gQr, lQr, pQr] = await Promise.all([
+          galleryUrl ? generateQRCode(galleryUrl, { width: 500, margin: 2 }) : Promise.resolve(''),
+          locationUrl ? generateQRCode(locationUrl, { width: 500, margin: 2 }) : Promise.resolve(''),
+          portalUrl ? generateQRCode(portalUrl, { width: 500, margin: 2 }) : Promise.resolve(''),
+        ]);
+        if (isMounted) {
+          setEventQrs({ gallery: gQr, location: lQr, portal: pQr });
+        }
+      } catch (err) {
+        console.error('Error generating event QR codes preview:', err);
+      }
+    };
+    loadEventQrs();
+    return () => {
+      isMounted = false;
+    };
+  }, [currentEvent?.id, currentEvent?.slug, currentEvent?.party_maps_url, currentEvent?.ceremony_maps_url, currentEvent?.party_location, currentEvent?.ceremony_location, galleryUrl, locationUrl, portalUrl]);
+
+  const handleCopyLink = async (text: string, key: string) => {
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedKey(key);
+      setTimeout(() => setCopiedKey(null), 2500);
+    } catch {
+      alert('Link: ' + text);
+    }
+  };
+
+  const handleDownloadEventQr = async (url: string, filename: string, key: string) => {
+    if (!url) return;
+    setDownloadingQrKey(key);
+    try {
+      await downloadQRCodePNG(url, filename, { width: 1024, margin: 3 });
+    } catch (err) {
+      console.error('Error downloading event QR:', err);
+      alert('Erro ao descarregar o QR Code.');
+    } finally {
+      setDownloadingQrKey(null);
+    }
+  };
 
   const canvaConfig = currentEvent ? resolveCanvaConfig(currentEvent.id, currentEvent.template_config, infoBlocks, null) : null;
   const isSinglePage = canvaConfig?.pdf_mode === 'single_page';
@@ -521,36 +596,86 @@ export default function ConvitesPage() {
             <MailOpen className="h-6 w-6 text-primary" /> Convites & QR Codes
           </h1>
           <p className="text-sm text-foreground/60">
-            Carregue o design do seu convite Canva, associe aos convidados e gere as folhas complementares com QR Code.
+            {activeTab === 'invitations'
+              ? 'Carregue o design do seu convite Canva, associe aos convidados e gere as folhas complementares com QR Code.'
+              : 'Gere e descarregue os QR Codes oficiais do evento em alta resolução (PNG) para confecção de placas de mesa, sinalética e impressos.'}
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
-          <Button
-            variant="outline"
-            leftIcon={<Send className="h-4 w-4" />}
-            onClick={handleOpenBulkModal}
-            disabled={guests.length === 0}
-            size="sm"
-          >
-            Enviar Convites (Massa)
-          </Button>
+        {activeTab === 'invitations' ? (
+          <div className="flex flex-wrap items-center gap-2.5">
+            <Button
+              variant="outline"
+              leftIcon={<Send className="h-4 w-4" />}
+              onClick={handleOpenBulkModal}
+              disabled={guests.length === 0}
+              size="sm"
+            >
+              Enviar Convites (Massa)
+            </Button>
 
-          <Button
-            leftIcon={bulkDownloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-            onClick={() => setExportModalOpen(true)}
-            disabled={bulkDownloading || activeGuests.length === 0}
-            size="sm"
-            className="shadow-sm"
-          >
-            {bulkDownloading && bulkExportProgress
-              ? `A Exportar (${bulkExportProgress.current}/${bulkExportProgress.total})...`
-              : `Exportar PDFs em Lote (${activeGuests.length})`}
-          </Button>
-        </div>
+            <Button
+              leftIcon={bulkDownloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+              onClick={() => setExportModalOpen(true)}
+              disabled={bulkDownloading || activeGuests.length === 0}
+              size="sm"
+              className="shadow-sm"
+            >
+              {bulkDownloading && bulkExportProgress
+                ? `A Exportar (${bulkExportProgress.current}/${bulkExportProgress.total})...`
+                : `Exportar PDFs em Lote (${activeGuests.length})`}
+            </Button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              leftIcon={<Camera className="h-4 w-4 text-primary" />}
+              onClick={() => handleDownloadEventQr(galleryUrl, `qrcode_galeria_live_${currentEvent.slug}`, 'gallery')}
+              disabled={!galleryUrl || downloadingQrKey === 'gallery'}
+            >
+              Baixar QR Galeria (PNG)
+            </Button>
+          </div>
+        )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      {/* Tab Navigation */}
+      <div className="flex items-center gap-2 border-b border-border-custom pb-0">
+        <button
+          onClick={() => setActiveTab('invitations')}
+          className={`flex items-center gap-2 px-5 py-3 text-sm font-bold rounded-t-xl transition-all border-b-2 cursor-pointer ${
+            activeTab === 'invitations'
+              ? 'border-primary text-primary bg-primary/10 shadow-sm'
+              : 'border-transparent text-foreground/60 hover:text-foreground hover:bg-secondary/40'
+          }`}
+        >
+          <MailOpen className="h-4 w-4" />
+          <span>Convites por Convidado</span>
+          <span className="ml-1 text-xs px-2 py-0.5 rounded-full bg-secondary/80 text-foreground/70 font-semibold">
+            {guests.length}
+          </span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('qrcodes')}
+          className={`flex items-center gap-2 px-5 py-3 text-sm font-bold rounded-t-xl transition-all border-b-2 cursor-pointer ${
+            activeTab === 'qrcodes'
+              ? 'border-primary text-primary bg-primary/10 shadow-sm'
+              : 'border-transparent text-foreground/60 hover:text-foreground hover:bg-secondary/40'
+          }`}
+        >
+          <QrCode className="h-4 w-4" />
+          <span>QR Codes do Evento (Displays & Mesas)</span>
+          <span className="ml-1 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary/20 text-primary font-bold">
+            Novo
+          </span>
+        </button>
+      </div>
+
+      {activeTab === 'invitations' ? (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Side: Canva Template Upload */}
         <div className="lg:col-span-4 space-y-4">
           <Card className="bg-card-bg">
@@ -840,6 +965,312 @@ export default function ConvitesPage() {
           </Card>
         </div>
       </div>
+      ) : (
+        /* Event QR Codes Tab */
+        <div className="space-y-6 animate-in fade-in duration-200">
+          {/* Header Info Banner */}
+          <div className="p-4 sm:p-5 rounded-2xl bg-secondary/30 border border-border-custom flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
+                <QrCode className="h-4 w-4 text-primary" /> Hub Oficial de QR Codes para Produção Gráfica
+              </h2>
+              <p className="text-xs text-foreground/65 max-w-3xl leading-relaxed">
+                Descarregue os QR Codes oficiais do evento em alta resolução (PNG de 1024x1024px a 300 DPI) para enviar ao seu designer gráfico ou gráfica. Perfeitos para displays de acrílico das mesas, menus, sinalética do salão e envelopes.
+              </p>
+            </div>
+            <div className="shrink-0 flex items-center gap-2 text-xs font-semibold text-primary bg-primary/10 border border-primary/25 px-3 py-1.5 rounded-xl">
+              <CheckCircle className="h-4 w-4" />
+              <span>Alta Resolução (1024px)</span>
+            </div>
+          </div>
+
+          {/* Cards Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* Card 1: Galeria Live */}
+            <Card className="bg-card-bg flex flex-col justify-between" hoverEffect>
+              <CardHeader className="pb-3 border-b border-border-custom">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 rounded-xl bg-primary/10 text-primary">
+                      <Camera className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-base">Galeria Live (Fotos das Mesas)</CardTitle>
+                      <p className="text-[11px] text-foreground/50">Upload instantâneo pelos convidados</p>
+                    </div>
+                  </div>
+                  <Badge variant="success" className="text-[10px] px-2 py-0.5">
+                    Mesas
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-4 space-y-4 flex-1 flex flex-col justify-between">
+                <div className="space-y-3">
+                  <div className="bg-white p-4 rounded-2xl border border-border-custom flex items-center justify-center shadow-inner mx-auto max-w-[220px]">
+                    {eventQrs.gallery ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={eventQrs.gallery}
+                        alt="QR Code Galeria Live"
+                        className="w-48 h-48 object-contain"
+                      />
+                    ) : (
+                      <div className="w-48 h-48 flex items-center justify-center">
+                        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                      </div>
+                    )}
+                  </div>
+
+                  <p className="text-xs text-foreground/70 leading-relaxed text-center px-1">
+                    Coloque nos displays acrílicos das mesas ou totens. Os convidados apontam a câmara e enviam fotos e vídeos em tempo real para a projeção e para o álbum do casamento.
+                  </p>
+
+                  <div className="bg-secondary/40 p-2.5 rounded-xl border border-border-custom flex items-center justify-between gap-2 text-xs font-mono">
+                    <span className="truncate text-foreground/70 text-[11px]" title={galleryUrl}>
+                      {galleryUrl}
+                    </span>
+                    <button
+                      onClick={() => handleCopyLink(galleryUrl, 'gallery')}
+                      className="p-1.5 rounded-lg hover:bg-secondary text-foreground/70 hover:text-foreground shrink-0 transition-colors cursor-pointer"
+                      title="Copiar Link"
+                    >
+                      {copiedKey === 'gallery' ? (
+                        <Check className="h-4 w-4 text-emerald-500" />
+                      ) : (
+                        <Copy className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-2 pt-2 border-t border-border-custom">
+                  <Button
+                    className="w-full justify-center shadow-sm"
+                    leftIcon={downloadingQrKey === 'gallery' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                    onClick={() => handleDownloadEventQr(galleryUrl, `qrcode_galeria_live_${currentEvent.slug}`, 'gallery')}
+                    disabled={!galleryUrl || downloadingQrKey === 'gallery'}
+                  >
+                    Descarregar PNG (1024px)
+                  </Button>
+                  <a
+                    href={galleryUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[11px] font-semibold text-primary hover:underline flex items-center justify-center gap-1 py-1"
+                  >
+                    <span>Testar no navegador</span>
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Card 2: Localização & GPS */}
+            <Card className="bg-card-bg flex flex-col justify-between" hoverEffect>
+              <CardHeader className="pb-3 border-b border-border-custom">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                      <MapPin className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-base">Localização (GPS / Google Maps)</CardTitle>
+                      <p className="text-[11px] text-foreground/50">Rota direta para a cerimónia/festa</p>
+                    </div>
+                  </div>
+                  <Badge variant="warning" className="text-[10px] px-2 py-0.5">
+                    Envelopes
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-4 space-y-4 flex-1 flex flex-col justify-between">
+                <div className="space-y-3">
+                  <div className="bg-white p-4 rounded-2xl border border-border-custom flex items-center justify-center shadow-inner mx-auto max-w-[220px]">
+                    {eventQrs.location ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={eventQrs.location}
+                        alt="QR Code Localização GPS"
+                        className="w-48 h-48 object-contain"
+                      />
+                    ) : (
+                      <div className="w-48 h-48 flex items-center justify-center">
+                        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                      </div>
+                    )}
+                  </div>
+
+                  <p className="text-xs text-foreground/70 leading-relaxed text-center px-1">
+                    Perfeito para imprimir no verso do envelope do convite, no cartão de Save-the-Date ou em placas de orientação na estrada e entrada do local.
+                  </p>
+
+                  <div className="bg-secondary/40 p-2.5 rounded-xl border border-border-custom flex items-center justify-between gap-2 text-xs font-mono">
+                    <span className="truncate text-foreground/70 text-[11px]" title={locationUrl || 'Sem localização configurada'}>
+                      {locationUrl || 'Definir link em "O Evento"'}
+                    </span>
+                    {locationUrl && (
+                      <button
+                        onClick={() => handleCopyLink(locationUrl, 'location')}
+                        className="p-1.5 rounded-lg hover:bg-secondary text-foreground/70 hover:text-foreground shrink-0 transition-colors cursor-pointer"
+                        title="Copiar Link"
+                      >
+                        {copiedKey === 'location' ? (
+                          <Check className="h-4 w-4 text-emerald-500" />
+                        ) : (
+                          <Copy className="h-4 w-4" />
+                        )}
+                      </button>
+                    )}
+                  </div>
+
+                  {!currentEvent.party_maps_url && !currentEvent.ceremony_maps_url && (
+                    <p className="text-[11px] text-amber-600 dark:text-amber-400 bg-amber-500/10 p-2 rounded-lg border border-amber-500/20">
+                      💡 <strong>Dica:</strong> Para maior precisão, pode colar o link exato do Google Maps na secção <em>O Evento</em>.
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2 pt-2 border-t border-border-custom">
+                  <Button
+                    className="w-full justify-center shadow-sm"
+                    leftIcon={downloadingQrKey === 'location' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                    onClick={() => handleDownloadEventQr(locationUrl, `qrcode_localizacao_${currentEvent.slug}`, 'location')}
+                    disabled={!locationUrl || downloadingQrKey === 'location'}
+                  >
+                    Descarregar PNG (1024px)
+                  </Button>
+                  {locationUrl && (
+                    <a
+                      href={locationUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] font-semibold text-primary hover:underline flex items-center justify-center gap-1 py-1"
+                    >
+                      <span>Abrir no Google Maps</span>
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Card 3: Portal Geral do Evento */}
+            <Card className="bg-card-bg flex flex-col justify-between" hoverEffect>
+              <CardHeader className="pb-3 border-b border-border-custom">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 rounded-xl bg-blue-500/10 text-blue-500">
+                      <Globe className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-base">Portal Geral do Evento</CardTitle>
+                      <p className="text-[11px] text-foreground/50">Acesso público & cronograma</p>
+                    </div>
+                  </div>
+                  <Badge variant="default" className="text-[10px] px-2 py-0.5">
+                    Geral
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-4 space-y-4 flex-1 flex flex-col justify-between">
+                <div className="space-y-3">
+                  <div className="bg-white p-4 rounded-2xl border border-border-custom flex items-center justify-center shadow-inner mx-auto max-w-[220px]">
+                    {eventQrs.portal ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={eventQrs.portal}
+                        alt="QR Code Portal do Evento"
+                        className="w-48 h-48 object-contain"
+                      />
+                    ) : (
+                      <div className="w-48 h-48 flex items-center justify-center">
+                        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                      </div>
+                    )}
+                  </div>
+
+                  <p className="text-xs text-foreground/70 leading-relaxed text-center px-1">
+                    Link público para confirmações abertas, consulta da ordem de serviços e instruções de vestuário e cronograma pelos convidados e equipa.
+                  </p>
+
+                  <div className="bg-secondary/40 p-2.5 rounded-xl border border-border-custom flex items-center justify-between gap-2 text-xs font-mono">
+                    <span className="truncate text-foreground/70 text-[11px]" title={portalUrl}>
+                      {portalUrl}
+                    </span>
+                    <button
+                      onClick={() => handleCopyLink(portalUrl, 'portal')}
+                      className="p-1.5 rounded-lg hover:bg-secondary text-foreground/70 hover:text-foreground shrink-0 transition-colors cursor-pointer"
+                      title="Copiar Link"
+                    >
+                      {copiedKey === 'portal' ? (
+                        <Check className="h-4 w-4 text-emerald-500" />
+                      ) : (
+                        <Copy className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-2 pt-2 border-t border-border-custom">
+                  <Button
+                    className="w-full justify-center shadow-sm"
+                    leftIcon={downloadingQrKey === 'portal' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                    onClick={() => handleDownloadEventQr(portalUrl, `qrcode_portal_${currentEvent.slug}`, 'portal')}
+                    disabled={!portalUrl || downloadingQrKey === 'portal'}
+                  >
+                    Descarregar PNG (1024px)
+                  </Button>
+                  <a
+                    href={portalUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[11px] font-semibold text-primary hover:underline flex items-center justify-center gap-1 py-1"
+                  >
+                    <span>Abrir Portal</span>
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Tips for Graphic Printing / Gráfica */}
+          <Card className="bg-card-bg border border-border-custom p-5">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 pb-3 border-b border-border-custom">
+              <div className="p-2 rounded-xl bg-primary/10 text-primary shrink-0">
+                <Printer className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-sm text-foreground">Guia Prático de Impressão para a Gráfica</h3>
+                <p className="text-xs text-foreground/60">Recomendações técnicas para garantir uma leitura rápida por todos os smartphones</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 text-xs">
+              <div className="p-3 rounded-xl bg-secondary/30 space-y-1">
+                <span className="font-bold text-primary block">Plaquinhas de Mesa (Galeria Live)</span>
+                <p className="text-foreground/70">
+                  Tamanho ideal: <strong>A6 (10x15cm)</strong> ou <strong>13x18cm</strong> em papel couchê 300g dentro de suporte de acrílico transparente.
+                </p>
+              </div>
+
+              <div className="p-3 rounded-xl bg-secondary/30 space-y-1">
+                <span className="font-bold text-primary block">Verso de Envelopes (GPS / Rota)</span>
+                <p className="text-foreground/70">
+                  Tamanho mínimo impresso: <strong>2.5 x 2.5cm</strong> para garantir que a câmara foque sem dificuldade a curta distância.
+                </p>
+              </div>
+
+              <div className="p-3 rounded-xl bg-secondary/30 space-y-1">
+                <span className="font-bold text-primary block">Placas de Cavalete / Entrada</span>
+                <p className="text-foreground/70">
+                  Formatos recomendados: <strong>A4 (21x29.7cm)</strong> ou <strong>A3</strong>. Os ficheiros PNG a 1024px mantêm a nitidez vetorial.
+                </p>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
 
       {/* INDIVIDUAL SEND DIALOG */}
       <Dialog

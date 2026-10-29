@@ -6,7 +6,7 @@ import { MediaRepository, EventMedia } from '@/repositories/media.repository';
 import { Event } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Camera, Loader2, Play, Heart } from 'lucide-react';
+import { Camera, Loader2, Play, Heart, Upload, X, Check } from 'lucide-react';
 import GlobalBroadcastBanner from '@/components/common/GlobalBroadcastBanner';
 
 interface LiveGalleryProps {
@@ -21,6 +21,53 @@ export default function PublicLiveGalleryPage({ params }: LiveGalleryProps) {
   const [mediaList, setMediaList] = useState<EventMedia[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
+
+  // Upload modal states
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [uploaderName, setUploaderName] = useState('');
+  const [uploaderCaption, setUploaderCaption] = useState('');
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
+
+  const handleDirectUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !event) return;
+
+    if (!uploaderName.trim()) {
+      alert('Por favor, indique o seu nome antes de enviar a foto.');
+      return;
+    }
+
+    setUploadingFile(true);
+    try {
+      const publicUrl = await MediaRepository.uploadFile(event.id, file);
+      if (!publicUrl) throw new Error('Falha no upload');
+
+      const isVideo = file.type.startsWith('video');
+      const mediaType = isVideo ? 'video' : 'image';
+
+      await MediaRepository.create({
+        event_id: event.id,
+        guest_name: uploaderName.trim(),
+        media_url: publicUrl,
+        media_type: mediaType,
+        caption: uploaderCaption.trim() || null,
+        status: 'approved',
+      });
+
+      setUploaderCaption('');
+      setUploadSuccess(true);
+      setTimeout(() => {
+        setUploadSuccess(false);
+        setUploadModalOpen(false);
+      }, 2000);
+    } catch (err: any) {
+      console.error(err);
+      alert('Erro ao enviar ficheiro: ' + (err.message || 'Falha no envio'));
+    } finally {
+      setUploadingFile(false);
+    }
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -163,9 +210,20 @@ export default function PublicLiveGalleryPage({ params }: LiveGalleryProps) {
           <h1 className="text-xl md:text-2xl font-serif font-black tracking-tight text-white mt-1">{event.title}</h1>
         </div>
 
-        {/* Counter of approved images */}
-        <div className="text-right text-xs font-bold text-[#f3e0aa] bg-[#d4af37]/15 border border-[#d4af37]/30 px-3.5 py-1.5 rounded-full shadow-sm">
-          <span>{mediaList.length} momentos partilhados</span>
+        {/* Actions & Counter */}
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => setUploadModalOpen(true)}
+            className="flex items-center gap-2 px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-full bg-gradient-to-r from-[#b89742] via-[#d4af37] to-[#f3e0aa] text-[#09090c] font-black text-xs uppercase tracking-wider shadow-lg hover:brightness-110 active:scale-95 transition-all cursor-pointer"
+          >
+            <Camera className="h-4 w-4" />
+            <span className="hidden sm:inline">Enviar Foto / Vídeo</span>
+            <span className="sm:hidden">Enviar</span>
+          </button>
+
+          <div className="text-right text-xs font-bold text-[#f3e0aa] bg-[#d4af37]/15 border border-[#d4af37]/30 px-3.5 py-1.5 rounded-full shadow-sm">
+            <span>{mediaList.length} momentos partilhados</span>
+          </div>
         </div>
       </header>
 
@@ -245,9 +303,94 @@ export default function PublicLiveGalleryPage({ params }: LiveGalleryProps) {
         </div>
         <div className="mt-2 sm:mt-0 font-bold bg-[#d4af37]/15 py-1.5 px-4 rounded-full border border-[#d4af37]/30 flex items-center gap-2 text-[#f3e0aa]">
           <span className="h-2 w-2 rounded-full bg-[#d4af37] animate-pulse" />
-          <span>Envie as suas fotos em tempo real através do link do seu convite</span>
+          <span>Envie as suas fotos através da câmara ou do botão &quot;Enviar Foto&quot;</span>
         </div>
       </footer>
+
+      {/* Floating Button for Mobile */}
+      <div className="fixed bottom-6 right-6 z-30 sm:hidden">
+        <button
+          onClick={() => setUploadModalOpen(true)}
+          className="flex items-center gap-2 px-5 py-3 rounded-full bg-gradient-to-r from-[#b89742] via-[#d4af37] to-[#f3e0aa] text-[#09090c] font-black text-xs uppercase tracking-wider shadow-2xl hover:brightness-110 active:scale-95 transition-all cursor-pointer border border-[#d4af37]/50"
+        >
+          <Camera className="h-4 w-4" />
+          <span>Tirar Foto</span>
+        </button>
+      </div>
+
+      {/* Upload Modal Dialog */}
+      {uploadModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-[#0e0e13] border-2 border-[#d4af37]/40 rounded-3xl p-6 text-white shadow-2xl relative space-y-4">
+            <div className="flex items-center justify-between border-b border-[#d4af37]/20 pb-3">
+              <h3 className="font-cinzel text-lg font-bold text-[#f3e0aa] flex items-center gap-2">
+                <Camera className="h-5 w-5 text-[#d4af37]" /> Enviar para o Telão
+              </h3>
+              <button
+                onClick={() => setUploadModalOpen(false)}
+                className="p-1 rounded-lg text-white/50 hover:text-white hover:bg-white/10 cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {uploadSuccess ? (
+              <div className="py-8 text-center space-y-2">
+                <Check className="h-12 w-12 text-emerald-400 mx-auto" />
+                <h4 className="text-base font-bold text-white">Foto enviada com sucesso!</h4>
+                <p className="text-xs text-white/70">A sua foto já está na fila de projeção do casamento.</p>
+              </div>
+            ) : (
+              <div className="space-y-4 text-xs">
+                <div className="space-y-1.5">
+                  <label className="font-semibold text-white/80">O seu nome / Família <span className="text-[#f3e0aa]">*</span></label>
+                  <input
+                    type="text"
+                    placeholder="Ex: Tio João, Família Silva..."
+                    value={uploaderName}
+                    onChange={(e) => setUploaderName(e.target.value)}
+                    className="w-full rounded-xl border border-[#d4af37]/35 bg-[#14141a] px-3.5 py-2.5 text-white placeholder:text-white/30 focus:border-[#f3e0aa] focus:outline-none"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="font-semibold text-white/80">Mensagem ou Legenda (opcional)</label>
+                  <input
+                    type="text"
+                    placeholder="Ex: Que sejam muito felizes!"
+                    value={uploaderCaption}
+                    onChange={(e) => setUploaderCaption(e.target.value)}
+                    className="w-full rounded-xl border border-[#d4af37]/35 bg-[#14141a] px-3.5 py-2.5 text-white placeholder:text-white/30 focus:border-[#f3e0aa] focus:outline-none"
+                  />
+                </div>
+
+                <div className="pt-2">
+                  <label className="w-full flex items-center justify-center gap-2 px-6 py-3.5 bg-gradient-to-r from-[#b89742] via-[#d4af37] to-[#f3e0aa] text-[#09090c] rounded-xl font-black text-xs uppercase tracking-wider cursor-pointer hover:brightness-110 active:scale-95 transition-all shadow-[0_4px_20px_rgba(212,175,55,0.3)]">
+                    {uploadingFile ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin text-[#09090c]" />
+                        <span>A enviar ficheiro...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-4 w-4 text-[#09090c]" />
+                        <span>Escolher ou Tirar Foto</span>
+                      </>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/*,video/*"
+                      className="hidden"
+                      disabled={uploadingFile}
+                      onChange={handleDirectUpload}
+                    />
+                  </label>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

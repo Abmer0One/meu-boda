@@ -17,13 +17,31 @@ import {
   RefreshCw,
   Eye,
   Calendar,
+  QrCode,
+  Download,
 } from 'lucide-react';
+import { downloadQRCodePNG } from '@/utils/qr';
 
 export default function AdminGaleriaPage() {
   const { currentEvent } = useEvent();
   const [mediaList, setMediaList] = useState<EventMedia[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
+  const [downloadingQr, setDownloadingQr] = useState(false);
+
+  const handleDownloadTableQr = async () => {
+    if (!currentEvent) return;
+    setDownloadingQr(true);
+    try {
+      const origin = typeof window !== 'undefined' ? window.location.origin : 'https://www.meuboda.com';
+      const galleryUrl = `${origin}/galeria-live/${currentEvent.slug}`;
+      await downloadQRCodePNG(galleryUrl, `qrcode_galeria_live_${currentEvent.slug}`, { width: 1024, margin: 3 });
+    } catch (err) {
+      console.error('Error downloading table QR code:', err);
+    } finally {
+      setDownloadingQr(false);
+    }
+  };
 
   const loadData = async () => {
     if (!currentEvent) return;
@@ -100,7 +118,18 @@ export default function AdminGaleriaPage() {
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            leftIcon={downloadingQr ? <Loader2 className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4 text-primary" />}
+            onClick={handleDownloadTableQr}
+            disabled={downloadingQr || !currentEvent}
+            size="sm"
+            title="Descarregar o QR Code da galeria em alta resolução para colocar nas mesas"
+          >
+            Baixar QR das Mesas (PNG)
+          </Button>
+
           <Button
             variant="outline"
             leftIcon={<RefreshCw className="h-4 w-4" />}
