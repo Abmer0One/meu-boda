@@ -5,6 +5,7 @@ import { useEvent } from '@/contexts/EventContext';
 import { supabase } from '@/lib/supabase';
 import { GuestRepository } from '@/repositories/guest.repository';
 import { TableRepository } from '@/repositories/table.repository';
+import { cleanGuestNotesForDisplay } from '@/repositories/checkin.repository';
 import { Guest, Table } from '@/types';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -148,13 +149,18 @@ export default function ConvidadosPage() {
         if (s === 'declined' || s === 'recusado' || s === 'recusada' || s === 'não' || s === 'no') return 'Declined';
         return 'Pending';
       })() as 'Pending' | 'Confirmed' | 'Declined',
-      notes: guest.notes || '',
+      notes: cleanGuestNotesForDisplay(guest.notes),
     });
     setGuestModalOpen(true);
   };
 
   const handleFormSubmit = async (data: any) => {
     if (!currentEvent) return;
+
+    const checkinTag = editingGuest?.notes?.match(/\[CHECKIN:.*?\]/)?.[0];
+    const combinedNotes = data.notes
+      ? (checkinTag ? `${data.notes.trim()}\n${checkinTag}` : data.notes.trim())
+      : (checkinTag || null);
 
     const guestPayload = {
       event_id: currentEvent.id,
@@ -165,7 +171,7 @@ export default function ConvidadosPage() {
       companions: Number(data.companions),
       table_id: data.table_id || null,
       status: data.status,
-      notes: data.notes || null,
+      notes: combinedNotes,
       invitation_sent: editingGuest ? editingGuest.invitation_sent : false,
     };
 

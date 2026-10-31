@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useRef, use, Suspense } from 'react';
 import { PortariaRepository } from '@/repositories/portaria.repository';
 import { EventRepository } from '@/repositories/event.repository';
+import { GuestRepository } from '@/repositories/guest.repository';
 import { TableRepository } from '@/repositories/table.repository';
 import { Event, Guest, CheckIn, PortariaConfig, Table } from '@/types';
 import confetti from 'canvas-confetti';
@@ -47,30 +48,72 @@ const playFeedbackSound = (type: 'success' | 'warning' | 'error') => {
       osc.type = 'sine';
       osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
       osc.frequency.setValueAtTime(880, ctx.currentTime + 0.1); // A5
-      gain.gain.setValueAtTime(0.25, ctx.currentTime);
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.4);
+    } else {
+      // Clear, unmistakable error buzz for invalid / already used QR code
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(220, ctx.currentTime); // A3
+      gain.gain.setValueAtTime(0.35, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
       osc.start(ctx.currentTime);
       osc.stop(ctx.currentTime + 0.35);
-    } else if (type === 'warning') {
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(440, ctx.currentTime); // A4
-      osc.frequency.setValueAtTime(349.23, ctx.currentTime + 0.15); // F4
-      gain.gain.setValueAtTime(0.3, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45);
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.45);
-    } else {
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(220, ctx.currentTime); // A3
-      gain.gain.setValueAtTime(0.3, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.3);
     }
   } catch (e) {
     // Non-fatal if browser audio policy blocks autoplay
   }
 };
+
+/**
+ * Robustly parses and extracts candidate tokens, IDs and event metadata from raw QR code input
+ * Supports: JSON format (PDF / convite screen), direct URLs (/convite/[token]#mapas), plain tokens, UUIDs
+ */
+function extractScanPayload(rawText: string): {
+  tokenCandidate?: string;
+  guestIdCandidate?: string;
+  eventIdCandidate?: string;
+} {
+  const text = (rawText || '').trim();
+  if (!text) return {};
+
+  // 1. Check for JSON inside the scanned string
+  let parsedJson: any = null;
+  if (text.includes('{') && text.includes('}')) {
+    try {
+      const firstBrace = text.indexOf('{');
+      const lastBrace = text.lastIndexOf('}');
+      if (lastBrace > firstBrace) {
+        const jsonSub = text.substring(firstBrace, lastBrace + 1);
+        parsedJson = JSON.parse(jsonSub);
+      }
+    } catch (e) {}
+  }
+
+  if (parsedJson && typeof parsedJson === 'object') {
+    return {
+      tokenCandidate: parsedJson.token || parsedJson.qr_token || parsedJson.qrToken,
+      guestIdCandidate: parsedJson.guestId || parsedJson.guest_id || parsedJson.id,
+      eventIdCandidate: parsedJson.eventId || parsedJson.event_id,
+    };
+  }
+
+  // 2. Check for URL structure like /convite/TOKEN or /convite/TOKEN#mapas
+  const urlMatch = text.match(/\/convite\/([a-zA-Z0-9_\-]+)/i);
+  if (urlMatch && urlMatch[1]) {
+    return {
+      tokenCandidate: urlMatch[1],
+      guestIdCandidate: urlMatch[1],
+    };
+  }
+
+  // 3. Fallback: treat the clean string itself as token candidate and guestId candidate
+  return {
+    tokenCandidate: text,
+    guestIdCandidate: text,
+  };
+}
 
 function PortariaContent({ slug }: { slug: string }) {
   // Auth & Event state
@@ -102,6 +145,20 @@ function PortariaContent({ slug }: { slug: string }) {
     table?: Table;
     previousCheckin?: CheckIn;
   } | null>(null);
+
+  // High-visibility green/red visual alert state
+  const [scanVisualAlert, setScanVisualAlert] = useState<'success' | 'error' | null>(null);
+  const visualAlertTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const triggerVisualAlert = (type: 'success' | 'error') => {
+    setScanVisualAlert(type);
+    if (visualAlertTimerRef.current) {
+      clearTimeout(visualAlertTimerRef.current);
+    }
+    visualAlertTimerRef.current = setTimeout(() => {
+      setScanVisualAlert(null);
+    }, 4500);
+  };
 
   // Prevent duplicate rapid processing in scanner & UI
   const isScanningBusyRef = useRef(false);
@@ -208,12 +265,13 @@ function PortariaContent({ slug }: { slug: string }) {
     // Check if already checked in in local state
     const existingCi = checkins.find((ci) => ci.guest_id === guest.id);
     if (existingCi) {
-      playFeedbackSound('warning');
+      playFeedbackSound('error');
+      triggerVisualAlert('error');
       const table = tables.find((t) => t.id === guest.table_id);
       setScanResult({
-        type: 'warning',
-        title: 'Entrada Já Registada!',
-        message: `O convidado '${guest.name}' já efetuou a entrada anteriormente.`,
+        type: 'error',
+        title: 'CÓDIGO JÁ UTILIZADO ANTERIORMENTE!',
+        message: `O convite de '${guest.name}' já foi validado para dar entrada no evento.`,
         guest,
         table,
         previousCheckin: existingCi,
@@ -231,40 +289,43 @@ function PortariaContent({ slug }: { slug: string }) {
       const newCi = await PortariaRepository.performCheckin(guest.id, activeOperator, {
         guestName: guest.name,
         companions: guest.companions,
-        eventId: event?.id,
-        eventTitle: event?.title,
+        eventId: event.id,
+        eventTitle: event.title,
       });
+
       if (newCi) {
-        // Optimistically add to local checkins state so subsequent scans know immediately
-        setCheckins((prev) => [newCi, ...prev]);
+        // Optimistically add to local checkins state so "Presentes" count increments IMMEDIATELY!
+        setCheckins((prev) => [newCi, ...prev.filter((c) => c.guest_id !== guest.id)]);
 
         playFeedbackSound('success');
+        triggerVisualAlert('success');
         confetti({
-          particleCount: 70,
-          spread: 60,
+          particleCount: 80,
+          spread: 70,
           origin: { y: 0.6 },
-          colors: ['#D4AF37', '#10B981', '#ffffff', '#E86C64'],
+          colors: ['#10B981', '#34D399', '#D4AF37', '#ffffff'],
         });
 
         const table = tables.find((t) => t.id === guest.table_id);
         setScanResult({
           type: 'success',
-          title: 'Entrada Autorizada!',
+          title: 'ENTRADA AUTORIZADA!',
           message: `Bem-vindo(a), ${guest.name}! Acesso validado com sucesso.`,
           guest,
           table,
         });
 
-        // Background sync
+        // Background sync to ensure all stations have latest data
         loadEventData(event.id);
       } else {
         // Returned null because it was already checked in (in DB or concurrent request)
-        playFeedbackSound('warning');
+        playFeedbackSound('error');
+        triggerVisualAlert('error');
         const table = tables.find((t) => t.id === guest.table_id);
         setScanResult({
-          type: 'warning',
-          title: 'Entrada Já Registada!',
-          message: `O convidado '${guest.name}' já efetuou a entrada anteriormente.`,
+          type: 'error',
+          title: 'CÓDIGO JÁ UTILIZADO ANTERIORMENTE!',
+          message: `O convite de '${guest.name}' já foi utilizado anteriormente para dar entrada.`,
           guest,
           table,
         });
@@ -272,10 +333,11 @@ function PortariaContent({ slug }: { slug: string }) {
       }
     } catch (err) {
       playFeedbackSound('error');
+      triggerVisualAlert('error');
       setScanResult({
         type: 'error',
-        title: 'Erro ao Registar Entrada',
-        message: 'Ocorreu um erro no servidor ao tentar registar a entrada.',
+        title: 'ERRO AO REGISTAR ENTRADA',
+        message: 'Ocorreu um erro no servidor ao tentar registar a entrada. Tente novamente.',
       });
     } finally {
       setTimeout(() => {
@@ -286,24 +348,60 @@ function PortariaContent({ slug }: { slug: string }) {
 
   // Handle successful camera QR scan
   const handleScanSuccess = async (decodedText: string) => {
-    let token = decodedText.trim();
-    try {
-      if (token.startsWith('{') && token.endsWith('}')) {
-        const parsed = JSON.parse(token);
-        if (parsed.token) {
-          token = parsed.token;
-        }
-      }
-    } catch (e) {}
+    const { tokenCandidate, guestIdCandidate, eventIdCandidate } = extractScanPayload(decodedText);
 
-    const matchedGuest = guests.find((g) => g.qr_token === token);
+    // If QR payload contains an eventId that belongs to a different event, reject immediately with red alert
+    if (eventIdCandidate && event && eventIdCandidate !== event.id) {
+      playFeedbackSound('error');
+      triggerVisualAlert('error');
+      setScanResult({
+        type: 'error',
+        title: 'CONVITE DE OUTRO EVENTO!',
+        message: 'Este código QR pertence a um evento diferente e não é válido para este casamento.',
+      });
+      return;
+    }
+
+    // Match guest in local list
+    let matchedGuest = guests.find((g) => {
+      const gToken = (g.qr_token || '').trim().toLowerCase();
+      const gId = (g.id || '').trim().toLowerCase();
+      const candToken = (tokenCandidate || '').trim().toLowerCase();
+      const candId = (guestIdCandidate || '').trim().toLowerCase();
+
+      return (
+        (candToken && gToken && gToken === candToken) ||
+        (candId && gId && gId === candId) ||
+        (candToken && gId && gId === candToken) ||
+        (candId && gToken && gToken === candId)
+      );
+    });
+
+    // Fallback: Check Supabase directly if guest was recently added after portaria opened
+    if (!matchedGuest && event) {
+      try {
+        if (tokenCandidate) {
+          matchedGuest = (await GuestRepository.getByToken(tokenCandidate)) || undefined;
+        }
+        if (!matchedGuest && guestIdCandidate) {
+          matchedGuest = (await GuestRepository.getById(guestIdCandidate)) || undefined;
+        }
+        if (matchedGuest && matchedGuest.event_id === event.id) {
+          setGuests((prev) => [...prev.filter((x) => x.id !== matchedGuest!.id), matchedGuest!]);
+        } else {
+          matchedGuest = undefined;
+        }
+      } catch (e) {}
+    }
+
     if (matchedGuest) {
       await handleProcessCheckin(matchedGuest);
     } else {
       playFeedbackSound('error');
+      triggerVisualAlert('error');
       setScanResult({
         type: 'error',
-        title: 'QR Code Não Reconhecido',
+        title: 'CÓDIGO QR INVÁLIDO OU NÃO ENCONTRADO!',
         message: 'Este código QR não pertence à lista oficial de convidados deste evento.',
       });
     }
@@ -393,8 +491,10 @@ function PortariaContent({ slug }: { slug: string }) {
   const handleRevert = async (guestId: string) => {
     if (!confirm('Deseja anular o registo de entrada deste convidado?')) return;
     if (!event) return;
+    setCheckins((prev) => prev.filter((ci) => ci.guest_id !== guestId));
     await PortariaRepository.revertCheckin(guestId);
     setScanResult(null);
+    setScanVisualAlert(null);
     loadEventData(event.id);
   };
 
@@ -620,9 +720,27 @@ function PortariaContent({ slug }: { slug: string }) {
             <p className="text-[10px] uppercase tracking-wider text-zinc-400 font-semibold">Total</p>
             <p className="text-lg font-black text-white">{totalGuests}</p>
           </div>
-          <div className="bg-emerald-950/20 border border-emerald-500/30 p-2.5 rounded-2xl">
-            <p className="text-[10px] uppercase tracking-wider text-emerald-400 font-semibold">Presentes</p>
-            <p className="text-lg font-black text-emerald-400">{checkedInCount}</p>
+          <div
+            className={`p-2.5 rounded-2xl border transition-all duration-300 ${
+              scanVisualAlert === 'success'
+                ? 'bg-emerald-600 border-emerald-400 text-white shadow-xl shadow-emerald-500/50 scale-105'
+                : 'bg-emerald-950/20 border-emerald-500/30'
+            }`}
+          >
+            <p
+              className={`text-[10px] uppercase tracking-wider font-semibold ${
+                scanVisualAlert === 'success' ? 'text-emerald-100 font-bold' : 'text-emerald-400'
+              }`}
+            >
+              Presentes
+            </p>
+            <p
+              className={`text-lg font-black ${
+                scanVisualAlert === 'success' ? 'text-white' : 'text-emerald-400'
+              }`}
+            >
+              {checkedInCount}
+            </p>
           </div>
           <div className="bg-[#1A1926] border border-[#2D2A3E] p-2.5 rounded-2xl">
             <p className="text-[10px] uppercase tracking-wider text-amber-400 font-semibold">Por Chegar</p>
@@ -630,61 +748,81 @@ function PortariaContent({ slug }: { slug: string }) {
           </div>
         </div>
 
-        {/* Scan Result Feedback Card (Dynamic Alert) */}
+        {/* Scan Result Feedback Card (High-Impact Dynamic Alert - Green for Valid, Red for Invalid/Already Used) */}
         {scanResult && (
           <div
-            className={`p-4 rounded-2xl border-2 transition-all shadow-xl animate-in zoom-in-95 ${
+            className={`p-5 rounded-3xl border-2 transition-all shadow-2xl animate-in zoom-in-95 ${
               scanResult.type === 'success'
-                ? 'bg-emerald-950/40 border-emerald-500 text-emerald-200'
-                : scanResult.type === 'warning'
-                ? 'bg-amber-950/40 border-amber-500 text-amber-200'
-                : 'bg-red-950/40 border-red-500 text-red-200'
+                ? 'bg-gradient-to-br from-emerald-600 to-emerald-700 border-emerald-300 text-white shadow-emerald-950/70'
+                : 'bg-gradient-to-br from-red-600 to-red-700 border-red-300 text-white shadow-red-950/70'
             }`}
           >
             <div className="flex items-start justify-between gap-3">
-              <div className="flex items-start gap-3">
+              <div className="flex items-start gap-3.5">
                 {scanResult.type === 'success' ? (
-                  <CheckCircle className="h-7 w-7 text-emerald-400 shrink-0 mt-0.5" />
-                ) : scanResult.type === 'warning' ? (
-                  <AlertTriangle className="h-7 w-7 text-amber-400 shrink-0 mt-0.5" />
+                  <div className="p-2 rounded-2xl bg-white/20 shrink-0 mt-0.5">
+                    <CheckCircle className="h-8 w-8 text-white" />
+                  </div>
                 ) : (
-                  <XCircle className="h-7 w-7 text-red-400 shrink-0 mt-0.5" />
+                  <div className="p-2 rounded-2xl bg-white/20 shrink-0 mt-0.5">
+                    <XCircle className="h-8 w-8 text-white animate-pulse" />
+                  </div>
                 )}
-                <div className="space-y-1">
-                  <h3 className="text-base font-bold text-white">{scanResult.title}</h3>
-                  <p className="text-xs opacity-90 leading-relaxed">{scanResult.message}</p>
+                <div className="space-y-1.5 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span
+                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                        scanResult.type === 'success'
+                          ? 'bg-emerald-950/40 text-emerald-100 border border-emerald-300/40'
+                          : 'bg-red-950/40 text-red-100 border border-red-300/40'
+                      }`}
+                    >
+                      {scanResult.type === 'success' ? 'Acesso Permitido' : 'Acesso Recusado'}
+                    </span>
+                    <h3 className="text-base sm:text-lg font-black tracking-tight text-white truncate">
+                      {scanResult.title}
+                    </h3>
+                  </div>
+                  <p className="text-xs sm:text-sm text-white/95 leading-relaxed font-medium">
+                    {scanResult.message}
+                  </p>
 
                   {/* Guest Detailed Card on Successful/Duplicate Scan */}
                   {scanResult.guest && (
-                    <div className="mt-2 p-2.5 rounded-xl bg-black/40 border border-white/10 text-xs space-y-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-bold text-white text-sm">{scanResult.guest.name}</span>
-                        <span className="px-2 py-0.5 rounded-full bg-white/10 text-[10px] font-semibold text-white">
+                    <div className="mt-3 p-3.5 rounded-2xl bg-black/40 border border-white/20 text-xs space-y-2 backdrop-blur-sm">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <span className="font-black text-white text-base">
+                          {scanResult.guest.name}
+                        </span>
+                        <span className="px-2.5 py-1 rounded-full bg-white/20 text-[11px] font-bold text-white">
                           +{scanResult.guest.companions} acomp. (Total: {1 + scanResult.guest.companions} pax)
                         </span>
                       </div>
 
                       {scanResult.table && (
-                        <div className="flex items-center gap-1.5 text-[#D4AF37] font-semibold text-[11px] pt-0.5">
-                          <UtensilsCrossed className="h-3.5 w-3.5" />
+                        <div className="flex items-center gap-2 text-[#FFE082] font-bold text-xs pt-0.5">
+                          <UtensilsCrossed className="h-4 w-4" />
                           <span>Mesa: {scanResult.table.name}</span>
                         </div>
                       )}
 
                       {scanResult.guest.family_group && (
-                        <p className="text-[10px] text-zinc-400">
+                        <p className="text-[11px] text-zinc-300">
                           Grupo: {scanResult.guest.family_group}
                         </p>
                       )}
 
                       {scanResult.previousCheckin && (
-                        <div className="text-[10px] text-amber-300/90 pt-1 border-t border-white/10 mt-1">
-                          Entrada anterior às{' '}
-                          {new Date(scanResult.previousCheckin.checked_at).toLocaleTimeString('pt-PT', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}{' '}
-                          por <strong>{scanResult.previousCheckin.operator || 'Portaria'}</strong>
+                        <div className="text-[11px] text-red-100 bg-red-950/70 p-2.5 rounded-xl border border-red-400/40 mt-2 font-medium">
+                          ⚠️ Primeira entrada registada às{' '}
+                          <strong className="text-white underline">
+                            {new Date(scanResult.previousCheckin.checked_at).toLocaleTimeString('pt-PT', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              second: '2-digit',
+                            })}
+                          </strong>{' '}
+                          pelo operador: <strong>{scanResult.previousCheckin.operator || 'Portaria'}</strong>
                         </div>
                       )}
                     </div>
@@ -694,8 +832,12 @@ function PortariaContent({ slug }: { slug: string }) {
 
               <button
                 type="button"
-                onClick={() => setScanResult(null)}
-                className="text-white/60 hover:text-white p-1"
+                onClick={() => {
+                  setScanResult(null);
+                  setScanVisualAlert(null);
+                }}
+                className="text-white/80 hover:text-white p-1.5 rounded-xl hover:bg-white/10 transition-colors"
+                title="Fechar alerta"
               >
                 ✕
               </button>
@@ -765,7 +907,29 @@ function PortariaContent({ slug }: { slug: string }) {
             </div>
 
             {/* Video Scanner Container */}
-            <div className="relative rounded-2xl overflow-hidden bg-black aspect-square max-w-sm mx-auto w-full border-2 border-[#D4AF37]/30 flex flex-col items-center justify-center shadow-inner">
+            <div
+              className={`relative rounded-3xl overflow-hidden bg-black aspect-square max-w-sm mx-auto w-full transition-all duration-300 flex flex-col items-center justify-center shadow-2xl ${
+                scanVisualAlert === 'success'
+                  ? 'ring-8 ring-emerald-500 shadow-[0_0_50px_rgba(16,185,129,0.85)] scale-[1.02]'
+                  : scanVisualAlert === 'error'
+                  ? 'ring-8 ring-red-600 shadow-[0_0_50px_rgba(239,68,68,0.95)] scale-[1.02]'
+                  : 'border-2 border-[#D4AF37]/40 shadow-inner'
+              }`}
+            >
+              {/* Immediate High-Visibility Status Pill Overlay */}
+              {scanVisualAlert === 'success' && (
+                <div className="absolute top-3 inset-x-3 z-30 py-2.5 px-4 rounded-2xl bg-emerald-600 border-2 border-emerald-300 text-white font-black text-xs sm:text-sm uppercase tracking-wider text-center flex items-center justify-center gap-2 shadow-2xl animate-in zoom-in-95">
+                  <CheckCircle className="h-5 w-5 text-white animate-bounce shrink-0" />
+                  <span>VÁLIDO • ENTRADA AUTORIZADA</span>
+                </div>
+              )}
+              {scanVisualAlert === 'error' && (
+                <div className="absolute top-3 inset-x-3 z-30 py-2.5 px-4 rounded-2xl bg-red-600 border-2 border-red-300 text-white font-black text-xs sm:text-sm uppercase tracking-wider text-center flex items-center justify-center gap-2 shadow-2xl animate-in zoom-in-95">
+                  <XCircle className="h-5 w-5 text-white animate-pulse shrink-0" />
+                  <span>CÓDIGO RECUSADO / JÁ UTILIZADO</span>
+                </div>
+              )}
+
               {isScanning ? (
                 <>
                   <div id="portaria-reader" className="w-full h-full" />
