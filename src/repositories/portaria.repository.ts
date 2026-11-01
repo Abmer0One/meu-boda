@@ -270,7 +270,7 @@ export const PortariaRepository = {
   /**
    * Revert a check-in (in case of operator mistake)
    */
-  async revertCheckin(guestId: string): Promise<boolean> {
-    return CheckInRepository.deleteByGuestId(guestId);
+  async revertCheckin(guestId: string, eventId?: string): Promise<boolean> {
+    return CheckInRepository.deleteByGuestId(guestId, eventId);
   },
 };

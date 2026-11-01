@@ -8,6 +8,7 @@ import {
   PortariaRepository,
   generatePortariaPin,
 } from '@/repositories/portaria.repository';
+import { supabase } from '@/lib/supabase';
 import { Guest, CheckIn, PortariaConfig } from '@/types';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -178,6 +179,57 @@ export default function CheckinPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentEvent]);
 
+  // Realtime subscription: synchronize checkins and deletions with portaria stations
+  useEffect(() => {
+    if (!currentEvent?.id) return;
+
+    const streamChannel = supabase
+      .channel('portaria-live-stream')
+      .on('broadcast', { event: 'new-checkin' }, (payload) => {
+        const p = payload?.payload;
+        if (!p) return;
+        if (!p.event_id || p.event_id === currentEvent.id) {
+          setCheckins((prev) => {
+            if (prev.some((c) => c.guest_id === p.guest_id)) return prev;
+            return [
+              {
+                id: p.id || `ci_${p.guest_id}`,
+                guest_id: p.guest_id,
+                operator: p.operator || 'Portaria',
+                checked_at: p.checked_at || new Date().toISOString(),
+              },
+              ...prev,
+            ];
+          });
+        }
+      })
+      .on('broadcast', { event: 'delete-checkin' }, (payload) => {
+        const p = payload?.payload;
+        if (!p) return;
+        if (!p.event_id || p.event_id === currentEvent.id) {
+          setCheckins((prev) => prev.filter((c) => c.guest_id !== p.guest_id));
+        }
+      })
+      .subscribe();
+
+    const handleStorage = (e: StorageEvent) => {
+      if (
+        e.key === `portaria_checkins_cache_${currentEvent.id}` ||
+        e.key === 'meuboda_live_checkins_cache'
+      ) {
+        loadData();
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+
+    return () => {
+      try {
+        supabase.removeChannel(streamChannel);
+      } catch {}
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, [currentEvent?.id]);
+
   // Portaria Handlers
   const handleTogglePortaria = async () => {
     if (!currentEvent || !portariaConfig) return;
@@ -343,12 +395,19 @@ export default function CheckinPage() {
   };
 
   const handleRemoveCheckin = async (guestId: string) => {
+    if (!confirm('Deseja anular o registo de entrada deste convidado?')) return;
+    if (!currentEvent) return;
+
+    // Optimistically update checkins state immediately so table and counters update with zero latency
+    setCheckins((prev) => prev.filter((ci) => ci.guest_id !== guestId));
+    setAlertMessage(null);
+
     try {
-      await CheckInRepository.deleteByGuestId(guestId);
-      setAlertMessage(null);
+      await PortariaRepository.revertCheckin(guestId, currentEvent.id);
       loadData();
     } catch (err) {
       console.error(err);
+      setAlertMessage({ type: 'error', text: 'Erro ao remover registo de entrada.' });
     }
   };
 

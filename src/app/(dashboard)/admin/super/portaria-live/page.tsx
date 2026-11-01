@@ -84,6 +84,20 @@ export default function SuperAdminPortariaLivePage() {
           setLastRefreshedAt(new Date());
         }
       })
+      .on('broadcast', { event: 'delete-checkin' }, (payload) => {
+        const p = payload?.payload;
+        if (p?.guest_id) {
+          setFeed((prev) =>
+            prev.filter(
+              (item: any) =>
+                item.guest_id !== p.guest_id &&
+                item.id !== `ci_${p.guest_id}` &&
+                item.id !== p.id
+            )
+          );
+          setLastRefreshedAt(new Date());
+        }
+      })
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'checkins' },
