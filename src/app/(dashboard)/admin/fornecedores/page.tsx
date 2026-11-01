@@ -15,6 +15,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { vendorSchema } from '@/validations/schemas';
 import MarketplaceTab from '@/components/marketplace/MarketplaceTab';
 import ChatTab from '@/components/marketplace/ChatTab';
+import StaffPassTab from '@/components/marketplace/StaffPassTab';
 import { ContractRepository } from '@/repositories/marketplace.repository';
 import { downloadReceiptPDF } from '@/utils/receipt-pdf';
 import { supabase } from '@/lib/supabase';
@@ -37,7 +38,8 @@ import {
   ExternalLink,
   Upload,
   CreditCard,
-  CheckCircle2
+  CheckCircle2,
+  Award
 } from 'lucide-react';
 
 export default function FornecedoresPage() {
@@ -45,7 +47,7 @@ export default function FornecedoresPage() {
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [contracts, setContracts] = useState<VendorContract[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'contratos' | 'explorar' | 'mensagens'>('contratos');
+  const [activeTab, setActiveTab] = useState<'contratos' | 'explorar' | 'mensagens' | 'credenciais'>('contratos');
   const [preselectedRoomId, setPreselectedRoomId] = useState<string | null>(null);
 
   // Modals state
@@ -326,6 +328,17 @@ export default function FornecedoresPage() {
             }`}
           >
             Mensagens & Pedidos
+          </button>
+          <button
+            onClick={() => setActiveTab('credenciais')}
+            className={`px-4 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'credenciais'
+                ? 'bg-card-bg text-primary shadow-sm font-bold border border-border-custom/50'
+                : 'text-foreground/60 hover:text-foreground'
+            }`}
+          >
+            <Award className="h-3.5 w-3.5 text-primary" />
+            <span>Credenciais & Staff</span>
           </button>
         </div>
       </div>
@@ -611,6 +624,10 @@ export default function FornecedoresPage() {
           preselectedRoomId={preselectedRoomId}
           onRoomSelected={(roomId) => setPreselectedRoomId(roomId)}
         />
+      )}
+
+      {activeTab === 'credenciais' && (
+        <StaffPassTab event={currentEvent} vendors={vendors} />
       )}
 
       {/* ADD/EDIT VENDOR DIALOG */}

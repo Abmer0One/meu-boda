@@ -293,3 +293,28 @@ export interface LiveCheckinFeed {
   checked_at: string;
   operator: string;
 }
+
+export interface StaffPass {
+  id: string;
+  event_id: string;
+  vendor_id?: string | null;
+  company_name: string;
+  category: string;
+  holder_name?: string | null;
+  role_title: string;
+  access_level?: string;
+  qr_token: string;
+  notes?: string | null;
+  created_at: string;
+}
+
+export interface StaffCheckin {
+  id: string;
+  pass_id: string;
+  event_id: string;
+  company_name: string;
+  role_title: string;
+  holder_name?: string | null;
+  operator: string;
+  checked_at: string;
+}

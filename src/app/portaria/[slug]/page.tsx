@@ -5,8 +5,9 @@ import { PortariaRepository } from '@/repositories/portaria.repository';
 import { EventRepository } from '@/repositories/event.repository';
 import { GuestRepository } from '@/repositories/guest.repository';
 import { TableRepository } from '@/repositories/table.repository';
+import { StaffPassRepository } from '@/repositories/staff-pass.repository';
 import { supabase } from '@/lib/supabase';
-import { Event, Guest, CheckIn, PortariaConfig, Table } from '@/types';
+import { Event, Guest, CheckIn, PortariaConfig, Table, StaffPass, StaffCheckin } from '@/types';
 import confetti from 'canvas-confetti';
 import {
   QrCode,
@@ -26,6 +27,7 @@ import {
   ShieldCheck,
   RefreshCw,
   UtensilsCrossed,
+  Award,
 } from 'lucide-react';
 
 import GlobalBroadcastBanner from '@/components/common/GlobalBroadcastBanner';
@@ -75,6 +77,8 @@ function extractScanPayload(rawText: string): {
   tokenCandidate?: string;
   guestIdCandidate?: string;
   eventIdCandidate?: string;
+  isStaffCandidate?: boolean;
+  staffPayload?: any;
 } {
   const text = (rawText || '').trim();
   if (!text) return {};
@@ -93,10 +97,16 @@ function extractScanPayload(rawText: string): {
   }
 
   if (parsedJson && typeof parsedJson === 'object') {
+    const isStaff =
+      Boolean(parsedJson.staffPassId) ||
+      (parsedJson.token && String(parsedJson.token).startsWith('stf_'));
+
     return {
       tokenCandidate: parsedJson.token || parsedJson.qr_token || parsedJson.qrToken,
       guestIdCandidate: parsedJson.guestId || parsedJson.guest_id || parsedJson.id,
       eventIdCandidate: parsedJson.eventId || parsedJson.event_id,
+      isStaffCandidate: isStaff,
+      staffPayload: parsedJson,
     };
   }
 
@@ -109,10 +119,14 @@ function extractScanPayload(rawText: string): {
     };
   }
 
-  // 3. Fallback: treat the clean string itself as token candidate and guestId candidate
+  // 3. Check for raw staff token (starts with stf_)
+  const isStaff = text.toLowerCase().startsWith('stf_');
+
+  // 4. Fallback: treat the clean string itself as token candidate and guestId candidate
   return {
     tokenCandidate: text,
     guestIdCandidate: text,
+    isStaffCandidate: isStaff,
   };
 }
 
@@ -131,6 +145,9 @@ function PortariaContent({ slug }: { slug: string }) {
   const [guests, setGuests] = useState<Guest[]>([]);
   const [checkins, setCheckins] = useState<CheckIn[]>([]);
   const [tables, setTables] = useState<Table[]>([]);
+  const [staffPasses, setStaffPasses] = useState<StaffPass[]>([]);
+  const [staffCheckins, setStaffCheckins] = useState<StaffCheckin[]>([]);
+  const [historyFilter, setHistoryFilter] = useState<'guests' | 'staff'>('guests');
   const [loadingData, setLoadingData] = useState(false);
 
   // Scanning & Search UI state
@@ -139,19 +156,21 @@ function PortariaContent({ slug }: { slug: string }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [manualQrInput, setManualQrInput] = useState('');
   const [scanResult, setScanResult] = useState<{
-    type: 'success' | 'warning' | 'error';
+    type: 'success' | 'warning' | 'error' | 'staff';
     title: string;
     message: string;
     guest?: Guest;
     table?: Table;
     previousCheckin?: CheckIn;
+    staffPass?: StaffPass;
+    previousStaffCheckin?: StaffCheckin;
   } | null>(null);
 
-  // High-visibility green/red visual alert state
-  const [scanVisualAlert, setScanVisualAlert] = useState<'success' | 'error' | null>(null);
+  // High-visibility green/red/blue visual alert state
+  const [scanVisualAlert, setScanVisualAlert] = useState<'success' | 'error' | 'staff' | null>(null);
   const visualAlertTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const triggerVisualAlert = (type: 'success' | 'error') => {
+  const triggerVisualAlert = (type: 'success' | 'error' | 'staff') => {
     setScanVisualAlert(type);
     if (visualAlertTimerRef.current) {
       clearTimeout(visualAlertTimerRef.current);
@@ -229,18 +248,22 @@ function PortariaContent({ slug }: { slug: string }) {
     }
   };
 
-  // Load guest list, checkins and tables
+  // Load guest list, checkins, tables, and staff credentials
   const loadEventData = async (eventId: string) => {
     setLoadingData(true);
     try {
-      const [g, ci, t] = await Promise.all([
+      const [g, ci, t, sp, sc] = await Promise.all([
         PortariaRepository.getGuests(eventId),
         PortariaRepository.getCheckins(eventId),
         TableRepository.getAll(eventId),
+        StaffPassRepository.getAll(eventId),
+        StaffPassRepository.getCheckins(eventId),
       ]);
       setGuests(g);
       setCheckins(ci);
       setTables(t);
+      setStaffPasses(sp);
+      setStaffCheckins(sc);
     } catch (err) {
       console.error('Erro ao carregar dados da portaria:', err);
     } finally {
@@ -248,7 +271,7 @@ function PortariaContent({ slug }: { slug: string }) {
     }
   };
 
-  // Realtime synchronization for checkins and deletions across stations
+  // Realtime synchronization for checkins and deletions across stations (Guests & Staff)
   useEffect(() => {
     if (!event?.id) return;
 
@@ -292,12 +315,31 @@ function PortariaContent({ slug }: { slug: string }) {
           }
         }
       })
+      .on('broadcast', { event: 'staff-checkin' }, (payload) => {
+        const p = payload?.payload as StaffCheckin | undefined;
+        if (!p) return;
+        if (!p.event_id || p.event_id === event.id) {
+          setStaffCheckins((prev) => {
+            if (prev.some((c) => c.pass_id === p.pass_id)) return prev;
+            return [p, ...prev];
+          });
+        }
+      })
+      .on('broadcast', { event: 'delete-staff-checkin' }, (payload) => {
+        const p = payload?.payload;
+        if (!p) return;
+        if (!p.event_id || p.event_id === event.id) {
+          setStaffCheckins((prev) => prev.filter((c) => c.pass_id !== (p.pass_id || p.staff_pass_id)));
+        }
+      })
       .subscribe();
 
     const handleStorage = (e: StorageEvent) => {
       if (
         e.key === `portaria_checkins_cache_${event.id}` ||
-        e.key === 'meuboda_live_checkins_cache'
+        e.key === 'meuboda_live_checkins_cache' ||
+        e.key === `portaria_staff_checkins_cache_${event.id}` ||
+        e.key === `portaria_staff_passes_cache_${event.id}`
       ) {
         loadEventData(event.id);
       }
@@ -411,9 +453,137 @@ function PortariaContent({ slug }: { slug: string }) {
     }
   };
 
+  // Perform Staff Check-in
+  const handleProcessStaffScan = async (tokenCandidate?: string, staffPayload?: any) => {
+    if (!event) return;
+
+    const rawToken = (tokenCandidate || staffPayload?.token || staffPayload?.qrToken || '').trim();
+    const passId = (staffPayload?.staffPassId || staffPayload?.id || '').trim();
+
+    // 1. Find staff pass in local state
+    let matchedPass = staffPasses.find((sp) => {
+      if (passId && sp.id === passId) return true;
+      const spTok = ((sp as any).token || sp.qr_token || '').toLowerCase();
+      if (rawToken && spTok === rawToken.toLowerCase()) return true;
+      return false;
+    });
+
+    // 2. Fallback: query repository in case it was created recently
+    if (!matchedPass && (rawToken || passId)) {
+      try {
+        if (rawToken) {
+          matchedPass = (await StaffPassRepository.getByToken(rawToken, event.id)) || undefined;
+        }
+        if (!matchedPass && passId) {
+          const all = await StaffPassRepository.getAll(event.id);
+          matchedPass = all.find((p) => p.id === passId);
+        }
+        if (matchedPass) {
+          setStaffPasses((prev) => [...prev.filter((p) => p.id !== matchedPass!.id), matchedPass!]);
+        }
+      } catch (e) {
+        console.warn('Erro ao pesquisar credencial de staff:', e);
+      }
+    }
+
+    if (!matchedPass) {
+      playFeedbackSound('error');
+      triggerVisualAlert('error');
+      setScanResult({
+        type: 'error',
+        title: 'CREDENCIAL NÃO ENCONTRADA!',
+        message: 'Esta credencial de serviço/staff não pertence à lista autorizada deste evento.',
+      });
+      return;
+    }
+
+    // 3. Check if already checked in
+    const existingCheckin = staffCheckins.find((sc) => sc.pass_id === matchedPass!.id);
+    if (existingCheckin) {
+      playFeedbackSound('error');
+      triggerVisualAlert('error');
+      setScanResult({
+        type: 'error',
+        title: 'CREDENCIAL JÁ REGISTADA ANTERIORMENTE!',
+        message: `A credencial '${matchedPass.role_title}' (${matchedPass.holder_name || matchedPass.company_name || 'Serviço'}) já efetuou entrada no evento.`,
+        staffPass: matchedPass,
+        previousStaffCheckin: existingCheckin,
+      });
+      return;
+    }
+
+    // 4. Perform check-in
+    try {
+      const newStaffCi = await StaffPassRepository.performCheckin(
+        matchedPass,
+        activeOperator
+      );
+
+      if (newStaffCi) {
+        setStaffCheckins((prev) => [newStaffCi, ...prev.filter((c) => c.pass_id !== matchedPass!.id)]);
+        playFeedbackSound('success');
+        triggerVisualAlert('staff');
+        confetti({
+          particleCount: 70,
+          spread: 60,
+          origin: { y: 0.6 },
+          colors: ['#4F46E5', '#6366F1', '#38BDF8', '#D4AF37'],
+        });
+
+        setScanResult({
+          type: 'staff',
+          title: 'STAFF AUTORIZADO • ENTRADA DE SERVIÇO',
+          message: `Bem-vindo(a)! Credencial autorizada para ${matchedPass.role_title} • ${matchedPass.company_name || 'Prestador de Serviço'}.`,
+          staffPass: matchedPass,
+        });
+
+        loadEventData(event.id);
+      }
+    } catch (err) {
+      playFeedbackSound('error');
+      triggerVisualAlert('error');
+      setScanResult({
+        type: 'error',
+        title: 'ERRO AO REGISTAR STAFF',
+        message: 'Ocorreu uma falha ao tentar registar a entrada do prestador de serviço.',
+      });
+    }
+  };
+
+  // Revert a Staff Check-in
+  const handleRevertStaff = async (passId: string) => {
+    if (!confirm('Deseja anular o registo de entrada desta credencial de staff?')) return;
+    if (!event) return;
+
+    setStaffCheckins((prev) => prev.filter((ci) => ci.pass_id !== passId));
+    setScanResult(null);
+    setScanVisualAlert(null);
+
+    try {
+      await StaffPassRepository.revertCheckin(passId, event.id);
+    } catch (err) {
+      console.warn('Erro ao anular entrada de staff:', err);
+    }
+
+    loadEventData(event.id);
+  };
+
   // Handle successful camera QR scan
   const handleScanSuccess = async (decodedText: string) => {
-    const { tokenCandidate, guestIdCandidate, eventIdCandidate } = extractScanPayload(decodedText);
+    const { tokenCandidate, guestIdCandidate, eventIdCandidate, isStaffCandidate, staffPayload } =
+      extractScanPayload(decodedText);
+
+    // If QR is recognized as a staff credential
+    const isStaff =
+      isStaffCandidate ||
+      (tokenCandidate && tokenCandidate.toLowerCase().startsWith('stf_')) ||
+      decodedText.includes('staffPassId') ||
+      decodedText.includes('__event_staff_passes__');
+
+    if (isStaff) {
+      await handleProcessStaffScan(tokenCandidate, staffPayload);
+      return;
+    }
 
     // If QR payload contains an eventId that belongs to a different event, reject immediately with red alert
     if (eventIdCandidate && event && eventIdCandidate !== event.id) {
@@ -821,12 +991,44 @@ function PortariaContent({ slug }: { slug: string }) {
           </div>
         </div>
 
-        {/* Scan Result Feedback Card (High-Impact Dynamic Alert - Green for Valid, Red for Invalid/Already Used) */}
+        {/* Staff Team Summary Strip */}
+        {staffPasses.length > 0 && (
+          <div
+            className={`p-2.5 sm:p-3 rounded-2xl border transition-all duration-300 flex items-center justify-between gap-3 text-xs ${
+              scanVisualAlert === 'staff'
+                ? 'bg-indigo-600/30 border-indigo-400 shadow-lg shadow-indigo-500/30'
+                : 'bg-[#1A1926] border-indigo-500/30'
+            }`}
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="p-1.5 rounded-xl bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 shrink-0">
+                <Award className="h-4 w-4" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] uppercase tracking-wider text-indigo-300 font-bold">
+                  Equipa de Serviço / Staff
+                </p>
+                <p className="text-xs font-black text-white truncate">
+                  {staffCheckins.length} presentes de {staffPasses.length} credenciais
+                </p>
+              </div>
+            </div>
+            <div className="shrink-0 text-right">
+              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                {Math.round((staffCheckins.length / (staffPasses.length || 1)) * 100)}% em serviço
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Scan Result Feedback Card (High-Impact Dynamic Alert - Green for Guests, Indigo for Staff, Red for Error) */}
         {scanResult && (
           <div
             className={`p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border-2 transition-all shadow-2xl animate-in zoom-in-95 w-full overflow-hidden ${
               scanResult.type === 'success'
                 ? 'bg-gradient-to-br from-emerald-600 to-emerald-700 border-emerald-300 text-white shadow-emerald-950/70'
+                : scanResult.type === 'staff'
+                ? 'bg-gradient-to-br from-indigo-700 via-indigo-800 to-slate-900 border-indigo-300 text-white shadow-indigo-950/70'
                 : 'bg-gradient-to-br from-red-600 to-red-700 border-red-300 text-white shadow-red-950/70'
             }`}
           >
@@ -835,6 +1037,10 @@ function PortariaContent({ slug }: { slug: string }) {
                 {scanResult.type === 'success' ? (
                   <div className="p-1.5 sm:p-2 rounded-xl sm:rounded-2xl bg-white/20 shrink-0 mt-0.5">
                     <CheckCircle className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
+                  </div>
+                ) : scanResult.type === 'staff' ? (
+                  <div className="p-1.5 sm:p-2 rounded-xl sm:rounded-2xl bg-indigo-500/30 border border-indigo-400/40 shrink-0 mt-0.5">
+                    <Award className="h-6 w-6 sm:h-8 sm:w-8 text-indigo-200" />
                   </div>
                 ) : (
                   <div className="p-1.5 sm:p-2 rounded-xl sm:rounded-2xl bg-white/20 shrink-0 mt-0.5">
@@ -847,10 +1053,16 @@ function PortariaContent({ slug }: { slug: string }) {
                       className={`inline-block px-2 sm:px-2.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-wider shrink-0 ${
                         scanResult.type === 'success'
                           ? 'bg-emerald-950/40 text-emerald-100 border border-emerald-300/40'
+                          : scanResult.type === 'staff'
+                          ? 'bg-indigo-950/60 text-indigo-200 border border-indigo-300/40'
                           : 'bg-red-950/40 text-red-100 border border-red-300/40'
                       }`}
                     >
-                      {scanResult.type === 'success' ? 'Acesso Permitido' : 'Acesso Recusado'}
+                      {scanResult.type === 'success'
+                        ? 'Acesso Permitido'
+                        : scanResult.type === 'staff'
+                        ? 'Prestador de Serviço'
+                        : 'Acesso Recusado'}
                     </span>
                   </div>
 
@@ -861,6 +1073,49 @@ function PortariaContent({ slug }: { slug: string }) {
                   <p className="text-xs sm:text-sm text-white/95 leading-relaxed font-medium break-words">
                     {scanResult.message}
                   </p>
+
+                  {/* Staff Detailed Card */}
+                  {scanResult.staffPass && (
+                    <div className="mt-2.5 sm:mt-3 p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl bg-black/40 border border-white/20 text-xs space-y-1.5 sm:space-y-2 backdrop-blur-sm">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2">
+                        <span className="font-black text-white text-sm sm:text-base break-words">
+                          {scanResult.staffPass.holder_name
+                            ? `${scanResult.staffPass.holder_name} (${scanResult.staffPass.role_title})`
+                            : scanResult.staffPass.role_title}
+                        </span>
+                        {scanResult.staffPass.company_name && (
+                          <span className="self-start sm:self-auto px-2 py-0.5 rounded-full bg-indigo-500/30 border border-indigo-400/40 text-[10px] sm:text-[11px] font-bold text-indigo-200 shrink-0">
+                            {scanResult.staffPass.company_name}
+                          </span>
+                        )}
+                      </div>
+
+                      {scanResult.staffPass.access_level && (
+                        <div className="flex items-center gap-1.5 sm:gap-2 text-indigo-200 font-semibold text-xs pt-0.5">
+                          <ShieldCheck className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
+                          <span className="break-words">Acesso: {scanResult.staffPass.access_level}</span>
+                        </div>
+                      )}
+
+                      <div className="text-[10px] text-zinc-300 font-mono">
+                        ID: {scanResult.staffPass.qr_token}
+                      </div>
+
+                      {scanResult.previousStaffCheckin && (
+                        <div className="text-[10px] sm:text-[11px] text-red-100 bg-red-950/70 p-2 sm:p-2.5 rounded-xl border border-red-400/40 mt-1.5 sm:mt-2 font-medium break-words leading-relaxed">
+                          ⚠️ Entrada anterior registada às{' '}
+                          <strong className="text-white underline">
+                            {new Date(scanResult.previousStaffCheckin.checked_at).toLocaleTimeString('pt-PT', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              second: '2-digit',
+                            })}
+                          </strong>{' '}
+                          pelo operador: <strong>{scanResult.previousStaffCheckin.operator || 'Portaria'}</strong>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Guest Detailed Card on Successful/Duplicate Scan */}
                   {scanResult.guest && (
@@ -986,6 +1241,8 @@ function PortariaContent({ slug }: { slug: string }) {
               className={`relative rounded-3xl overflow-hidden bg-black aspect-square max-w-sm mx-auto w-full transition-all duration-300 flex flex-col items-center justify-center shadow-2xl ${
                 scanVisualAlert === 'success'
                   ? 'ring-8 ring-emerald-500 shadow-[0_0_50px_rgba(16,185,129,0.85)] scale-[1.02]'
+                  : scanVisualAlert === 'staff'
+                  ? 'ring-8 ring-indigo-500 shadow-[0_0_50px_rgba(99,102,241,0.85)] scale-[1.02]'
                   : scanVisualAlert === 'error'
                   ? 'ring-8 ring-red-600 shadow-[0_0_50px_rgba(239,68,68,0.95)] scale-[1.02]'
                   : 'border-2 border-[#D4AF37]/40 shadow-inner'
@@ -996,6 +1253,12 @@ function PortariaContent({ slug }: { slug: string }) {
                 <div className="absolute top-2 sm:top-3 inset-x-2 sm:inset-x-3 z-30 py-2 sm:py-2.5 px-2.5 sm:px-4 rounded-xl sm:rounded-2xl bg-emerald-600 border-2 border-emerald-300 text-white font-black text-[10px] sm:text-xs uppercase tracking-wider text-center flex items-center justify-center gap-1.5 sm:gap-2 shadow-2xl animate-in zoom-in-95">
                   <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-white animate-bounce shrink-0" />
                   <span className="truncate">VÁLIDO • ENTRADA AUTORIZADA</span>
+                </div>
+              )}
+              {scanVisualAlert === 'staff' && (
+                <div className="absolute top-2 sm:top-3 inset-x-2 sm:inset-x-3 z-30 py-2 sm:py-2.5 px-2.5 sm:px-4 rounded-xl sm:rounded-2xl bg-indigo-600 border-2 border-indigo-300 text-white font-black text-[10px] sm:text-xs uppercase tracking-wider text-center flex items-center justify-center gap-1.5 sm:gap-2 shadow-2xl animate-in zoom-in-95">
+                  <Award className="h-4 w-4 sm:h-5 sm:w-5 text-indigo-200 animate-bounce shrink-0" />
+                  <span className="truncate">STAFF AUTORIZADO • ENTRADA DE SERVIÇO</span>
                 </div>
               )}
               {scanVisualAlert === 'error' && (
@@ -1160,8 +1423,8 @@ function PortariaContent({ slug }: { slug: string }) {
           <div className="bg-[#1A1926] border border-[#2D2A3E] rounded-3xl p-5 space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-bold text-white">Histórico de Entradas ({checkins.length})</h3>
-                <p className="text-xs text-zinc-400">Lista dos convidados com entrada confirmada.</p>
+                <h3 className="text-sm font-bold text-white">Histórico de Entradas</h3>
+                <p className="text-xs text-zinc-400">Registo de validações na portaria em tempo real.</p>
               </div>
               <button
                 type="button"
@@ -1173,53 +1436,135 @@ function PortariaContent({ slug }: { slug: string }) {
               </button>
             </div>
 
+            {/* Sub-filter: Convidados vs Staff */}
+            <div className="flex p-1 bg-[#0F0E17] rounded-xl border border-[#2D2A3E] text-xs">
+              <button
+                type="button"
+                onClick={() => setHistoryFilter('guests')}
+                className={`flex-1 py-1.5 rounded-lg font-bold transition-all ${
+                  historyFilter === 'guests'
+                    ? 'bg-zinc-800 text-white shadow'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                Convidados ({checkins.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setHistoryFilter('staff')}
+                className={`flex-1 py-1.5 rounded-lg font-bold transition-all flex items-center justify-center gap-1.5 ${
+                  historyFilter === 'staff'
+                    ? 'bg-indigo-600 text-white shadow'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                <Award className="h-3.5 w-3.5" />
+                <span>Staff & Serviço ({staffCheckins.length})</span>
+              </button>
+            </div>
+
             <div className="max-h-[380px] overflow-y-auto space-y-2 pr-1">
-              {checkins.length > 0 ? (
-                checkins.map((ci) => {
-                  const guest = guests.find((g) => g.id === ci.guest_id);
-                  const table = guest ? tables.find((t) => t.id === guest.table_id) : null;
+              {historyFilter === 'guests' ? (
+                checkins.length > 0 ? (
+                  checkins.map((ci) => {
+                    const guest = guests.find((g) => g.id === ci.guest_id);
+                    const table = guest ? tables.find((t) => t.id === guest.table_id) : null;
 
-                  return (
-                    <div
-                      key={ci.id}
-                      className="p-3 rounded-xl bg-[#0F0E17] border border-[#2D2A3E] flex items-center justify-between gap-3 text-xs"
-                    >
-                      <div className="min-w-0">
-                        <p className="font-bold text-white truncate">{guest?.name || 'Convidado'}</p>
-                        <div className="flex items-center gap-2 text-[10px] text-zinc-400 mt-0.5">
-                          <span className="text-emerald-400 font-semibold">
-                            {new Date(ci.checked_at).toLocaleTimeString('pt-PT', {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                              second: '2-digit',
-                            })}
-                          </span>
-                          <span>•</span>
-                          <span className="text-zinc-500">{ci.operator || 'Portaria'}</span>
-                          {table && (
-                            <>
-                              <span>•</span>
-                              <span className="text-[#D4AF37] truncate">{table.name}</span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => handleRevert(ci.guest_id)}
-                        className="p-1.5 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer shrink-0"
-                        title="Anular Entrada"
+                    return (
+                      <div
+                        key={ci.id}
+                        className="p-3 rounded-xl bg-[#0F0E17] border border-[#2D2A3E] flex items-center justify-between gap-3 text-xs"
                       >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  );
-                })
+                        <div className="min-w-0">
+                          <p className="font-bold text-white truncate">{guest?.name || 'Convidado'}</p>
+                          <div className="flex items-center gap-2 text-[10px] text-zinc-400 mt-0.5">
+                            <span className="text-emerald-400 font-semibold">
+                              {new Date(ci.checked_at).toLocaleTimeString('pt-PT', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                second: '2-digit',
+                              })}
+                            </span>
+                            <span>•</span>
+                            <span className="text-zinc-500">{ci.operator || 'Portaria'}</span>
+                            {table && (
+                              <>
+                                <span>•</span>
+                                <span className="text-[#D4AF37] truncate">{table.name}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleRevert(ci.guest_id)}
+                          className="p-1.5 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer shrink-0"
+                          title="Anular Entrada"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="py-12 text-center text-zinc-500 text-xs italic">
+                    Ainda não foi registada nenhuma entrada de convidado neste evento.
+                  </div>
+                )
               ) : (
-                <div className="py-12 text-center text-zinc-500 text-xs italic">
-                  Ainda não foi registada nenhuma entrada neste evento.
-                </div>
+                staffCheckins.length > 0 ? (
+                  staffCheckins.map((sc) => {
+                    const pass = staffPasses.find((p) => p.id === sc.pass_id);
+                    return (
+                      <div
+                        key={sc.id}
+                        className="p-3 rounded-xl bg-[#0F0E17] border border-indigo-500/30 flex items-center justify-between gap-3 text-xs"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="p-1 rounded bg-indigo-500/20 text-indigo-400">
+                              <Award className="h-3.5 w-3.5" />
+                            </span>
+                            <p className="font-bold text-white truncate">
+                              {pass?.holder_name ? `${pass.holder_name} • ` : ''}{pass?.role_title || sc.role_title || 'Staff de Serviço'}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 text-[10px] text-zinc-400 mt-1 pl-6">
+                            <span className="text-indigo-400 font-semibold">
+                              {new Date(sc.checked_at).toLocaleTimeString('pt-PT', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                second: '2-digit',
+                              })}
+                            </span>
+                            <span>•</span>
+                            <span className="text-zinc-500">{sc.operator || 'Portaria'}</span>
+                            {(pass?.company_name || sc.company_name) && (
+                              <>
+                                <span>•</span>
+                                <span className="text-indigo-300 font-medium truncate">{pass?.company_name || sc.company_name}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleRevertStaff(sc.pass_id)}
+                          className="p-1.5 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer shrink-0"
+                          title="Anular Entrada de Staff"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="py-12 text-center text-zinc-500 text-xs italic">
+                    Ainda não foi registada nenhuma entrada de prestador de serviço/staff.
+                  </div>
+                )
               )}
             </div>
           </div>
