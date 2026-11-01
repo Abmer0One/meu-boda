@@ -751,27 +751,27 @@ function PortariaContent({ slug }: { slug: string }) {
         {/* Scan Result Feedback Card (High-Impact Dynamic Alert - Green for Valid, Red for Invalid/Already Used) */}
         {scanResult && (
           <div
-            className={`p-5 rounded-3xl border-2 transition-all shadow-2xl animate-in zoom-in-95 ${
+            className={`p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border-2 transition-all shadow-2xl animate-in zoom-in-95 w-full overflow-hidden ${
               scanResult.type === 'success'
                 ? 'bg-gradient-to-br from-emerald-600 to-emerald-700 border-emerald-300 text-white shadow-emerald-950/70'
                 : 'bg-gradient-to-br from-red-600 to-red-700 border-red-300 text-white shadow-red-950/70'
             }`}
           >
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-start gap-3.5">
+            <div className="flex items-start justify-between gap-2 sm:gap-3">
+              <div className="flex items-start gap-2.5 sm:gap-3.5 flex-1 min-w-0">
                 {scanResult.type === 'success' ? (
-                  <div className="p-2 rounded-2xl bg-white/20 shrink-0 mt-0.5">
-                    <CheckCircle className="h-8 w-8 text-white" />
+                  <div className="p-1.5 sm:p-2 rounded-xl sm:rounded-2xl bg-white/20 shrink-0 mt-0.5">
+                    <CheckCircle className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
                   </div>
                 ) : (
-                  <div className="p-2 rounded-2xl bg-white/20 shrink-0 mt-0.5">
-                    <XCircle className="h-8 w-8 text-white animate-pulse" />
+                  <div className="p-1.5 sm:p-2 rounded-xl sm:rounded-2xl bg-white/20 shrink-0 mt-0.5">
+                    <XCircle className="h-6 w-6 sm:h-8 sm:w-8 text-white animate-pulse" />
                   </div>
                 )}
-                <div className="space-y-1.5 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
+                <div className="space-y-1 sm:space-y-1.5 flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                     <span
-                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                      className={`inline-block px-2 sm:px-2.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-wider shrink-0 ${
                         scanResult.type === 'success'
                           ? 'bg-emerald-950/40 text-emerald-100 border border-emerald-300/40'
                           : 'bg-red-950/40 text-red-100 border border-red-300/40'
@@ -779,41 +779,43 @@ function PortariaContent({ slug }: { slug: string }) {
                     >
                       {scanResult.type === 'success' ? 'Acesso Permitido' : 'Acesso Recusado'}
                     </span>
-                    <h3 className="text-base sm:text-lg font-black tracking-tight text-white truncate">
-                      {scanResult.title}
-                    </h3>
                   </div>
-                  <p className="text-xs sm:text-sm text-white/95 leading-relaxed font-medium">
+
+                  <h3 className="text-sm sm:text-base font-black tracking-tight text-white break-words leading-snug">
+                    {scanResult.title}
+                  </h3>
+
+                  <p className="text-xs sm:text-sm text-white/95 leading-relaxed font-medium break-words">
                     {scanResult.message}
                   </p>
 
                   {/* Guest Detailed Card on Successful/Duplicate Scan */}
                   {scanResult.guest && (
-                    <div className="mt-3 p-3.5 rounded-2xl bg-black/40 border border-white/20 text-xs space-y-2 backdrop-blur-sm">
-                      <div className="flex items-center justify-between gap-2 flex-wrap">
-                        <span className="font-black text-white text-base">
+                    <div className="mt-2.5 sm:mt-3 p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl bg-black/40 border border-white/20 text-xs space-y-1.5 sm:space-y-2 backdrop-blur-sm">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2">
+                        <span className="font-black text-white text-sm sm:text-base break-words">
                           {scanResult.guest.name}
                         </span>
-                        <span className="px-2.5 py-1 rounded-full bg-white/20 text-[11px] font-bold text-white">
+                        <span className="self-start sm:self-auto px-2 py-0.5 rounded-full bg-white/20 text-[10px] sm:text-[11px] font-bold text-white shrink-0">
                           +{scanResult.guest.companions} acomp. (Total: {1 + scanResult.guest.companions} pax)
                         </span>
                       </div>
 
                       {scanResult.table && (
-                        <div className="flex items-center gap-2 text-[#FFE082] font-bold text-xs pt-0.5">
-                          <UtensilsCrossed className="h-4 w-4" />
-                          <span>Mesa: {scanResult.table.name}</span>
+                        <div className="flex items-center gap-1.5 sm:gap-2 text-[#FFE082] font-bold text-xs pt-0.5">
+                          <UtensilsCrossed className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
+                          <span className="break-words">Mesa: {scanResult.table.name}</span>
                         </div>
                       )}
 
                       {scanResult.guest.family_group && (
-                        <p className="text-[11px] text-zinc-300">
+                        <p className="text-[10px] sm:text-[11px] text-zinc-300 break-words">
                           Grupo: {scanResult.guest.family_group}
                         </p>
                       )}
 
                       {scanResult.previousCheckin && (
-                        <div className="text-[11px] text-red-100 bg-red-950/70 p-2.5 rounded-xl border border-red-400/40 mt-2 font-medium">
+                        <div className="text-[10px] sm:text-[11px] text-red-100 bg-red-950/70 p-2 sm:p-2.5 rounded-xl border border-red-400/40 mt-1.5 sm:mt-2 font-medium break-words leading-relaxed">
                           ⚠️ Primeira entrada registada às{' '}
                           <strong className="text-white underline">
                             {new Date(scanResult.previousCheckin.checked_at).toLocaleTimeString('pt-PT', {
@@ -836,7 +838,7 @@ function PortariaContent({ slug }: { slug: string }) {
                   setScanResult(null);
                   setScanVisualAlert(null);
                 }}
-                className="text-white/80 hover:text-white p-1.5 rounded-xl hover:bg-white/10 transition-colors"
+                className="text-white/80 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors shrink-0 -mr-1 -mt-1 cursor-pointer"
                 title="Fechar alerta"
               >
                 ✕
@@ -918,15 +920,15 @@ function PortariaContent({ slug }: { slug: string }) {
             >
               {/* Immediate High-Visibility Status Pill Overlay */}
               {scanVisualAlert === 'success' && (
-                <div className="absolute top-3 inset-x-3 z-30 py-2.5 px-4 rounded-2xl bg-emerald-600 border-2 border-emerald-300 text-white font-black text-xs sm:text-sm uppercase tracking-wider text-center flex items-center justify-center gap-2 shadow-2xl animate-in zoom-in-95">
-                  <CheckCircle className="h-5 w-5 text-white animate-bounce shrink-0" />
-                  <span>VÁLIDO • ENTRADA AUTORIZADA</span>
+                <div className="absolute top-2 sm:top-3 inset-x-2 sm:inset-x-3 z-30 py-2 sm:py-2.5 px-2.5 sm:px-4 rounded-xl sm:rounded-2xl bg-emerald-600 border-2 border-emerald-300 text-white font-black text-[10px] sm:text-xs uppercase tracking-wider text-center flex items-center justify-center gap-1.5 sm:gap-2 shadow-2xl animate-in zoom-in-95">
+                  <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-white animate-bounce shrink-0" />
+                  <span className="truncate">VÁLIDO • ENTRADA AUTORIZADA</span>
                 </div>
               )}
               {scanVisualAlert === 'error' && (
-                <div className="absolute top-3 inset-x-3 z-30 py-2.5 px-4 rounded-2xl bg-red-600 border-2 border-red-300 text-white font-black text-xs sm:text-sm uppercase tracking-wider text-center flex items-center justify-center gap-2 shadow-2xl animate-in zoom-in-95">
-                  <XCircle className="h-5 w-5 text-white animate-pulse shrink-0" />
-                  <span>CÓDIGO RECUSADO / JÁ UTILIZADO</span>
+                <div className="absolute top-2 sm:top-3 inset-x-2 sm:inset-x-3 z-30 py-2 sm:py-2.5 px-2.5 sm:px-4 rounded-xl sm:rounded-2xl bg-red-600 border-2 border-red-300 text-white font-black text-[10px] sm:text-xs uppercase tracking-wider text-center flex items-center justify-center gap-1.5 sm:gap-2 shadow-2xl animate-in zoom-in-95">
+                  <XCircle className="h-4 w-4 sm:h-5 sm:w-5 text-white animate-pulse shrink-0" />
+                  <span className="truncate">CÓDIGO RECUSADO / JÁ UTILIZADO</span>
                 </div>
               )}
 
