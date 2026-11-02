@@ -2,43 +2,39 @@ import { jsPDF } from 'jspdf';
 import { StaffPass } from '@/types';
 import { generateQRCode } from '@/utils/qr';
 
-interface CategoryStyle {
+export interface CategoryStyle {
   bannerBg: [number, number, number];
   bannerText: [number, number, number];
-  tagBg: [number, number, number];
-  tagText: [number, number, number];
+  hex: string;
 }
 
-function getCategoryStyle(category: string, role: string): CategoryStyle {
+export function getCategoryStyle(category: string = '', role: string = ''): CategoryStyle {
   const combined = `${category} ${role}`.toLowerCase();
 
   if (combined.includes('seguran') || combined.includes('guarda') || combined.includes('prote')) {
-    // Deep Navy / Slate
+    // Deep Midnight Slate / Navy
     return {
-      bannerBg: [30, 41, 59],
+      bannerBg: [15, 23, 42],
       bannerText: [255, 255, 255],
-      tagBg: [226, 232, 240],
-      tagText: [15, 23, 42],
+      hex: '#0F172A',
     };
   }
 
   if (combined.includes('bar') || combined.includes('cocktail') || combined.includes('bebida')) {
-    // Luxury Burgundy / Rose
+    // Luxury Burgundy / Crimson
     return {
       bannerBg: [136, 19, 55],
       bannerText: [255, 255, 255],
-      tagBg: [254, 205, 211],
-      tagText: [136, 19, 55],
+      hex: '#881337',
     };
   }
 
   if (combined.includes('cater') || combined.includes('buffet') || combined.includes('garç') || combined.includes('cozinha')) {
-    // Amber / Warm Gold
+    // Warm Amber / Rich Gold
     return {
       bannerBg: [180, 83, 9],
       bannerText: [255, 255, 255],
-      tagBg: [254, 243, 199],
-      tagText: [146, 64, 14],
+      hex: '#B45309',
     };
   }
 
@@ -47,42 +43,64 @@ function getCategoryStyle(category: string, role: string): CategoryStyle {
     return {
       bannerBg: [67, 56, 202],
       bannerText: [255, 255, 255],
-      tagBg: [224, 231, 255],
-      tagText: [49, 46, 129],
+      hex: '#4338CA',
     };
   }
 
-  if (combined.includes('som') || combined.includes('dj') || combined.includes('luz') || combined.includes('músic')) {
-    // Deep Purple
+  if (combined.includes('som') || combined.includes('dj') || combined.includes('luz') || combined.includes('músic') || combined.includes('anima')) {
+    // Deep Electric Violet
     return {
       bannerBg: [109, 40, 217],
       bannerText: [255, 255, 255],
-      tagBg: [237, 233, 254],
-      tagText: [91, 33, 182],
+      hex: '#6D28D9',
     };
   }
 
-  if (combined.includes('proto') || combined.includes('recep') || combined.includes('coord')) {
+  if (combined.includes('proto') || combined.includes('recep') || combined.includes('coord') || combined.includes('hostess')) {
     // Emerald Green
     return {
       bannerBg: [4, 120, 87],
       bannerText: [255, 255, 255],
-      tagBg: [209, 250, 229],
-      tagText: [6, 95, 70],
+      hex: '#047857',
     };
   }
 
-  // Default Luxury Charcoal / Gold
+  // Default Navy Blue (like reference 2c.jpeg)
   return {
-    bannerBg: [39, 39, 42],
+    bannerBg: [30, 41, 59],
     bannerText: [255, 255, 255],
-    tagBg: [244, 244, 245],
-    tagText: [24, 24, 27],
+    hex: '#1E293B',
   };
 }
 
+let cachedLogoDataUrl: string | null = null;
+
+export async function getLogoDataUrl(): Promise<string | null> {
+  if (cachedLogoDataUrl) return cachedLogoDataUrl;
+  if (typeof window === 'undefined') return null;
+
+  try {
+    const res = await fetch('/logo_meu_boda.png');
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        cachedLogoDataUrl = reader.result as string;
+        resolve(cachedLogoDataUrl);
+      };
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch (e) {
+    console.warn('Erro ao carregar imagem de logo do Meu Boda:', e);
+    return null;
+  }
+}
+
 /**
- * Generates an A4 PDF sheet containing up to 4 passes per page ready for cutting and lanyard lamination
+ * Generates an A4 PDF sheet containing up to 4 passes per page
+ * inspired by the authentic vertical lanyard badges with Meu Boda branding
  */
 export async function generateStaffPassesPDF(
   passes: StaffPass[],
@@ -90,91 +108,93 @@ export async function generateStaffPassesPDF(
   eventDate?: string
 ): Promise<jsPDF> {
   const doc = new jsPDF('p', 'mm', 'a4');
-  const pageWidth = 210;
-  const pageHeight = 297;
 
   // Grid configuration: 2 columns x 2 rows = 4 passes per A4 page
-  const cardWidth = 92;
-  const cardHeight = 132;
-  const marginX = 9;
-  const marginY = 12;
-  const gapX = 8;
-  const gapY = 9;
+  const cardW = 88;
+  const cardH = 133;
+
+  const positions = [
+    { x: 11, y: 11 },
+    { x: 111, y: 11 },
+    { x: 11, y: 153 },
+    { x: 111, y: 153 },
+  ];
+
+  const logoDataUrl = await getLogoDataUrl();
 
   for (let i = 0; i < passes.length; i++) {
-    const pageIndex = Math.floor(i / 4);
     const posInPage = i % 4;
 
     if (i > 0 && posInPage === 0) {
       doc.addPage();
     }
 
-    const col = posInPage % 2;
-    const row = Math.floor(posInPage / 2);
-
-    const x = marginX + col * (cardWidth + gapX);
-    const y = marginY + row * (cardHeight + gapY);
-
+    const { x, y } = positions[posInPage];
     const pass = passes[i];
     const style = getCategoryStyle(pass.category, pass.role_title);
+    const displayName = pass.holder_name?.trim() || pass.role_title;
 
-    // 1. Draw outer cutting marks / border
-    doc.setDrawColor(210, 210, 215);
-    doc.setLineWidth(0.4);
-    doc.roundedRect(x, y, cardWidth, cardHeight, 3.5, 3.5);
-
-    // Card background
+    // 1. Card Background & Subtle Border
     doc.setFillColor(255, 255, 255);
-    doc.roundedRect(x + 0.2, y + 0.2, cardWidth - 0.4, cardHeight - 0.4, 3.5, 3.5, 'F');
+    doc.roundedRect(x, y, cardW, cardH, 5, 5, 'F');
+    doc.setDrawColor(226, 232, 240);
+    doc.setLineWidth(0.4);
+    doc.roundedRect(x, y, cardW, cardH, 5, 5, 'D');
 
-    // 2. Top Header Banner
-    doc.setFillColor(...style.bannerBg);
-    doc.roundedRect(x, y, cardWidth, 24, 3.5, 3.5, 'F');
-    // Square off the bottom corners of the banner
-    doc.rect(x, y + 16, cardWidth, 8, 'F');
+    // 2. Lanyard Slot Punch Cutout Guide at Top (matching 2c.jpeg / 1c.jpeg)
+    const slotW = 15;
+    const slotH = 3.6;
+    doc.setFillColor(241, 245, 249);
+    doc.setDrawColor(203, 213, 225);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(x + (cardW - slotW) / 2, y + 5, slotW, slotH, 1.8, 1.8, 'FD');
 
-    // Header Text: Event Title
-    doc.setTextColor(...style.bannerText);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10.5);
-    const titleText = (eventTitle || 'O Nosso Casamento').toUpperCase();
-    doc.text(titleText, x + cardWidth / 2, y + 8.5, { align: 'center', maxWidth: cardWidth - 8 });
+    // 3. Circular Emblem with Meu Boda Logo
+    const logoSize = 12;
+    const logoX = x + (cardW - logoSize) / 2;
+    const logoY = y + 10.5;
 
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(6.5);
-    doc.setTextColor(230, 230, 230);
-    doc.text('CREDENCIAL OFICIAL DE STAFF / SERVIÇO', x + cardWidth / 2, y + 14, { align: 'center' });
+    doc.setFillColor(255, 255, 255);
+    doc.setDrawColor(226, 232, 240);
+    doc.setLineWidth(0.3);
+    doc.circle(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2 + 1, 'FD');
 
-    if (eventDate) {
-      doc.setFontSize(6);
-      doc.text(eventDate, x + cardWidth / 2, y + 18.5, { align: 'center' });
+    if (logoDataUrl) {
+      doc.addImage(logoDataUrl, 'PNG', logoX, logoY, logoSize, logoSize);
+    } else {
+      // Fallback elegant monogram
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(180, 83, 9);
+      doc.text('MB', x + cardW / 2, logoY + 8, { align: 'center' });
     }
 
-    // 3. Role Badge Pill
-    const pillY = y + 27;
-    doc.setFillColor(...style.tagBg);
-    doc.roundedRect(x + 6, pillY, cardWidth - 12, 10, 2, 2, 'F');
-
-    doc.setTextColor(...style.tagText);
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.text(pass.role_title.toUpperCase(), x + cardWidth / 2, pillY + 7, { align: 'center' });
+    doc.setFontSize(5);
+    doc.setTextColor(71, 85, 105);
+    doc.text('MEU BODA', x + cardW / 2, logoY + logoSize + 3.8, { align: 'center' });
 
-    // 4. Holder Name (or Team / Generic identifier)
-    const nameY = y + 43;
+    // 4. Person Name (Large, Bold, Modern like 2c.jpeg "Your Name")
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(24, 24, 27);
-    doc.setFontSize(11.5);
-    const displayName = pass.holder_name?.trim() || 'Equipa de Serviço';
-    doc.text(displayName, x + cardWidth / 2, nameY, { align: 'center', maxWidth: cardWidth - 10 });
+    doc.setFontSize(13);
+    doc.setTextColor(15, 23, 42);
+    doc.text(displayName, x + cardW / 2, y + 36, { align: 'center', maxWidth: cardW - 8 });
 
-    // Company Name / Vendor
+    // 5. Profession / Role & Company (Clean uppercase like 2c.jpeg "YOUR PROFESSION")
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(100, 116, 139);
+    const roleComp = `${pass.role_title} • ${pass.company_name}`.toUpperCase();
+    doc.text(roleComp, x + cardW / 2, y + 41, { align: 'center', maxWidth: cardW - 8 });
+
+    // Event title & date
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    doc.setTextColor(113, 113, 122);
-    doc.text(`Empresa: ${pass.company_name}`, x + cardWidth / 2, nameY + 5.5, { align: 'center', maxWidth: cardWidth - 10 });
+    doc.setFontSize(6);
+    doc.setTextColor(148, 163, 184);
+    const eventSubtitle = (eventTitle || 'O Nosso Casamento').toUpperCase();
+    doc.text(eventSubtitle, x + cardW / 2, y + 45.5, { align: 'center', maxWidth: cardW - 8 });
 
-    // 5. QR Code in Center
+    // 6. QR Code in Center (Large, Sharp, High Scanning Contrast)
     const qrPayload = JSON.stringify({
       token: pass.qr_token,
       staffPassId: pass.id,
@@ -185,65 +205,71 @@ export async function generateStaffPassesPDF(
     });
 
     const qrDataUrl = await generateQRCode(qrPayload, {
-      width: 250,
+      width: 320,
       margin: 1,
     });
 
-    const qrSize = 38;
-    const qrX = x + (cardWidth - qrSize) / 2;
-    const qrY = y + 54;
+    const qrSize = 39;
+    const qrX = x + (cardW - qrSize) / 2;
+    const qrY = y + 49;
+
+    doc.setDrawColor(241, 245, 249);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(qrX - 1.5, qrY - 1.5, qrSize + 3, qrSize + 3, 2, 2, 'D');
 
     if (qrDataUrl) {
       doc.addImage(qrDataUrl, 'PNG', qrX, qrY, qrSize, qrSize);
     }
 
-    // Border around QR code
-    doc.setDrawColor(228, 228, 231);
-    doc.setLineWidth(0.3);
-    doc.rect(qrX - 1.5, qrY - 1.5, qrSize + 3, qrSize + 3);
+    // Monospace Token ID
+    doc.setFont('courier', 'bold');
+    doc.setFontSize(6.5);
+    doc.setTextColor(148, 163, 184);
+    doc.text(`ID: ${pass.qr_token.toUpperCase()}`, x + cardW / 2, qrY + qrSize + 4.5, { align: 'center' });
 
-    // 6. Access Zone & Instructions
-    const accessY = y + 99;
-    doc.setFillColor(248, 250, 252);
-    doc.roundedRect(x + 6, accessY, cardWidth - 12, 14, 2, 2, 'F');
-    doc.setDrawColor(226, 232, 240);
-    doc.roundedRect(x + 6, accessY, cardWidth - 12, 14, 2, 2, 'D');
+    // 7. Bottom Sector Banner (Solid colored block with giant bold STAFF like 2c.jpeg)
+    const bannerH = 30;
+    const bannerY = y + cardH - bannerH;
+    doc.setFillColor(style.bannerBg[0], style.bannerBg[1], style.bannerBg[2]);
+    doc.roundedRect(x, bannerY, cardW, bannerH, 5, 5, 'F');
+    doc.rect(x, bannerY, cardW, 5, 'F'); // Square off top corners of the bottom banner
 
+    // Giant Bold STAFF
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(21);
+    doc.setTextColor(255, 255, 255);
+    doc.text('STAFF', x + cardW / 2, bannerY + 13.5, { align: 'center' });
+
+    // Sector & Access Zone
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(6.5);
-    doc.setTextColor(71, 85, 105);
-    const accessZone = pass.access_level || 'Zona de Serviço • Acesso Técnico';
-    doc.text(`ZONA PERMITIDA: ${accessZone.toUpperCase()}`, x + cardWidth / 2, accessY + 5.5, { align: 'center' });
+    doc.setTextColor(226, 232, 240);
+    const accessZone = pass.access_level || 'Acesso Autorizado';
+    const sectorZoneText = `${pass.category} • ${accessZone}`.toUpperCase();
+    doc.text(sectorZoneText, x + cardW / 2, bannerY + 20, { align: 'center', maxWidth: cardW - 6 });
 
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(5.5);
-    doc.setTextColor(100, 116, 139);
-    doc.text('Apresente este passe no leitor da portaria à entrada.', x + cardWidth / 2, accessY + 10, { align: 'center' });
-
-    // 7. Footer Bar
-    const footerY = y + 116;
-    doc.setDrawColor(241, 245, 249);
-    doc.line(x + 6, footerY, x + cardWidth - 6, footerY);
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(5.5);
-    doc.setTextColor(148, 163, 184);
-    doc.text(`ID: ${pass.qr_token.toUpperCase()}`, x + cardWidth / 2, footerY + 5, { align: 'center' });
-
+    // Brand subtext
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(5);
-    doc.setTextColor(161, 161, 170);
-    doc.text('Meu Boda • Controlo de Acesso & Segurança', x + cardWidth / 2, footerY + 9, { align: 'center' });
+    doc.setTextColor(203, 213, 225);
+    const dateFooter = eventDate ? ` • ${eventDate}` : '';
+    doc.text(`Meu Boda • Controlo Oficial de Portaria${dateFooter}`, x + cardW / 2, bannerY + 25.5, { align: 'center' });
 
-    // Scissor Cut guides
+    // 8. Corner Cutting Tick Marks (cross marks at corners)
     doc.setDrawColor(180, 180, 185);
     doc.setLineWidth(0.2);
-    // Top-left cross mark
+    // top-left
     doc.line(x - 2, y, x + 2, y);
     doc.line(x, y - 2, x, y + 2);
-    // Bottom-right cross mark
-    doc.line(x + cardWidth - 2, y + cardHeight, x + cardWidth + 2, y + cardHeight);
-    doc.line(x + cardWidth, y + cardHeight - 2, x + cardWidth, y + cardHeight + 2);
+    // top-right
+    doc.line(x + cardW - 2, y, x + cardW + 2, y);
+    doc.line(x + cardW, y - 2, x + cardW, y + 2);
+    // bottom-left
+    doc.line(x - 2, y + cardH, x + 2, y + cardH);
+    doc.line(x, y + cardH - 2, x, y + cardH + 2);
+    // bottom-right
+    doc.line(x + cardW - 2, y + cardH, x + cardW + 2, y + cardH);
+    doc.line(x + cardW, y + cardH - 2, x + cardW, y + cardH + 2);
   }
 
   return doc;
@@ -276,6 +302,7 @@ export async function downloadSingleStaffPassPDF(
 
 /**
  * Generates and downloads a high-resolution digital pass PNG for WhatsApp sharing
+ * styled like authentic lanyard badges with Meu Boda logo
  */
 export async function downloadStaffPassDigitalCardPNG(
   pass: StaffPass,
@@ -293,64 +320,108 @@ export async function downloadStaffPassDigitalCardPNG(
   if (!ctx) return false;
 
   const style = getCategoryStyle(pass.category, pass.role_title);
-  const bannerColor = `rgb(${style.bannerBg.join(',')})`;
-  const tagBgColor = `rgb(${style.tagBg.join(',')})`;
-  const tagTextColor = `rgb(${style.tagText.join(',')})`;
+  const displayName = pass.holder_name?.trim() || pass.role_title;
 
-  // Background
-  ctx.fillStyle = '#FFFFFF';
+  // 1. Soft neutral background canvas
+  ctx.fillStyle = '#F8FAFC';
   ctx.fillRect(0, 0, width, height);
 
-  // Outer Border & rounded card
-  ctx.strokeStyle = '#E4E4E7';
-  ctx.lineWidth = 6;
-  ctx.strokeRect(16, 16, width - 32, height - 32);
+  // 2. White Card Container with rounded corners
+  const cardX = 30;
+  const cardY = 30;
+  const cardW = width - 60;
+  const cardH = height - 60;
+  const cardRadius = 36;
 
-  // Top Banner
-  ctx.fillStyle = bannerColor;
-  ctx.fillRect(16, 16, width - 32, 220);
-
-  // Event Title
+  // Drop shadow for the card
+  ctx.save();
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.08)';
+  ctx.shadowBlur = 30;
+  ctx.shadowOffsetY = 15;
   ctx.fillStyle = '#FFFFFF';
-  ctx.font = 'bold 36px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText((eventTitle || 'O NOSSO CASAMENTO').toUpperCase(), width / 2, 90);
+  ctx.beginPath();
+  ctx.roundRect(cardX, cardY, cardW, cardH, cardRadius);
+  ctx.fill();
+  ctx.restore();
 
-  ctx.fillStyle = '#E2E8F0';
-  ctx.font = 'bold 20px sans-serif';
-  ctx.fillText('CREDENCIAL OFICIAL DE STAFF / SERVIÇO', width / 2, 140);
+  // Subtle border around card
+  ctx.strokeStyle = '#E2E8F0';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.roundRect(cardX, cardY, cardW, cardH, cardRadius);
+  ctx.stroke();
 
-  if (eventDate) {
-    ctx.font = '18px sans-serif';
-    ctx.fillText(eventDate, width / 2, 180);
+  // 3. Lanyard slot punch pill cutout at top center
+  const slotW = 140;
+  const slotH = 34;
+  const slotX = (width - slotW) / 2;
+  const slotY = 65;
+  ctx.fillStyle = '#F1F5F9';
+  ctx.strokeStyle = '#CBD5E1';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.roundRect(slotX, slotY, slotW, slotH, slotH / 2);
+  ctx.fill();
+  ctx.stroke();
+
+  // 4. Circular Logo Emblem
+  const emblemCenterX = width / 2;
+  const emblemCenterY = 175;
+  const emblemRadius = 55;
+
+  ctx.fillStyle = '#FFFFFF';
+  ctx.strokeStyle = '#E2E8F0';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.arc(emblemCenterX, emblemCenterY, emblemRadius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  // Load and draw logo
+  const logoDataUrl = await getLogoDataUrl();
+  if (logoDataUrl) {
+    const logoImg = new Image();
+    await new Promise<void>((resolve) => {
+      logoImg.onload = () => {
+        const logoSize = 85;
+        ctx.drawImage(
+          logoImg,
+          emblemCenterX - logoSize / 2,
+          emblemCenterY - logoSize / 2,
+          logoSize,
+          logoSize
+        );
+        resolve();
+      };
+      logoImg.onerror = () => resolve();
+      logoImg.src = logoDataUrl;
+    });
   }
 
-  // Role Pill
-  ctx.fillStyle = tagBgColor;
-  ctx.beginPath();
-  const pillY = 270;
-  const pillH = 80;
-  const pillW = width - 120;
-  const pillX = 60;
-  ctx.roundRect(pillX, pillY, pillW, pillH, 20);
-  ctx.fill();
+  // MEU BODA text
+  ctx.fillStyle = '#475569';
+  ctx.font = 'bold 20px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('MEU BODA', width / 2, emblemCenterY + emblemRadius + 28);
 
-  ctx.fillStyle = tagTextColor;
-  ctx.font = '900 40px sans-serif';
-  ctx.fillText(pass.role_title.toUpperCase(), width / 2, pillY + 54);
-
-  // Holder Name
-  ctx.fillStyle = '#18181B';
+  // 5. Person Name (Large, Bold, Modern like 2c.jpeg)
+  ctx.fillStyle = '#0F172A';
   ctx.font = 'bold 44px sans-serif';
-  const displayName = pass.holder_name?.trim() || 'Equipa de Serviço';
-  ctx.fillText(displayName, width / 2, 420);
+  ctx.fillText(displayName, width / 2, 335);
 
-  // Company Name
-  ctx.fillStyle = '#71717A';
-  ctx.font = '600 28px sans-serif';
-  ctx.fillText(`Empresa: ${pass.company_name}`, width / 2, 470);
+  // 6. Profession & Company (Clean uppercase subtitle)
+  ctx.fillStyle = '#64748B';
+  ctx.font = 'bold 24px sans-serif';
+  const roleCompanyText = `${pass.role_title} • ${pass.company_name}`.toUpperCase();
+  ctx.fillText(roleCompanyText, width / 2, 375);
 
-  // QR Code
+  // Event Title
+  ctx.fillStyle = '#94A3B8';
+  ctx.font = '600 20px sans-serif';
+  const eventSubtitle = (eventTitle || 'O Nosso Casamento').toUpperCase();
+  ctx.fillText(eventSubtitle, width / 2, 412);
+
+  // 7. QR Code in Center
   const qrPayload = JSON.stringify({
     token: pass.qr_token,
     staffPassId: pass.id,
@@ -362,7 +433,7 @@ export async function downloadStaffPassDigitalCardPNG(
 
   const qrDataUrl = await generateQRCode(qrPayload, {
     width: 400,
-    margin: 2,
+    margin: 1,
   });
 
   if (qrDataUrl) {
@@ -371,11 +442,16 @@ export async function downloadStaffPassDigitalCardPNG(
       qrImg.onload = () => {
         const qrSize = 360;
         const qrX = (width - qrSize) / 2;
-        const qrY = 530;
+        const qrY = 445;
 
-        ctx.strokeStyle = '#D4D4D8';
-        ctx.lineWidth = 4;
-        ctx.strokeRect(qrX - 10, qrY - 10, qrSize + 20, qrSize + 20);
+        // Subtle frame around QR
+        ctx.fillStyle = '#FFFFFF';
+        ctx.strokeStyle = '#E2E8F0';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.roundRect(qrX - 12, qrY - 12, qrSize + 24, qrSize + 24, 16);
+        ctx.fill();
+        ctx.stroke();
 
         ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
         resolve();
@@ -384,39 +460,50 @@ export async function downloadStaffPassDigitalCardPNG(
     });
   }
 
-  // Access Zone
-  const zoneY = 940;
-  ctx.fillStyle = '#F8FAFC';
-  ctx.beginPath();
-  ctx.roundRect(60, zoneY, width - 120, 110, 16);
-  ctx.fill();
-  ctx.strokeStyle = '#E2E8F0';
-  ctx.lineWidth = 2;
-  ctx.stroke();
-
-  ctx.fillStyle = '#334155';
-  ctx.font = 'bold 22px sans-serif';
-  const accessZone = pass.access_level || 'Zona de Serviço • Acesso Técnico';
-  ctx.fillText(`ZONA PERMITIDA: ${accessZone.toUpperCase()}`, width / 2, zoneY + 45);
-
-  ctx.fillStyle = '#64748B';
-  ctx.font = '18px sans-serif';
-  ctx.fillText('Apresente este código no leitor da portaria à entrada.', width / 2, zoneY + 80);
-
-  // Footer
+  // Token ID under QR code
   ctx.fillStyle = '#94A3B8';
   ctx.font = 'bold 20px monospace';
-  ctx.fillText(`ID: ${pass.qr_token.toUpperCase()}`, width / 2, 1110);
+  ctx.fillText(`ID: ${pass.qr_token.toUpperCase()}`, width / 2, 850);
 
-  ctx.fillStyle = '#A1A1AA';
-  ctx.font = '16px sans-serif';
-  ctx.fillText('Meu Boda • Tecnologia para Eventos de Luxo', width / 2, 1145);
+  // 8. Bottom Sector Banner (Solid colored block with giant bold STAFF like 2c.jpeg)
+  const bannerH = 250;
+  const bannerY = cardY + cardH - bannerH;
+
+  ctx.save();
+  // Clip to card's rounded bottom
+  ctx.beginPath();
+  ctx.roundRect(cardX, cardY, cardW, cardH, cardRadius);
+  ctx.clip();
+
+  ctx.fillStyle = style.hex;
+  ctx.fillRect(cardX, bannerY, cardW, bannerH);
+
+  // Giant bold white STAFF
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = '900 68px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('STAFF', width / 2, bannerY + 105);
+
+  // Sector & Access Zone
+  ctx.fillStyle = '#E2E8F0';
+  ctx.font = 'bold 22px sans-serif';
+  const accessZone = pass.access_level || 'Acesso Autorizado';
+  const sectorZoneText = `${pass.category} • ${accessZone}`.toUpperCase();
+  ctx.fillText(sectorZoneText, width / 2, bannerY + 155);
+
+  // Footer text
+  ctx.fillStyle = '#CBD5E1';
+  ctx.font = '18px sans-serif';
+  const dateFooter = eventDate ? ` • ${eventDate}` : '';
+  ctx.fillText(`Meu Boda • Controlo Oficial de Portaria${dateFooter}`, width / 2, bannerY + 200);
+
+  ctx.restore();
 
   // Trigger download
   const cleanName = (pass.holder_name || pass.role_title).toLowerCase().replace(/\s+/g, '-');
   const link = document.createElement('a');
   link.href = canvas.toDataURL('image/png');
-  link.download = `passe-digital-${cleanName}.png`;
+  link.download = `cracha-digital-${cleanName}.png`;
   document.body.appendChild(link);
   link.click();
   link.remove();

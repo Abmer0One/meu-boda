@@ -7,6 +7,7 @@ import {
   downloadStaffPassesPDF,
   downloadSingleStaffPassPDF,
   downloadStaffPassDigitalCardPNG,
+  getCategoryStyle,
 } from '@/utils/staff-pass-pdf';
 import { generateQRCode } from '@/utils/qr';
 import { Button } from '@/components/ui/Button';
@@ -390,96 +391,117 @@ export default function StaffPassTab({ event, vendors }: StaffPassTabProps) {
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
           {filteredPasses.map((pass) => {
             const qrThumb = qrPreviews[pass.id];
+            const style = getCategoryStyle(pass.category, pass.role_title);
+            const displayName = pass.holder_name?.trim() || pass.role_title;
 
             return (
               <div
                 key={pass.id}
-                className="bg-card-bg border border-border-custom rounded-2xl p-4 shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-3 group"
+                className="bg-white border-2 border-zinc-200 dark:border-zinc-700/80 rounded-3xl overflow-hidden shadow-md hover:shadow-xl transition-all flex flex-col justify-between group relative"
               >
-                {/* Header Tag */}
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-secondary/30 text-foreground/70 truncate">
-                      {pass.category}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleDeletePass(pass.id)}
-                      className="text-foreground/40 hover:text-red-500 p-1 rounded transition-colors opacity-0 group-hover:opacity-100"
-                      title="Eliminar passe"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
+                {/* Delete button (hover) */}
+                <button
+                  type="button"
+                  onClick={() => handleDeletePass(pass.id)}
+                  className="absolute top-2.5 right-2.5 text-zinc-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-zinc-100 transition-colors opacity-0 group-hover:opacity-100 z-10 cursor-pointer"
+                  title="Eliminar passe"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
 
-                  <h4 className="text-sm font-black text-foreground uppercase tracking-tight truncate pt-1">
-                    {pass.role_title}
-                  </h4>
-                  <p className="text-xs font-semibold text-primary truncate">
-                    {pass.holder_name || 'Equipa de Serviço'}
-                  </p>
-                  <p className="text-[11px] text-foreground/60 truncate flex items-center gap-1">
-                    <Building2 className="h-3 w-3 shrink-0 text-foreground/40" />
-                    <span>{pass.company_name}</span>
-                  </p>
-                </div>
+                {/* Badge Body (Authentic Lanyard Badge Look) */}
+                <div className="p-4 flex flex-col items-center text-center space-y-2">
+                  {/* Lanyard Slot Cutout Guide */}
+                  <div className="w-12 h-2.5 rounded-full bg-zinc-100 border border-zinc-300 mx-auto" />
 
-                {/* QR Code Box */}
-                <div className="p-3 bg-white rounded-xl border border-zinc-200 flex flex-col items-center justify-center aspect-square max-w-[130px] mx-auto w-full shadow-inner">
-                  {qrThumb ? (
+                  {/* Meu Boda Circular Logo Emblem */}
+                  <div className="w-11 h-11 rounded-full border border-zinc-200 p-1 bg-white shadow-xs flex items-center justify-center">
                     <img
-                      src={qrThumb}
-                      alt="QR Code"
+                      src="/logo_meu_boda.png"
+                      alt="Meu Boda"
                       className="w-full h-full object-contain"
                     />
-                  ) : (
-                    <QrCode className="h-10 w-10 text-zinc-400 animate-pulse" />
-                  )}
-                  <span className="text-[8px] font-mono text-zinc-500 uppercase font-bold tracking-wider mt-1">
+                  </div>
+                  <span className="text-[8px] font-bold tracking-widest text-zinc-400 uppercase">
+                    Meu Boda
+                  </span>
+
+                  {/* Person Name (Bold, Modern like reference 2c.jpeg) */}
+                  <div className="space-y-0.5 pt-0.5 w-full px-1">
+                    <h4 className="text-sm font-black text-zinc-900 truncate">
+                      {displayName}
+                    </h4>
+                    <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-tight truncate">
+                      {pass.role_title} • {pass.company_name}
+                    </p>
+                    <p className="text-[9px] text-zinc-400 truncate">
+                      {event.title}
+                    </p>
+                  </div>
+
+                  {/* Centered QR Code */}
+                  <div className="p-2 bg-white rounded-xl border border-zinc-200 shadow-inner max-w-[130px] w-full aspect-square flex flex-col items-center justify-center my-1">
+                    {qrThumb ? (
+                      <img
+                        src={qrThumb}
+                        alt="QR Code"
+                        className="w-full h-full object-contain"
+                      />
+                    ) : (
+                      <QrCode className="h-10 w-10 text-zinc-300 animate-pulse" />
+                    )}
+                  </div>
+                  <span className="text-[8px] font-mono text-zinc-400 font-bold uppercase tracking-wider">
                     {pass.qr_token.substring(0, 10)}
                   </span>
                 </div>
 
-                {/* Zone Pill */}
-                <div className="text-center">
-                  <span className="inline-block px-2 py-0.5 rounded-full bg-secondary/20 text-[9px] font-semibold text-foreground/70 truncate max-w-full">
-                    {pass.access_level || 'Zona de Serviço'}
-                  </span>
+                {/* Bottom Sector Banner (Solid colored block with giant STAFF like 2c.jpeg) */}
+                <div
+                  style={{ backgroundColor: style.hex }}
+                  className="px-3 py-2.5 text-white text-center rounded-b-2xl space-y-0.5 shadow-inner"
+                >
+                  <p className="text-base font-black tracking-widest uppercase leading-none">
+                    STAFF
+                  </p>
+                  <p className="text-[9px] font-bold text-white/90 uppercase tracking-tight truncate">
+                    {pass.category} • {pass.access_level || 'Acesso Autorizado'}
+                  </p>
                 </div>
 
-                {/* Action Buttons */}
-                <div className="grid grid-cols-2 gap-1.5 pt-1 border-t border-border-custom/50">
-                  <button
-                    type="button"
-                    onClick={() => handleDownloadSinglePNG(pass)}
-                    disabled={actionLoadingId === `png_${pass.id}`}
-                    className="py-1.5 px-2 rounded-lg bg-secondary/20 hover:bg-secondary/40 text-[11px] font-bold text-foreground flex items-center justify-center gap-1 transition-colors cursor-pointer"
-                    title="Baixar Cartão Imagem para enviar pelo WhatsApp"
-                  >
-                    {actionLoadingId === `png_${pass.id}` ? (
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                    ) : (
-                      <Share2 className="h-3 w-3 text-emerald-500" />
-                    )}
-                    <span>WhatsApp</span>
-                  </button>
-
+                {/* Action Buttons Toolbar */}
+                <div className="p-2 bg-zinc-50 border-t border-zinc-200 flex items-center justify-between gap-1.5">
                   <button
                     type="button"
                     onClick={() => handleDownloadSinglePDF(pass)}
                     disabled={actionLoadingId === `pdf_${pass.id}`}
-                    className="py-1.5 px-2 rounded-lg bg-secondary/20 hover:bg-secondary/40 text-[11px] font-bold text-foreground flex items-center justify-center gap-1 transition-colors cursor-pointer"
-                    title="Baixar PDF pronto para imprimir"
+                    className="flex-1 py-1.5 px-2 rounded-xl bg-white hover:bg-zinc-100 border border-zinc-200 text-zinc-700 text-[11px] font-bold transition-all flex items-center justify-center gap-1 shadow-xs cursor-pointer disabled:opacity-50"
+                    title="Baixar Crachá em PDF"
                   >
                     {actionLoadingId === `pdf_${pass.id}` ? (
-                      <Loader2 className="h-3 w-3 animate-spin" />
+                      <Loader2 className="h-3 w-3 animate-spin text-zinc-600" />
                     ) : (
-                      <FileText className="h-3 w-3 text-primary" />
+                      <FileText className="h-3 w-3 text-zinc-600" />
                     )}
                     <span>PDF</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleDownloadSinglePNG(pass)}
+                    disabled={actionLoadingId === `png_${pass.id}`}
+                    className="flex-1 py-1.5 px-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold transition-all flex items-center justify-center gap-1 shadow-xs cursor-pointer disabled:opacity-50"
+                    title="Baixar Cartão Imagem PNG para enviar pelo WhatsApp"
+                  >
+                    {actionLoadingId === `png_${pass.id}` ? (
+                      <Loader2 className="h-3 w-3 animate-spin text-white" />
+                    ) : (
+                      <Share2 className="h-3 w-3" />
+                    )}
+                    <span>WhatsApp</span>
                   </button>
                 </div>
               </div>
