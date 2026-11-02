@@ -99,10 +99,14 @@ function extractScanPayload(rawText: string): {
   if (parsedJson && typeof parsedJson === 'object') {
     const isStaff =
       Boolean(parsedJson.staffPassId) ||
-      (parsedJson.token && String(parsedJson.token).startsWith('stf_'));
+      Boolean(parsedJson.role) ||
+      Boolean(parsedJson.role_title) ||
+      (parsedJson.token && String(parsedJson.token).toLowerCase().includes('stf_')) ||
+      text.toLowerCase().includes('staff') ||
+      text.toLowerCase().includes('stf_');
 
     return {
-      tokenCandidate: parsedJson.token || parsedJson.qr_token || parsedJson.qrToken,
+      tokenCandidate: parsedJson.token || parsedJson.qr_token || parsedJson.qrToken || parsedJson.staffPassId || parsedJson.id,
       guestIdCandidate: parsedJson.guestId || parsedJson.guest_id || parsedJson.id,
       eventIdCandidate: parsedJson.eventId || parsedJson.event_id,
       isStaffCandidate: isStaff,
@@ -119,8 +123,8 @@ function extractScanPayload(rawText: string): {
     };
   }
 
-  // 3. Check for raw staff token (starts with stf_)
-  const isStaff = text.toLowerCase().startsWith('stf_');
+  // 3. Check for raw staff token (starts with stf_ or pass_)
+  const isStaff = text.toLowerCase().includes('stf_') || text.toLowerCase().startsWith('pass_');
 
   // 4. Fallback: treat the clean string itself as token candidate and guestId candidate
   return {
@@ -468,7 +472,7 @@ function PortariaContent({ slug }: { slug: string }) {
       return false;
     });
 
-    // 2. Fallback: query repository in case it was created recently
+    // 2. Fallback: query repository in case it was created recently or belongs to linked event
     if (!matchedPass && (rawToken || passId)) {
       try {
         if (rawToken) {
@@ -477,6 +481,12 @@ function PortariaContent({ slug }: { slug: string }) {
         if (!matchedPass && passId) {
           const all = await StaffPassRepository.getAll(event.id);
           matchedPass = all.find((p) => p.id === passId);
+        }
+        if (!matchedPass && rawToken) {
+          matchedPass = (await StaffPassRepository.getByToken(rawToken)) || undefined;
+        }
+        if (!matchedPass && passId) {
+          matchedPass = (await StaffPassRepository.getByToken(passId)) || undefined;
         }
         if (matchedPass) {
           setStaffPasses((prev) => [...prev.filter((p) => p.id !== matchedPass!.id), matchedPass!]);
@@ -576,17 +586,28 @@ function PortariaContent({ slug }: { slug: string }) {
     // If QR is recognized as a staff credential
     const isStaff =
       isStaffCandidate ||
-      (tokenCandidate && tokenCandidate.toLowerCase().startsWith('stf_')) ||
+      (tokenCandidate && tokenCandidate.toLowerCase().includes('stf_')) ||
       decodedText.includes('staffPassId') ||
-      decodedText.includes('__event_staff_passes__');
+      decodedText.includes('__event_staff_passes__') ||
+      decodedText.includes('stf_') ||
+      decodedText.includes('pass_') ||
+      decodedText.toLowerCase().includes('staff');
 
     if (isStaff) {
       await handleProcessStaffScan(tokenCandidate, staffPayload);
       return;
     }
 
-    // If QR payload contains an eventId that belongs to a different event, reject immediately with red alert
+    // If QR payload contains an eventId that belongs to a different event, check if it's staff first before rejecting
     if (eventIdCandidate && event && eventIdCandidate !== event.id) {
+      try {
+        const possibleStaff = await StaffPassRepository.getByToken(tokenCandidate || decodedText);
+        if (possibleStaff) {
+          await handleProcessStaffScan(tokenCandidate, possibleStaff);
+          return;
+        }
+      } catch (e) {}
+
       playFeedbackSound('error');
       triggerVisualAlert('error');
       setScanResult({

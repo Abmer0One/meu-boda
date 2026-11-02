@@ -30,13 +30,53 @@ export const StaffPassRepository = {
 
       if (!error && data?.content) {
         const parsed = JSON.parse(data.content) as StaffPass[];
-        if (Array.isArray(parsed)) {
+        if (Array.isArray(parsed) && parsed.length > 0) {
           if (typeof window !== 'undefined') {
             try {
               localStorage.setItem(`staff_passes_${eventId}`, data.content);
             } catch (e) {}
           }
           return parsed;
+        }
+      }
+
+      // Check sister events with identical title if no passes directly under this eventId
+      const { data: ev } = await supabase
+        .from('events')
+        .select('title')
+        .eq('id', eventId)
+        .maybeSingle();
+
+      if (ev?.title) {
+        const { data: sisterEvents } = await supabase
+          .from('events')
+          .select('id')
+          .eq('title', ev.title);
+
+        const sisterIds = (sisterEvents || [])
+          .map((s) => s.id)
+          .filter((id) => id !== eventId);
+
+        if (sisterIds.length > 0) {
+          const { data: sisterBlock } = await supabase
+            .from('event_info_blocks')
+            .select('content, event_id')
+            .in('event_id', sisterIds)
+            .eq('title', STAFF_PASSES_BLOCK_TITLE)
+            .limit(1)
+            .maybeSingle();
+
+          if (sisterBlock?.content) {
+            const parsed = JSON.parse(sisterBlock.content) as StaffPass[];
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              if (typeof window !== 'undefined') {
+                try {
+                  localStorage.setItem(`staff_passes_${eventId}`, sisterBlock.content);
+                } catch (e) {}
+              }
+              return parsed;
+            }
+          }
         }
       }
     } catch (err) {
@@ -154,16 +194,51 @@ export const StaffPassRepository = {
   },
 
   /**
-   * Finds a staff pass by token
+   * Finds a staff pass by token or ID across event data and Supabase blocks
    */
   async getByToken(token: string, eventId?: string): Promise<StaffPass | null> {
     const cleanToken = token.trim();
     if (!cleanToken) return null;
 
+    // 1. Check in local event state first if eventId provided
     if (eventId) {
       const list = await this.getAll(eventId);
-      const match = list.find((p) => p.qr_token.toLowerCase() === cleanToken.toLowerCase());
+      const match = list.find(
+        (p) =>
+          (p.qr_token && p.qr_token.toLowerCase() === cleanToken.toLowerCase()) ||
+          (p.id && p.id.toLowerCase() === cleanToken.toLowerCase())
+      );
       if (match) return match;
+    }
+
+    // 2. Query Supabase event_info_blocks directly across all staff pass blocks
+    try {
+      const { data, error } = await supabase
+        .from('event_info_blocks')
+        .select('content, event_id')
+        .eq('title', STAFF_PASSES_BLOCK_TITLE);
+
+      if (!error && data) {
+        for (const block of data) {
+          if (block.content) {
+            try {
+              const parsed = JSON.parse(block.content) as StaffPass[];
+              if (Array.isArray(parsed)) {
+                const match = parsed.find(
+                  (p) =>
+                    (p.qr_token && p.qr_token.toLowerCase() === cleanToken.toLowerCase()) ||
+                    (p.id && p.id.toLowerCase() === cleanToken.toLowerCase())
+                );
+                if (match) {
+                  return match;
+                }
+              }
+            } catch {}
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Erro ao pesquisar passe de staff na nuvem:', e);
     }
 
     return null;
@@ -189,16 +264,54 @@ export const StaffPassRepository = {
           if (typeof window !== 'undefined') {
             try {
               localStorage.setItem(`staff_checkins_${eventId}`, data.content);
+              localStorage.setItem(`portaria_staff_checkins_cache_${eventId}`, data.content);
             } catch (e) {}
           }
           return parsed;
+        }
+      }
+
+      // Check sister events with identical title if no checkins under this eventId
+      const { data: ev } = await supabase
+        .from('events')
+        .select('title')
+        .eq('id', eventId)
+        .maybeSingle();
+
+      if (ev?.title) {
+        const { data: sisterEvents } = await supabase
+          .from('events')
+          .select('id')
+          .eq('title', ev.title);
+
+        const sisterIds = (sisterEvents || [])
+          .map((s) => s.id)
+          .filter((id) => id !== eventId);
+
+        if (sisterIds.length > 0) {
+          const { data: sisterBlock } = await supabase
+            .from('event_info_blocks')
+            .select('content, event_id')
+            .in('event_id', sisterIds)
+            .eq('title', STAFF_CHECKINS_BLOCK_TITLE)
+            .limit(1)
+            .maybeSingle();
+
+          if (sisterBlock?.content) {
+            const parsed = JSON.parse(sisterBlock.content) as StaffCheckin[];
+            if (Array.isArray(parsed)) {
+              return parsed;
+            }
+          }
         }
       }
     } catch (e) {}
 
     if (typeof window !== 'undefined') {
       try {
-        const raw = localStorage.getItem(`staff_checkins_${eventId}`);
+        const raw =
+          localStorage.getItem(`staff_checkins_${eventId}`) ||
+          localStorage.getItem(`portaria_staff_checkins_cache_${eventId}`);
         if (raw) {
           const parsed = JSON.parse(raw);
           if (Array.isArray(parsed)) return parsed;

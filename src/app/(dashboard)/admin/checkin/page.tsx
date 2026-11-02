@@ -8,8 +8,9 @@ import {
   PortariaRepository,
   generatePortariaPin,
 } from '@/repositories/portaria.repository';
+import { StaffPassRepository } from '@/repositories/staff-pass.repository';
 import { supabase } from '@/lib/supabase';
-import { Guest, CheckIn, PortariaConfig } from '@/types';
+import { Guest, CheckIn, PortariaConfig, StaffPass, StaffCheckin } from '@/types';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -34,12 +35,17 @@ import {
   ShieldOff,
   Edit2,
   MessageCircle,
+  IdCard,
+  Briefcase,
 } from 'lucide-react';
 
 export default function CheckinPage() {
   const { currentEvent } = useEvent();
   const [guests, setGuests] = useState<Guest[]>([]);
   const [checkins, setCheckins] = useState<CheckIn[]>([]);
+  const [staffPasses, setStaffPasses] = useState<StaffPass[]>([]);
+  const [staffCheckins, setStaffCheckins] = useState<StaffCheckin[]>([]);
+  const [historyTab, setHistoryTab] = useState<'guests' | 'staff'>('guests');
   const [loading, setLoading] = useState(true);
 
   // Portaria Team & Access State
@@ -66,29 +72,7 @@ export default function CheckinPage() {
 
   // Handle successful camera QR scan
   const handleScanSuccess = async (decodedText: string) => {
-    let token = decodedText.trim();
-
-    // Parse JSON if needed
-    try {
-      if (token.startsWith('{') && token.endsWith('}')) {
-        const parsed = JSON.parse(token);
-        if (parsed.token) {
-          token = parsed.token;
-        }
-      }
-    } catch (err) {}
-
-    const matchedGuest = guests.find((g) => g.qr_token === token);
-    if (matchedGuest) {
-      setIsScanning(false);
-      await handleCheckin(matchedGuest);
-    } else {
-      setIsScanning(false);
-      setAlertMessage({
-        type: 'error',
-        text: 'QR Code inválido ou não pertencente a este casamento.',
-      });
-    }
+    await processScannedCode(decodedText);
   };
 
   // Setup camera QR scanner when isScanning is toggled
@@ -152,21 +136,25 @@ export default function CheckinPage() {
         }
       }
     };
-  }, [isScanning, guests]);
+  }, [isScanning, guests, staffPasses]);
 
   const loadData = async () => {
     if (!currentEvent) return;
     setLoading(true);
     try {
-      const [g, ci, pConfig] = await Promise.all([
+      const [g, ci, pConfig, sp, sc] = await Promise.all([
         GuestRepository.getAll(currentEvent.id),
         CheckInRepository.getAll(currentEvent.id),
         PortariaRepository.getConfig(currentEvent.id),
+        StaffPassRepository.getAll(currentEvent.id),
+        StaffPassRepository.getCheckins(currentEvent.id),
       ]);
       setGuests(g);
       setCheckins(ci);
       setPortariaConfig(pConfig);
       setCustomPinInput(pConfig.pin);
+      setStaffPasses(sp);
+      setStaffCheckins(sc);
     } catch (err) {
       console.error(err);
     } finally {
@@ -179,7 +167,7 @@ export default function CheckinPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentEvent]);
 
-  // Realtime subscription: synchronize checkins and deletions with portaria stations
+  // Realtime subscription: synchronize checkins and deletions with portaria stations (Guests & Staff)
   useEffect(() => {
     if (!currentEvent?.id) return;
 
@@ -210,12 +198,31 @@ export default function CheckinPage() {
           setCheckins((prev) => prev.filter((c) => c.guest_id !== p.guest_id));
         }
       })
+      .on('broadcast', { event: 'staff-checkin' }, (payload) => {
+        const p = payload?.payload as StaffCheckin | undefined;
+        if (!p) return;
+        if (!p.event_id || p.event_id === currentEvent.id) {
+          setStaffCheckins((prev) => {
+            if (prev.some((c) => c.pass_id === p.pass_id)) return prev;
+            return [p, ...prev];
+          });
+        }
+      })
+      .on('broadcast', { event: 'delete-staff-checkin' }, (payload) => {
+        const p = payload?.payload;
+        if (!p) return;
+        if (!p.event_id || p.event_id === currentEvent.id) {
+          setStaffCheckins((prev) => prev.filter((c) => c.pass_id !== (p.pass_id || p.staff_pass_id)));
+        }
+      })
       .subscribe();
 
     const handleStorage = (e: StorageEvent) => {
       if (
         e.key === `portaria_checkins_cache_${currentEvent.id}` ||
-        e.key === 'meuboda_live_checkins_cache'
+        e.key === 'meuboda_live_checkins_cache' ||
+        e.key === `portaria_staff_checkins_cache_${currentEvent.id}` ||
+        e.key === `staff_checkins_${currentEvent.id}`
       ) {
         loadData();
       }
@@ -308,6 +315,145 @@ export default function CheckinPage() {
     });
   };
 
+  // Perform staff checkin logic
+  const handleStaffCheckin = async (pass: StaffPass) => {
+    if (!currentEvent) return;
+
+    // Check if already checked in
+    const isAlreadyCheckedIn = staffCheckins.some((sc) => sc.pass_id === pass.id);
+    if (isAlreadyCheckedIn) {
+      setAlertMessage({
+        type: 'error',
+        text: `A credencial de staff '${pass.role_title}' (${pass.holder_name || pass.company_name}) já efetuou entrada anteriormente!`,
+      });
+      return;
+    }
+
+    try {
+      const newStaffCi = await StaffPassRepository.performCheckin(
+        pass,
+        adminOperatorName || 'Gestor / Painel'
+      );
+
+      if (newStaffCi) {
+        setStaffCheckins((prev) => [newStaffCi, ...prev.filter((c) => c.pass_id !== pass.id)]);
+        setAlertMessage({
+          type: 'success',
+          text: `STAFF AUTORIZADO! Entrada confirmada para ${pass.role_title} • ${pass.company_name} (${pass.holder_name || 'Serviço'}).`,
+        });
+        triggerConfetti();
+        loadData();
+      }
+    } catch (err) {
+      console.error(err);
+      setAlertMessage({ type: 'error', text: 'Ocorreu um erro ao processar a entrada da equipa de serviço.' });
+    }
+  };
+
+  const handleRemoveStaffCheckin = async (passId: string) => {
+    if (!confirm('Deseja anular o registo de entrada desta credencial de staff?')) return;
+    if (!currentEvent) return;
+
+    setStaffCheckins((prev) => prev.filter((sc) => sc.pass_id !== passId));
+    setAlertMessage(null);
+
+    try {
+      await StaffPassRepository.revertCheckin(passId, currentEvent.id);
+      loadData();
+    } catch (err) {
+      console.error(err);
+      setAlertMessage({ type: 'error', text: 'Erro ao anular entrada da equipa de serviço.' });
+    }
+  };
+
+  // Process any scanned code or manual text input (Guests & Staff)
+  const processScannedCode = async (decodedText: string) => {
+    const raw = (decodedText || '').trim();
+    if (!raw) return;
+
+    let token = raw;
+    let passId = '';
+
+    // 1. Try parsing JSON format
+    if (raw.includes('{') && raw.includes('}')) {
+      try {
+        const first = raw.indexOf('{');
+        const last = raw.lastIndexOf('}');
+        if (last > first) {
+          const parsed = JSON.parse(raw.substring(first, last + 1));
+          token = (parsed.token || parsed.qr_token || parsed.qrToken || parsed.staffPassId || parsed.id || token).trim();
+          passId = (parsed.staffPassId || parsed.id || '').trim();
+        }
+      } catch (err) {}
+    }
+
+    const isStaff =
+      token.toLowerCase().includes('stf_') ||
+      raw.toLowerCase().includes('staff') ||
+      raw.toLowerCase().includes('stf_') ||
+      Boolean(passId);
+
+    // 2. If recognized as a staff credential candidate
+    if (isStaff) {
+      let matchedPass = staffPasses.find(
+        (sp) =>
+          (passId && sp.id === passId) ||
+          (token && sp.qr_token && sp.qr_token.toLowerCase() === token.toLowerCase()) ||
+          (sp.id && sp.id === token)
+      );
+
+      if (!matchedPass) {
+        matchedPass =
+          (await StaffPassRepository.getByToken(token, currentEvent?.id)) ||
+          (await StaffPassRepository.getByToken(token)) ||
+          (passId ? await StaffPassRepository.getByToken(passId) : null) ||
+          undefined;
+      }
+
+      if (matchedPass) {
+        setIsScanning(false);
+        await handleStaffCheckin(matchedPass);
+        return;
+      }
+    }
+
+    // 3. Match guest in local list
+    const matchedGuest = guests.find(
+      (g) =>
+        (g.qr_token && g.qr_token.toLowerCase() === token.toLowerCase()) ||
+        (g.id && g.id.toLowerCase() === token.toLowerCase())
+    );
+
+    if (matchedGuest) {
+      setIsScanning(false);
+      await handleCheckin(matchedGuest);
+      return;
+    }
+
+    // 4. Fallback: Check if guest or staff exists in repository
+    try {
+      const guestFromDb = await GuestRepository.getByToken(token);
+      if (guestFromDb && (!currentEvent || guestFromDb.event_id === currentEvent.id)) {
+        setIsScanning(false);
+        await handleCheckin(guestFromDb);
+        return;
+      }
+
+      const staffFromDb = await StaffPassRepository.getByToken(token);
+      if (staffFromDb) {
+        setIsScanning(false);
+        await handleStaffCheckin(staffFromDb);
+        return;
+      }
+    } catch (e) {}
+
+    setIsScanning(false);
+    setAlertMessage({
+      type: 'error',
+      text: 'QR Code inválido ou não pertencente a este casamento.',
+    });
+  };
+
   // Perform checkin logic
   const handleCheckin = async (guest: Guest) => {
     if (!currentEvent) return;
@@ -365,32 +511,7 @@ export default function CheckinPage() {
   const handleQrSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!qrInput.trim()) return;
-
-    let token = qrInput.trim();
-
-    // Check if input is a JSON string (scanned from our generated QR code structure)
-    try {
-      if (token.startsWith('{') && token.endsWith('}')) {
-        const parsed = JSON.parse(token);
-        if (parsed.token) {
-          token = parsed.token;
-        }
-      }
-    } catch (err) {
-      // Not a JSON, assume it is direct token
-    }
-
-    const matchedGuest = guests.find((g) => g.qr_token === token);
-
-    if (matchedGuest) {
-      await handleCheckin(matchedGuest);
-    } else {
-      setAlertMessage({
-        type: 'error',
-        text: 'QR Code inválido ou não pertencente a este casamento.',
-      });
-    }
-
+    await processScannedCode(qrInput.trim());
     setQrInput('');
   };
 
@@ -657,7 +778,9 @@ export default function CheckinPage() {
         <div className="lg:col-span-5 space-y-4">
           <Card className="bg-card-bg">
             <CardHeader>
-              <CardTitle>Leitor de Convites</CardTitle>
+              <CardTitle className="text-base font-bold flex items-center gap-2">
+                <QrCode className="h-5 w-5 text-primary" /> Leitor de Convites & Crachás de Staff
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Camera Scanner or Simulation Card */}
@@ -690,8 +813,8 @@ export default function CheckinPage() {
                   <p className="text-sm font-semibold flex items-center gap-1.5 text-foreground justify-center">
                     <Camera className="h-4 w-4 text-primary" /> Iniciar Leitor de Câmara
                   </p>
-                  <p className="text-[11px] text-foreground/50 max-w-[200px] mt-1">
-                    Clique neste cartão para abrir a câmara e ler o código QR do convite.
+                  <p className="text-[11px] text-foreground/50 max-w-[220px] mt-1">
+                    Clique neste cartão para abrir a câmara e ler o código QR do convite ou do crachá de staff.
                   </p>
                 </div>
               )}
@@ -700,7 +823,7 @@ export default function CheckinPage() {
               <form onSubmit={handleQrSubmit} className="flex gap-2">
                 <input
                   type="text"
-                  placeholder="Introduza o Token ou JSON do QR Code..."
+                  placeholder="Introduza o código do Convite ou Crachá de Staff..."
                   value={qrInput}
                   onChange={(e) => setQrInput(e.target.value)}
                   className="flex-1 rounded-xl border border-border-custom bg-background/50 px-3.5 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
@@ -783,59 +906,151 @@ export default function CheckinPage() {
 
           {/* Checked-in List log */}
           <Card className="bg-card-bg">
-            <CardHeader>
-              <CardTitle>Histórico de Entradas ({checkins.length})</CardTitle>
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-border-custom">
+              <CardTitle className="text-base font-bold flex items-center gap-2">
+                <CheckCircle className="h-4.5 w-4.5 text-primary" /> Histórico de Entradas
+              </CardTitle>
+
+              {/* Sub-tabs: Convidados vs Staff */}
+              <div className="flex items-center gap-1.5 p-1 bg-secondary/20 rounded-xl border border-border-custom text-xs">
+                <button
+                  type="button"
+                  onClick={() => setHistoryTab('guests')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition-all cursor-pointer ${
+                    historyTab === 'guests'
+                      ? 'bg-card-bg text-primary shadow-sm'
+                      : 'text-foreground/60 hover:text-foreground'
+                  }`}
+                >
+                  <Users className="h-3.5 w-3.5" />
+                  <span>Convidados ({checkins.length})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHistoryTab('staff')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition-all cursor-pointer ${
+                    historyTab === 'staff'
+                      ? 'bg-primary text-white shadow-sm'
+                      : 'text-foreground/60 hover:text-foreground'
+                  }`}
+                >
+                  <IdCard className="h-3.5 w-3.5" />
+                  <span>Staff ({staffCheckins.length}/{staffPasses.length})</span>
+                </button>
+              </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-4">
               {loading ? (
                 <div className="flex h-20 items-center justify-center">
                   <Loader2 className="h-5 w-5 animate-spin text-primary" />
                 </div>
-              ) : checkins.length > 0 ? (
-                <div className="overflow-x-auto rounded-xl border border-border-custom">
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="bg-secondary/30 text-foreground/70 font-semibold border-b border-border-custom">
-                        <th className="p-3">Convidado</th>
-                        <th className="p-3">Hora Entrada</th>
-                        <th className="p-3">Operador / Posto</th>
-                        <th className="p-3 text-center">Ações</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border-custom">
-                      {checkins.map((ci) => (
-                        <tr key={ci.id} className="hover:bg-secondary/15 transition-colors">
-                          <td className="p-3 font-medium">{ci.guest?.name || 'Convidado'}</td>
-                          <td className="p-3">
-                            {new Date(ci.checked_at).toLocaleTimeString('pt-PT', {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                              second: '2-digit',
-                            })}
-                          </td>
-                          <td className="p-3">
-                            <span className="px-2 py-0.5 rounded-full text-[10px] bg-secondary/60 font-medium text-foreground/80">
-                              {ci.operator || 'Portaria'}
-                            </span>
-                          </td>
-                          <td className="p-3 text-center">
-                            <button
-                              onClick={() => handleRemoveCheckin(ci.guest_id)}
-                              className="p-1 rounded-lg text-foreground/50 hover:bg-error/10 hover:text-error transition-colors cursor-pointer"
-                              title="Anular Entrada"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </td>
+              ) : historyTab === 'guests' ? (
+                checkins.length > 0 ? (
+                  <div className="overflow-x-auto rounded-xl border border-border-custom">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="bg-secondary/30 text-foreground/70 font-semibold border-b border-border-custom">
+                          <th className="p-3">Convidado</th>
+                          <th className="p-3">Hora Entrada</th>
+                          <th className="p-3">Operador / Posto</th>
+                          <th className="p-3 text-center">Ações</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody className="divide-y divide-border-custom">
+                        {checkins.map((ci) => (
+                          <tr key={ci.id} className="hover:bg-secondary/15 transition-colors">
+                            <td className="p-3 font-medium">{ci.guest?.name || 'Convidado'}</td>
+                            <td className="p-3">
+                              {new Date(ci.checked_at).toLocaleTimeString('pt-PT', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                second: '2-digit',
+                              })}
+                            </td>
+                            <td className="p-3">
+                              <span className="px-2 py-0.5 rounded-full text-[10px] bg-secondary/60 font-medium text-foreground/80">
+                                {ci.operator || 'Portaria'}
+                              </span>
+                            </td>
+                            <td className="p-3 text-center">
+                              <button
+                                onClick={() => handleRemoveCheckin(ci.guest_id)}
+                                className="p-1 rounded-lg text-foreground/50 hover:bg-error/10 hover:text-error transition-colors cursor-pointer"
+                                title="Anular Entrada"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-center text-[10px] text-foreground/40 py-6 italic">
+                    Nenhum check-in de convidado efetuado hoje.
+                  </div>
+                )
               ) : (
-                <div className="text-center text-[10px] text-foreground/40 py-6 italic">
-                  Nenhum check-in efetuado hoje.
-                </div>
+                /* Staff Checkins Table */
+                staffCheckins.length > 0 ? (
+                  <div className="overflow-x-auto rounded-xl border border-border-custom">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="bg-primary/10 text-primary font-semibold border-b border-border-custom">
+                          <th className="p-3">Função / Cargo</th>
+                          <th className="p-3">Empresa & Titular</th>
+                          <th className="p-3">Hora Entrada</th>
+                          <th className="p-3">Posto</th>
+                          <th className="p-3 text-center">Ações</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border-custom">
+                        {staffCheckins.map((sc) => (
+                          <tr key={sc.id} className="hover:bg-secondary/15 transition-colors">
+                            <td className="p-3 font-bold text-foreground">
+                              <div className="flex items-center gap-1.5">
+                                <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
+                                <span>{sc.role_title}</span>
+                              </div>
+                            </td>
+                            <td className="p-3">
+                              <div className="font-medium text-foreground/90">{sc.company_name}</div>
+                              {sc.holder_name && (
+                                <div className="text-[10px] text-foreground/50">{sc.holder_name}</div>
+                              )}
+                            </td>
+                            <td className="p-3">
+                              {new Date(sc.checked_at).toLocaleTimeString('pt-PT', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                second: '2-digit',
+                              })}
+                            </td>
+                            <td className="p-3">
+                              <span className="px-2 py-0.5 rounded-full text-[10px] bg-primary/10 font-bold text-primary">
+                                {sc.operator || 'Portaria'}
+                              </span>
+                            </td>
+                            <td className="p-3 text-center">
+                              <button
+                                onClick={() => handleRemoveStaffCheckin(sc.pass_id)}
+                                className="p-1 rounded-lg text-foreground/50 hover:bg-error/10 hover:text-error transition-colors cursor-pointer"
+                                title="Anular Entrada de Staff"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-center text-[10px] text-foreground/40 py-6 italic">
+                    Nenhum elemento da equipa de serviço / staff deu entrada ainda.
+                  </div>
+                )
               )}
             </CardContent>
           </Card>
