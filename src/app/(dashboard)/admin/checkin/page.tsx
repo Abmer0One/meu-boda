@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useEvent } from '@/contexts/EventContext';
 import { GuestRepository } from '@/repositories/guest.repository';
-import { CheckInRepository } from '@/repositories/checkin.repository';
+import { CheckInRepository, getGuestCheckinStats } from '@/repositories/checkin.repository';
 import {
   PortariaRepository,
   generatePortariaPin,
@@ -37,6 +37,9 @@ import {
   MessageCircle,
   IdCard,
   Briefcase,
+  UserCheck,
+  ArrowRight,
+  UtensilsCrossed,
 } from 'lucide-react';
 
 export default function CheckinPage() {
@@ -63,6 +66,8 @@ export default function CheckinPage() {
   // Alerts state
   const [alertMessage, setAlertMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isScanning, setIsScanning] = useState(false);
+  const [partialModalGuest, setPartialModalGuest] = useState<Guest | null>(null);
+  const [isExecutingCheckin, setIsExecutingCheckin] = useState(false);
 
   // Prevent duplicate rapid processing in scanner & UI
   const isScanningBusyRef = useRef(false);
@@ -178,13 +183,14 @@ export default function CheckinPage() {
         if (!p) return;
         if (!p.event_id || p.event_id === currentEvent.id) {
           setCheckins((prev) => {
-            if (prev.some((c) => c.guest_id === p.guest_id)) return prev;
+            if (p.id && prev.some((c) => c.id === p.id)) return prev;
             return [
               {
-                id: p.id || `ci_${p.guest_id}`,
+                id: p.id || `ci_${p.guest_id}_${Date.now()}`,
                 guest_id: p.guest_id,
                 operator: p.operator || 'Portaria',
                 checked_at: p.checked_at || new Date().toISOString(),
+                checked_count: Number(p.checked_count) || 1,
               },
               ...prev,
             ];
@@ -195,7 +201,12 @@ export default function CheckinPage() {
         const p = payload?.payload;
         if (!p) return;
         if (!p.event_id || p.event_id === currentEvent.id) {
-          setCheckins((prev) => prev.filter((c) => c.guest_id !== p.guest_id));
+          setCheckins((prev) => {
+            if (p.id && !p.all) {
+              return prev.filter((c) => c.id !== p.id);
+            }
+            return prev.filter((c) => c.guest_id !== p.guest_id);
+          });
         }
       })
       .on('broadcast', { event: 'staff-checkin' }, (payload) => {
@@ -454,56 +465,83 @@ export default function CheckinPage() {
     });
   };
 
-  // Perform checkin logic
-  const handleCheckin = async (guest: Guest) => {
+  // Perform checkin logic (supports full or partial entry)
+  const handleCheckin = async (guest: Guest, countOverride?: number) => {
     if (!currentEvent) return;
 
-    // Check if already checked in
-    const isAlreadyCheckedIn = checkins.some((ci) => ci.guest_id === guest.id);
-    if (isAlreadyCheckedIn) {
+    const stats = getGuestCheckinStats(guest, checkins);
+
+    // 1. If all entries exhausted
+    if (stats.isFullyCheckedIn) {
       setAlertMessage({
         type: 'error',
-        text: `O convidado '${guest.name}' já efetuou a entrada!`,
+        text: `CONVITE ESGOTADO! Todas as ${stats.maxAllowed} vagas de '${guest.name}' já deram entrada no evento.`,
       });
       return;
     }
 
-    // Check if check-in is already in-flight for this guest
+    // 2. If invitation has companions and operator hasn't selected quantity yet
+    if (guest.companions > 0 && countOverride === undefined) {
+      setIsScanning(false);
+      setPartialModalGuest(guest);
+      return;
+    }
+
+    // 3. Determine quantity to admit
+    const countToEnter = countOverride !== undefined
+      ? Math.min(countOverride, stats.remainingSlots)
+      : Math.min(1, stats.remainingSlots);
+
+    if (countToEnter <= 0) return;
+
     if (processingGuestIdsRef.current.has(guest.id)) {
       return;
     }
     processingGuestIdsRef.current.add(guest.id);
+    setIsExecutingCheckin(true);
 
     try {
       const newCheckin = await CheckInRepository.create({
         guest_id: guest.id,
         operator: adminOperatorName || 'Gestor / Painel',
+        checked_count: countToEnter,
       });
 
       if (newCheckin) {
         // Optimistic state update
         setCheckins((prev) => [newCheckin, ...prev]);
 
+        const updatedTotal = stats.totalEntered + countToEnter;
+        const newRemaining = Math.max(0, stats.maxAllowed - updatedTotal);
+        const isComplete = newRemaining === 0;
+
         setAlertMessage({
           type: 'success',
-          text: `Entrada autorizada! Bem-vindo, ${guest.name} (${1 + guest.companions} pax).`,
+          text: isComplete
+            ? (stats.maxAllowed > 1
+                ? `Entrada Completa! Todas as ${stats.maxAllowed} vagas de '${guest.name}' deram entrada.`
+                : `Entrada autorizada! Bem-vindo(a), ${guest.name}.`)
+            : `Entrada parcial autorizada (${updatedTotal}/${stats.maxAllowed})! Resta ${newRemaining} vaga guardada para chegada posterior.`,
         });
         triggerConfetti();
+        setPartialModalGuest(null);
         loadData();
       } else {
         setAlertMessage({
           type: 'error',
-          text: `O convidado '${guest.name}' já efetuou a entrada!`,
+          text: `Não foi possível registar entrada para '${guest.name}'. As vagas deste convite já se encontram esgotadas.`,
         });
+        setPartialModalGuest(null);
         loadData();
       }
     } catch (err) {
       console.error(err);
       setAlertMessage({ type: 'error', text: 'Ocorreu um erro ao processar a entrada.' });
     } finally {
+      setIsExecutingCheckin(false);
       setTimeout(() => {
         processingGuestIdsRef.current.delete(guest.id);
-      }, 2500);
+      }, 2000);
     }
   };
 
@@ -515,16 +553,16 @@ export default function CheckinPage() {
     setQrInput('');
   };
 
-  const handleRemoveCheckin = async (guestId: string) => {
-    if (!confirm('Deseja anular o registo de entrada deste convidado?')) return;
+  const handleRemoveCheckin = async (checkinId: string, guestId: string) => {
+    if (!confirm('Deseja anular este registo de entrada?')) return;
     if (!currentEvent) return;
 
     // Optimistically update checkins state immediately so table and counters update with zero latency
-    setCheckins((prev) => prev.filter((ci) => ci.guest_id !== guestId));
+    setCheckins((prev) => prev.filter((ci) => ci.id !== checkinId));
     setAlertMessage(null);
 
     try {
-      await PortariaRepository.revertCheckin(guestId, currentEvent.id);
+      await PortariaRepository.revertSingleCheckin(checkinId, guestId, currentEvent.id);
       loadData();
     } catch (err) {
       console.error(err);
@@ -532,13 +570,13 @@ export default function CheckinPage() {
     }
   };
 
-  // Filters for quick manual search
+  // Filters for quick manual search (show guests who still have remaining slots!)
   const filteredGuests = guests.filter((g) => {
     const isSeated = g.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const isCheckedIn = checkins.some((ci) => ci.guest_id === g.id);
+    const stats = getGuestCheckinStats(g, checkins);
     const s = g.status?.toLowerCase() || '';
     const isConfirmed = s === 'confirmed' || s === 'confirmado' || s === 'sim' || s === 'yes';
-    return isSeated && !isCheckedIn && isConfirmed;
+    return isSeated && !stats.isFullyCheckedIn && isConfirmed;
   });
 
   if (!currentEvent) {
@@ -879,22 +917,52 @@ export default function CheckinPage() {
                     <Loader2 className="h-5 w-5 animate-spin text-primary" />
                   </div>
                 ) : filteredGuests.length > 0 ? (
-                  filteredGuests.map((guest) => (
-                    <div
-                      key={guest.id}
-                      className="flex items-center justify-between p-2.5 border border-border-custom/50 rounded-lg bg-background hover:bg-secondary/15 transition-all text-xs"
-                    >
-                      <div>
-                        <span className="font-semibold text-foreground/90">{guest.name}</span>
-                        <span className="text-[10px] text-foreground/45 ml-2 font-medium">
-                          (+{guest.companions} acomp.)
-                        </span>
+                  filteredGuests.map((guest) => {
+                    const stats = getGuestCheckinStats(guest, checkins);
+                    return (
+                      <div
+                        key={guest.id}
+                        className={`flex items-center justify-between p-2.5 border rounded-lg transition-all text-xs ${
+                          stats.isPartiallyCheckedIn
+                            ? 'bg-amber-500/10 border-amber-500/30'
+                            : 'border-border-custom/50 bg-background hover:bg-secondary/15'
+                        }`}
+                      >
+                        <div className="min-w-0 pr-2">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-semibold text-foreground/90">{guest.name}</span>
+                            {stats.isPartiallyCheckedIn && (
+                              <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                                Parcial ({stats.totalEntered}/{stats.maxAllowed})
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[10px] text-foreground/45 font-medium block">
+                            +{guest.companions} acomp. ({stats.maxAllowed} pax)
+                            {stats.isPartiallyCheckedIn && (
+                              <span className="ml-1 text-amber-600 dark:text-amber-400 font-semibold">
+                                • Resta {stats.remainingSlots} vaga
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                        {stats.isPartiallyCheckedIn ? (
+                          <Button
+                            size="sm"
+                            className="text-[11px] py-1 px-2.5 bg-amber-500 hover:bg-amber-600 text-black font-bold shrink-0 flex items-center gap-1 shadow-sm"
+                            onClick={() => handleCheckin(guest)}
+                          >
+                            <UserCheck className="h-3.5 w-3.5" />
+                            <span>+ Entrada ({stats.remainingSlots})</span>
+                          </Button>
+                        ) : (
+                          <Button size="sm" className="text-[11px] py-1 px-3 shrink-0" onClick={() => handleCheckin(guest)}>
+                            Dar Entrada
+                          </Button>
+                        )}
                       </div>
-                      <Button size="sm" className="text-[11px] py-1 px-3" onClick={() => handleCheckin(guest)}>
-                        Dar Entrada
-                      </Button>
-                    </div>
-                  ))
+                    );
+                  })
                 ) : (
                   <div className="text-center text-[10px] text-foreground/40 py-8 italic">
                     Nenhum convidado confirmado pendente de entrada.
@@ -923,7 +991,9 @@ export default function CheckinPage() {
                   }`}
                 >
                   <Users className="h-3.5 w-3.5" />
-                  <span>Convidados ({checkins.length})</span>
+                  <span>
+                    Convidados ({checkins.length} check-ins • {checkins.reduce((s, c) => s + (Number(c.checked_count) || 1), 0)} pax)
+                  </span>
                 </button>
                 <button
                   type="button"
@@ -959,7 +1029,12 @@ export default function CheckinPage() {
                       <tbody className="divide-y divide-border-custom">
                         {checkins.map((ci) => (
                           <tr key={ci.id} className="hover:bg-secondary/15 transition-colors">
-                            <td className="p-3 font-medium">{ci.guest?.name || 'Convidado'}</td>
+                            <td className="p-3 font-medium">
+                              <div>{ci.guest?.name || 'Convidado'}</div>
+                              <span className="text-[10px] font-bold text-primary">
+                                {ci.checked_count && ci.checked_count > 1 ? `${ci.checked_count} pax` : '1 pax'}
+                              </span>
+                            </td>
                             <td className="p-3">
                               {new Date(ci.checked_at).toLocaleTimeString('pt-PT', {
                                 hour: '2-digit',
@@ -974,7 +1049,7 @@ export default function CheckinPage() {
                             </td>
                             <td className="p-3 text-center">
                               <button
-                                onClick={() => handleRemoveCheckin(ci.guest_id)}
+                                onClick={() => handleRemoveCheckin(ci.id, ci.guest_id)}
                                 className="p-1 rounded-lg text-foreground/50 hover:bg-error/10 hover:text-error transition-colors cursor-pointer"
                                 title="Anular Entrada"
                               >
@@ -1056,6 +1131,188 @@ export default function CheckinPage() {
           </Card>
         </div>
       </div>
+
+      {/* MODAL DE GESTÃO DE ENTRADA PARCIAL / VAGAS POR CONVITE */}
+      {partialModalGuest && (() => {
+        const modalStats = getGuestCheckinStats(partialModalGuest, checkins);
+        const isCompanionArrival = modalStats.totalEntered > 0 && modalStats.remainingSlots > 0;
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+            <div className="w-full max-w-md bg-card-bg border border-border-custom rounded-2xl p-6 shadow-2xl space-y-5 text-left relative overflow-hidden">
+              {/* Header Accent Bar */}
+              <div
+                className={`absolute top-0 inset-x-0 h-1.5 ${
+                  isCompanionArrival
+                    ? 'bg-gradient-to-r from-amber-500 to-amber-300'
+                    : 'bg-gradient-to-r from-primary to-primary/60'
+                }`}
+              />
+
+              {/* Modal Header */}
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <span
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                      isCompanionArrival
+                        ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30'
+                        : 'bg-primary/10 text-primary border border-primary/20'
+                    }`}
+                  >
+                    <Users className="h-3.5 w-3.5" />
+                    {isCompanionArrival ? 'Chegada de Acompanhante' : 'Controlo de Vagas do Convite'}
+                  </span>
+                  <h3 className="text-lg font-bold text-foreground tracking-tight">
+                    {partialModalGuest.name}
+                  </h3>
+                  <p className="text-xs text-foreground/60">
+                    Total autorizado: <strong className="text-foreground">{modalStats.maxAllowed} pessoas</strong> ({1} titular + {partialModalGuest.companions} acomp.)
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setPartialModalGuest(null)}
+                  className="p-1.5 rounded-lg text-foreground/50 hover:bg-secondary/40 hover:text-foreground transition-colors cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Scenario 1: Companion Arrival */}
+              {isCompanionArrival ? (
+                <div className="space-y-4">
+                  <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-2 text-xs">
+                    <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-bold text-xs">
+                      <CheckCircle className="h-4 w-4" />
+                      <span>Entrada Anterior Registada</span>
+                    </div>
+                    <p className="text-foreground/80 leading-relaxed">
+                      Já entrou <strong>{modalStats.totalEntered} pessoa(s)</strong> deste convite
+                      {modalStats.entries[0] && (
+                        <>
+                          {' '}às{' '}
+                          <strong>
+                            {new Date(modalStats.entries[0].checked_at).toLocaleTimeString('pt-PT', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </strong>{' '}
+                          por <strong>{modalStats.entries[0].operator || 'Portaria'}</strong>
+                        </>
+                      )}.
+                    </p>
+                    <div className="pt-2 flex items-center justify-between text-xs font-bold text-amber-700 dark:text-amber-300 border-t border-amber-500/20">
+                      <span>Vagas restantes agora:</span>
+                      <span className="px-2 py-0.5 rounded-full bg-amber-500/20 font-black">
+                        {modalStats.remainingSlots} {modalStats.remainingSlots === 1 ? 'vaga restante' : 'vagas restantes'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-foreground/70 leading-relaxed">
+                    O acompanhante que chegou agora está a apresentar o mesmo código QR para ocupar a vaga restante. Confirma a sua entrada?
+                  </p>
+
+                  <div className="space-y-2 pt-1">
+                    <Button
+                      disabled={isExecutingCheckin}
+                      onClick={() => handleCheckin(partialModalGuest, modalStats.remainingSlots)}
+                      className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-2"
+                    >
+                      {isExecutingCheckin ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <CheckCircle className="h-4 w-4" />
+                      )}
+                      <span>
+                        Confirmar Entrada do Acompanhante ({modalStats.remainingSlots === 1 ? 'Última vaga' : modalStats.remainingSlots + ' vagas'})
+                      </span>
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPartialModalGuest(null)}
+                      className="w-full text-xs"
+                    >
+                      Cancelar
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                /* Scenario 2: First arrival of a multi-guest invitation */
+                <div className="space-y-4">
+                  <div className="p-3.5 rounded-xl bg-secondary/15 border border-border-custom space-y-1 text-xs">
+                    <p className="text-foreground/90 font-medium">
+                      Este convite dá acesso a <strong>{modalStats.maxAllowed} pessoas</strong>.
+                    </p>
+                    <p className="text-foreground/60 text-[11px] leading-relaxed">
+                      Se os convidados não chegaram juntos, registe apenas 1 pessoa. A outra vaga ficará guardada para quando o parceiro chegar.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2.5 pt-1">
+                    {/* Option A: Only 1 Person */}
+                    <div
+                      onClick={() => !isExecutingCheckin && handleCheckin(partialModalGuest, 1)}
+                      className="p-3.5 rounded-xl border-2 border-primary/40 hover:border-primary bg-primary/5 hover:bg-primary/10 transition-all cursor-pointer flex items-center justify-between gap-3 group"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-primary/15 text-primary group-hover:scale-105 transition-transform">
+                          <UserCheck className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-foreground flex items-center gap-2">
+                            <span>👤 Só 1 Pessoa Chegou</span>
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/15 text-primary font-semibold">
+                              Recomendado
+                            </span>
+                          </p>
+                          <p className="text-[11px] text-foreground/60 mt-0.5">
+                            Regista 1 entrada. Guarda {modalStats.maxAllowed - 1} vaga para chegada posterior.
+                          </p>
+                        </div>
+                      </div>
+                      <ArrowRight className="h-4 w-4 text-primary shrink-0" />
+                    </div>
+
+                    {/* Option B: All People Together */}
+                    <div
+                      onClick={() => !isExecutingCheckin && handleCheckin(partialModalGuest, modalStats.maxAllowed)}
+                      className="p-3.5 rounded-xl border border-border-custom hover:border-emerald-500/60 bg-secondary/10 hover:bg-emerald-500/10 transition-all cursor-pointer flex items-center justify-between gap-3 group"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 group-hover:scale-105 transition-transform">
+                          <Users className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-foreground">
+                            👥 Entram Todos ({modalStats.maxAllowed} Pessoas)
+                          </p>
+                          <p className="text-[11px] text-foreground/60 mt-0.5">
+                            Todos os convidados chegaram juntos agora.
+                          </p>
+                        </div>
+                      </div>
+                      <ArrowRight className="h-4 w-4 text-emerald-500 shrink-0" />
+                    </div>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPartialModalGuest(null)}
+                      className="w-full text-xs mt-2"
+                    >
+                      Cancelar
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

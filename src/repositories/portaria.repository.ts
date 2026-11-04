@@ -212,11 +212,13 @@ export const PortariaRepository = {
       companions?: number;
       eventId?: string;
       eventTitle?: string;
+      checked_count?: number;
     }
   ): Promise<CheckIn | null> {
     const res = await CheckInRepository.create({
       guest_id: guestId,
       operator: operator || 'Portaria',
+      checked_count: extraData?.checked_count || 1,
     });
 
     if (res) {
@@ -228,6 +230,7 @@ export const PortariaRepository = {
         event_title: extraData?.eventTitle || 'Evento',
         checked_at: res.checked_at || new Date().toISOString(),
         operator: operator || 'Portaria',
+        checked_count: res.checked_count || 1,
       };
 
       // 1. Broadcast over Supabase Realtime channel (instant sub-second delivery to Radar Live)
@@ -268,7 +271,14 @@ export const PortariaRepository = {
   },
 
   /**
-   * Revert a check-in (in case of operator mistake)
+   * Revert a specific check-in entry
+   */
+  async revertSingleCheckin(checkinId: string, guestId: string, eventId?: string): Promise<boolean> {
+    return CheckInRepository.deleteCheckin(checkinId, guestId, eventId);
+  },
+
+  /**
+   * Revert all check-ins for a guest (in case of operator mistake)
    */
   async revertCheckin(guestId: string, eventId?: string): Promise<boolean> {
     return CheckInRepository.deleteByGuestId(guestId, eventId);

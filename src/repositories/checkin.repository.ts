@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import { CheckIn } from '@/types';
+import { CheckIn, Guest } from '@/types';
 
 // In-flight mutex to avoid rapid concurrent check-in requests for the same guest
 const inFlightCheckins = new Set<string>();
@@ -7,49 +7,151 @@ const inFlightCheckins = new Set<string>();
 export const CHECKIN_NOTE_TAG_PREFIX = '[CHECKIN:';
 export const CHECKIN_REVERTED_TAG_PREFIX = '[CHECKIN_REVERTED:';
 
+export interface GuestCheckinStats {
+  maxAllowed: number;
+  totalEntered: number;
+  remainingSlots: number;
+  isFullyCheckedIn: boolean;
+  isPartiallyCheckedIn: boolean;
+  entries: CheckIn[];
+}
+
 /**
- * Extracts check-in metadata embedded in guest notes (fallback persistence)
+ * Computes live admission statistics and slot availability for a guest based on current check-in records.
  */
-export function parseGuestCheckinNote(notes?: string | null): { operator: string; at: string } | null {
+export function getGuestCheckinStats(
+  guest: { id: string; companions?: number | null; name?: string },
+  checkins: CheckIn[]
+): GuestCheckinStats {
+  const maxAllowed = 1 + (Number(guest?.companions) || 0);
+  const guestEntries = (checkins || []).filter((ci) => ci.guest_id === guest.id);
+  const totalEntered = guestEntries.reduce((sum, ci) => sum + (Number(ci.checked_count) || 1), 0);
+  const remainingSlots = Math.max(0, maxAllowed - totalEntered);
+  const isFullyCheckedIn = totalEntered >= maxAllowed;
+  const isPartiallyCheckedIn = totalEntered > 0 && remainingSlots > 0;
+
+  return {
+    maxAllowed,
+    totalEntered,
+    remainingSlots,
+    isFullyCheckedIn,
+    isPartiallyCheckedIn,
+    entries: guestEntries,
+  };
+}
+
+/**
+ * Extracts latest check-in metadata embedded in guest notes (fallback persistence)
+ */
+export function parseGuestCheckinNote(notes?: string | null): { operator: string; at: string; checked_count?: number } | null {
   if (!notes || notes.includes(CHECKIN_REVERTED_TAG_PREFIX) || !notes.includes(CHECKIN_NOTE_TAG_PREFIX)) {
     return null;
   }
-  try {
-    const match = notes.match(/\[CHECKIN:(.*?)\]/);
-    if (match && match[1]) {
-      const data = JSON.parse(match[1]);
-      return {
-        operator: data.operator || 'Portaria',
-        at: data.at || new Date().toISOString(),
-      };
-    }
-  } catch (e) {
-    console.warn('Error parsing checkin note metadata:', e);
+  const all = parseAllGuestCheckinNotes(notes);
+  if (all.length > 0) {
+    const latest = all[all.length - 1];
+    return {
+      operator: latest.operator,
+      at: latest.at,
+      checked_count: latest.checked_count,
+    };
   }
   return null;
 }
 
 /**
- * Attaches or updates structured check-in metadata tag in guest notes
+ * Parses all structured check-in tags embedded in guest notes (supporting multiple partial entries)
  */
-export function attachCheckinToNotes(existingNotes: string | null | undefined, operator: string, at?: string): string {
+export function parseAllGuestCheckinNotes(
+  notes?: string | null
+): Array<{ id?: string; operator: string; at: string; checked_count: number }> {
+  if (!notes || notes.includes(CHECKIN_REVERTED_TAG_PREFIX) || !notes.includes(CHECKIN_NOTE_TAG_PREFIX)) {
+    return [];
+  }
+  const results: Array<{ id?: string; operator: string; at: string; checked_count: number }> = [];
+  try {
+    const regex = /\[CHECKIN:(.*?)\]/g;
+    let match: RegExpExecArray | null;
+    while ((match = regex.exec(notes)) !== null) {
+      if (match[1]) {
+        try {
+          const data = JSON.parse(match[1]);
+          results.push({
+            id: data.id,
+            operator: data.operator || 'Portaria',
+            at: data.at || new Date().toISOString(),
+            checked_count: Number(data.checked_count) || 1,
+          });
+        } catch {}
+      }
+    }
+  } catch (e) {
+    console.warn('Error parsing all checkin notes metadata:', e);
+  }
+  return results;
+}
+
+/**
+ * Attaches or appends structured check-in metadata tag in guest notes
+ */
+export function attachCheckinToNotes(
+  existingNotes: string | null | undefined,
+  operator: string,
+  at?: string,
+  checked_count: number = 1,
+  checkinId?: string
+): string {
+  // Strip any reversion marker
   const clean = (existingNotes || '')
-    .replace(/\[CHECKIN:.*?\]/g, '')
     .replace(/\[CHECKIN_REVERTED:.*?\]/g, '')
     .trim();
 
   const meta = JSON.stringify({
+    id: checkinId || `ci_${Date.now()}`,
     operator: operator || 'Portaria',
     at: at || new Date().toISOString(),
+    checked_count: Number(checked_count) || 1,
   });
+
   return clean ? `${clean}\n[CHECKIN:${meta}]` : `[CHECKIN:${meta}]`;
 }
 
 /**
- * Replaces any check-in tag with an explicit reversion tag in guest notes
+ * Replaces or removes check-in tags in guest notes upon reversion
  */
-export function revertCheckinInNotes(existingNotes: string | null | undefined, at?: string): string {
-  const clean = (existingNotes || '')
+export function revertCheckinInNotes(
+  existingNotes: string | null | undefined,
+  at?: string,
+  checkinId?: string
+): string {
+  if (!existingNotes) {
+    const meta = JSON.stringify({ at: at || new Date().toISOString() });
+    return `[CHECKIN_REVERTED:${meta}]`;
+  }
+
+  // If reverting a specific check-in entry
+  if (checkinId) {
+    let hasRemaining = false;
+    const updated = existingNotes.replace(/\[CHECKIN:(.*?)\]/g, (match, p1) => {
+      try {
+        const data = JSON.parse(p1);
+        if (data.id === checkinId) {
+          return ''; // remove this specific entry
+        }
+        hasRemaining = true;
+        return match;
+      } catch {
+        return match;
+      }
+    }).trim();
+
+    if (hasRemaining) {
+      return updated;
+    }
+  }
+
+  // If no check-in entries remain or blanket reversion requested:
+  const clean = existingNotes
     .replace(/\[CHECKIN:.*?\]/g, '')
     .replace(/\[CHECKIN_REVERTED:.*?\]/g, '')
     .trim();
@@ -80,7 +182,7 @@ export function cleanGuestNotesForDisplay(notes?: string | null): string {
 /**
  * Cleans localStorage caches on the current device
  */
-export function clearCheckinLocalCaches(guestId: string, eventId?: string) {
+export function clearCheckinLocalCaches(guestId: string, eventId?: string, checkinId?: string) {
   if (typeof window === 'undefined') return;
   try {
     if (eventId) {
@@ -88,16 +190,22 @@ export function clearCheckinLocalCaches(guestId: string, eventId?: string) {
       const raw = localStorage.getItem(cacheKey);
       if (raw) {
         const list: CheckIn[] = JSON.parse(raw);
-        const updated = list.filter((item) => item.guest_id !== guestId);
+        const updated = list.filter((item) => {
+          if (checkinId && item.id === checkinId) return false;
+          if (!checkinId && item.guest_id === guestId) return false;
+          return true;
+        });
         localStorage.setItem(cacheKey, JSON.stringify(updated));
       }
     }
     const liveRaw = localStorage.getItem('meuboda_live_checkins_cache');
     if (liveRaw) {
       const liveList = JSON.parse(liveRaw);
-      const updatedLive = liveList.filter(
-        (item: any) => item.id !== `ci_${guestId}` && item.guest_id !== guestId
-      );
+      const updatedLive = liveList.filter((item: any) => {
+        if (checkinId && item.id === checkinId) return false;
+        if (!checkinId && (item.id === `ci_${guestId}` || item.guest_id === guestId)) return false;
+        return true;
+      });
       localStorage.setItem('meuboda_live_checkins_cache', JSON.stringify(updatedLive));
     }
   } catch (e) {}
@@ -115,6 +223,8 @@ export function broadcastCheckinNew(feedPayload: {
   event_title?: string;
   checked_at?: string;
   operator?: string;
+  checked_count?: number;
+  remaining_slots?: number;
 }) {
   try {
     const streamChannel = supabase.channel('portaria-live-stream');
@@ -143,7 +253,7 @@ export function broadcastCheckinNew(feedPayload: {
 /**
  * Broadcasts a deleted/reverted checkin event via Supabase Realtime channel
  */
-export function broadcastCheckinDelete(guestId: string, eventId?: string) {
+export function broadcastCheckinDelete(guestId: string, eventId?: string, checkinId?: string) {
   try {
     const streamChannel = supabase.channel('portaria-live-stream');
     streamChannel.subscribe((status) => {
@@ -153,9 +263,10 @@ export function broadcastCheckinDelete(guestId: string, eventId?: string) {
             type: 'broadcast',
             event: 'delete-checkin',
             payload: {
-              id: `ci_${guestId}`,
+              id: checkinId || `ci_${guestId}`,
               guest_id: guestId,
               event_id: eventId || '',
+              all: !checkinId,
             },
           })
           .finally(() => {
@@ -177,13 +288,13 @@ export const CheckInRepository = {
    * Retrieves all check-ins for an event from the authoritative database:
    * 1. Public checkins table (if accessible)
    * 2. Embedded checkin tags in guests table (resilient cloud fallback)
+   * Preserves multiple partial check-in entries per guest so counts sum accurately.
    * Excludes any guests explicitly marked as reverted ([CHECKIN_REVERTED]).
-   * Synchronizes the authoritative list to localStorage (never resurrects stale deleted items).
+   * Synchronizes the authoritative list to localStorage.
    */
   async getAll(eventId: string): Promise<CheckIn[]> {
-    const uniqueMap = new Map<string, CheckIn>();
-    const duplicateIdsToDelete: string[] = [];
-    const orphansToDeleteFromTable: string[] = [];
+    const itemsMap = new Map<string, CheckIn>();
+    const guestsWithCheckinsInTable = new Set<string>();
 
     // 1. Try querying public.checkins table
     try {
@@ -208,13 +319,13 @@ export const CheckInRepository = {
       }
 
       if (data && Array.isArray(data)) {
-        for (let i = data.length - 1; i >= 0; i--) {
-          const item = data[i] as unknown as CheckIn;
-          if (!uniqueMap.has(item.guest_id)) {
-            uniqueMap.set(item.guest_id, item);
-          } else {
-            duplicateIdsToDelete.push(item.id);
-          }
+        for (const item of data) {
+          const ci = item as unknown as CheckIn;
+          itemsMap.set(ci.id, {
+            ...ci,
+            checked_count: Number((ci as any).checked_count) || 1,
+          });
+          guestsWithCheckinsInTable.add(ci.guest_id);
         }
       }
     } catch (err) {
@@ -232,25 +343,30 @@ export const CheckInRepository = {
         for (const g of guestsWithNotes) {
           const notes = g.notes || '';
 
-          // If guest has been marked as reverted, remove from check-ins map immediately
+          // If guest has been explicitly marked as reverted, purge from checkins
           if (notes.includes(CHECKIN_REVERTED_TAG_PREFIX)) {
-            if (uniqueMap.has(g.id)) {
-              uniqueMap.delete(g.id);
-              orphansToDeleteFromTable.push(g.id);
+            for (const [id, ci] of itemsMap.entries()) {
+              if (ci.guest_id === g.id) {
+                itemsMap.delete(id);
+              }
             }
           } else if (notes.includes(CHECKIN_NOTE_TAG_PREFIX)) {
-            // Guest has active check-in tag
-            if (!uniqueMap.has(g.id)) {
-              const parsed = parseGuestCheckinNote(notes);
-              if (parsed) {
-                uniqueMap.set(g.id, {
-                  id: `ci_${g.id}`,
-                  guest_id: g.id,
-                  operator: parsed.operator,
-                  checked_at: parsed.at,
-                  guest: g,
-                });
-              }
+            // If table didn't yield checkins for this guest, load from notes
+            if (!guestsWithCheckinsInTable.has(g.id)) {
+              const parsedEntries = parseAllGuestCheckinNotes(notes);
+              parsedEntries.forEach((entry, idx) => {
+                const entryId = entry.id || `ci_${g.id}_${idx}`;
+                if (!itemsMap.has(entryId)) {
+                  itemsMap.set(entryId, {
+                    id: entryId,
+                    guest_id: g.id,
+                    operator: entry.operator,
+                    checked_at: entry.at,
+                    checked_count: entry.checked_count,
+                    guest: g,
+                  });
+                }
+              });
             }
           }
         }
@@ -259,26 +375,10 @@ export const CheckInRepository = {
       console.warn('Error reading check-ins from guest notes:', notesErr);
     }
 
-    // Background cleanup of duplicate checkins or orphaned table rows
-    if (duplicateIdsToDelete.length > 0) {
-      (async () => {
-        try {
-          await supabase.from('checkins').delete().in('id', duplicateIdsToDelete);
-        } catch (e) {}
-      })();
-    }
-    if (orphansToDeleteFromTable.length > 0) {
-      (async () => {
-        try {
-          await supabase.from('checkins').delete().in('guest_id', orphansToDeleteFromTable);
-        } catch (e) {}
-      })();
-    }
-
-    const result = Array.from(uniqueMap.values());
+    const result = Array.from(itemsMap.values());
     result.sort((a, b) => new Date(b.checked_at).getTime() - new Date(a.checked_at).getTime());
 
-    // Synchronize authoritative results to localStorage cache so stale records are overwritten
+    // Synchronize authoritative results to localStorage cache
     if (typeof window !== 'undefined') {
       try {
         localStorage.setItem(`portaria_checkins_cache_${eventId}`, JSON.stringify(result));
@@ -289,10 +389,74 @@ export const CheckInRepository = {
   },
 
   /**
-   * Records a check-in for a guest with dual-layer cloud persistence:
+   * Retrieves all check-in records for a specific guest
+   */
+  async getAllByGuestId(guestId: string): Promise<CheckIn[]> {
+    const list: CheckIn[] = [];
+
+    // 1. Direct checkins table
+    try {
+      const { data, error } = await supabase
+        .from('checkins')
+        .select('*')
+        .eq('guest_id', guestId)
+        .order('checked_at', { ascending: true });
+
+      if (!error && data && Array.isArray(data)) {
+        for (const row of data) {
+          list.push({
+            ...(row as CheckIn),
+            checked_count: Number((row as any).checked_count) || 1,
+          });
+        }
+      }
+    } catch (e) {}
+
+    // 2. Fallback to guest notes if table returned nothing
+    if (list.length === 0) {
+      try {
+        const { data: guest } = await supabase
+          .from('guests')
+          .select('*')
+          .eq('id', guestId)
+          .single();
+
+        if (guest && !guest.notes?.includes(CHECKIN_REVERTED_TAG_PREFIX)) {
+          const parsed = parseAllGuestCheckinNotes(guest.notes);
+          parsed.forEach((p, idx) => {
+            list.push({
+              id: p.id || `ci_${guest.id}_${idx}`,
+              guest_id: guest.id,
+              operator: p.operator,
+              checked_at: p.at,
+              checked_count: p.checked_count,
+              guest,
+            });
+          });
+        }
+      } catch (e) {}
+    }
+
+    return list;
+  },
+
+  /**
+   * Checks if a guest has any active check-in (returns the latest one, or null)
+   */
+  async getByGuestId(guestId: string): Promise<CheckIn | null> {
+    const all = await this.getAllByGuestId(guestId);
+    return all.length > 0 ? all[all.length - 1] : null;
+  },
+
+  /**
+   * Records a check-in (full or partial) for a guest with dual-layer cloud persistence:
    * Direct table insert + Guest record update + local cache + Realtime broadcast
    */
-  async create(checkin: Omit<CheckIn, 'id' | 'checked_at'>): Promise<CheckIn | null> {
+  async create(checkin: {
+    guest_id: string;
+    operator: string;
+    checked_count?: number;
+  }): Promise<CheckIn | null> {
     if (!checkin.guest_id) return null;
 
     // Mutex check: prevent concurrent operations for the same guest
@@ -304,87 +468,142 @@ export const CheckInRepository = {
     inFlightCheckins.add(checkin.guest_id);
 
     try {
-      // 1. Verify guest has not already checked in
-      const existing = await this.getByGuestId(checkin.guest_id);
-      if (existing) {
-        console.warn('Guest is already checked in:', checkin.guest_id);
+      // 1. Fetch guest record and existing check-ins to verify available slots
+      let guestCompanions = 0;
+      let eventId = '';
+      let guestNotes = '';
+      let guestName = '';
+
+      try {
+        const { data: currentGuest } = await supabase
+          .from('guests')
+          .select('id, name, event_id, notes, companions')
+          .eq('id', checkin.guest_id)
+          .single();
+
+        if (currentGuest) {
+          guestCompanions = Number(currentGuest.companions) || 0;
+          eventId = currentGuest.event_id || '';
+          guestNotes = currentGuest.notes || '';
+          guestName = currentGuest.name || '';
+        }
+      } catch (e) {
+        console.warn('Error fetching guest for checkin validation:', e);
+      }
+
+      const existingEntries = await this.getAllByGuestId(checkin.guest_id);
+      const totalAlreadyEntered = existingEntries.reduce(
+        (sum, ci) => sum + (Number(ci.checked_count) || 1),
+        0
+      );
+      const maxAllowed = 1 + guestCompanions;
+      const remainingSlots = Math.max(0, maxAllowed - totalAlreadyEntered);
+
+      if (remainingSlots <= 0) {
+        console.warn('Guest invitation is already fully checked in:', checkin.guest_id);
         return null;
       }
+
+      const countToEnter = Math.min(Number(checkin.checked_count) || 1, remainingSlots);
+      if (countToEnter <= 0) return null;
 
       const checkinTimestamp = new Date().toISOString();
       let createdCheckIn: CheckIn | null = null;
 
       // 2. Attempt direct insert into public.checkins table
       try {
+        // First try with checked_count
         const { data, error } = await supabase
           .from('checkins')
           .insert({
             guest_id: checkin.guest_id,
             operator: checkin.operator,
             checked_at: checkinTimestamp,
+            checked_count: countToEnter,
           })
           .select()
           .single();
 
         if (!error && data) {
-          createdCheckIn = data as CheckIn;
+          createdCheckIn = {
+            ...(data as CheckIn),
+            checked_count: countToEnter,
+          };
+        } else if (error) {
+          // If column checked_count does not exist in schema, retry without it
+          console.warn('Direct checkin with checked_count failed, falling back:', error.message);
+          const fallbackRes = await supabase
+            .from('checkins')
+            .insert({
+              guest_id: checkin.guest_id,
+              operator: checkin.operator,
+              checked_at: checkinTimestamp,
+            })
+            .select()
+            .single();
+
+          if (!fallbackRes.error && fallbackRes.data) {
+            createdCheckIn = {
+              ...(fallbackRes.data as CheckIn),
+              checked_count: countToEnter,
+            };
+          }
         }
       } catch (insertErr) {
         console.warn('Direct checkins table insert failed (RLS/Permissions):', insertErr);
       }
 
-      // 3. Resilient Cloud Persistence: update guest record notes with check-in tag
-      let eventId = '';
-      try {
-        const { data: currentGuest } = await supabase
-          .from('guests')
-          .select('id, event_id, notes')
-          .eq('id', checkin.guest_id)
-          .single();
+      const assignedId = createdCheckIn?.id || `ci_${checkin.guest_id}_${Date.now()}`;
 
-        if (currentGuest) {
-          eventId = currentGuest.event_id;
-          const updatedNotes = attachCheckinToNotes(currentGuest.notes, checkin.operator, checkinTimestamp);
+      // 3. Resilient Cloud Persistence: update guest record notes with check-in tag
+      try {
+        if (checkin.guest_id) {
+          const updatedNotes = attachCheckinToNotes(
+            guestNotes,
+            checkin.operator,
+            checkinTimestamp,
+            countToEnter,
+            assignedId
+          );
           await supabase
             .from('guests')
             .update({ notes: updatedNotes })
             .eq('id', checkin.guest_id);
-
-          // Update local cache for immediate recovery
-          if (typeof window !== 'undefined' && currentGuest.event_id) {
-            try {
-              const cacheKey = `portaria_checkins_cache_${currentGuest.event_id}`;
-              const raw = localStorage.getItem(cacheKey);
-              const list: CheckIn[] = raw ? JSON.parse(raw) : [];
-              const newItem: CheckIn = createdCheckIn || {
-                id: `ci_${checkin.guest_id}`,
-                guest_id: checkin.guest_id,
-                operator: checkin.operator,
-                checked_at: checkinTimestamp,
-              };
-              const filtered = [newItem, ...list.filter((x) => x.guest_id !== checkin.guest_id)].slice(0, 500);
-              localStorage.setItem(cacheKey, JSON.stringify(filtered));
-            } catch (cacheErr) {}
-          }
         }
       } catch (guestUpdateErr) {
         console.warn('Error persisting check-in tag to guest notes:', guestUpdateErr);
       }
 
       const finalCheckin: CheckIn = createdCheckIn || {
-        id: `ci_${checkin.guest_id}`,
+        id: assignedId,
         guest_id: checkin.guest_id,
         operator: checkin.operator,
         checked_at: checkinTimestamp,
+        checked_count: countToEnter,
       };
 
-      // 4. Broadcast via Realtime channel
+      // 4. Update local storage cache
+      if (typeof window !== 'undefined' && eventId) {
+        try {
+          const cacheKey = `portaria_checkins_cache_${eventId}`;
+          const raw = localStorage.getItem(cacheKey);
+          const list: CheckIn[] = raw ? JSON.parse(raw) : [];
+          const filtered = [finalCheckin, ...list.filter((x) => x.id !== finalCheckin.id)].slice(0, 500);
+          localStorage.setItem(cacheKey, JSON.stringify(filtered));
+        } catch (cacheErr) {}
+      }
+
+      // 5. Broadcast via Realtime channel
       broadcastCheckinNew({
         id: finalCheckin.id,
         guest_id: checkin.guest_id,
+        guest_name: guestName,
+        guest_companions: guestCompanions,
         event_id: eventId,
         checked_at: checkinTimestamp,
         operator: checkin.operator,
+        checked_count: countToEnter,
+        remaining_slots: Math.max(0, maxAllowed - (totalAlreadyEntered + countToEnter)),
       });
 
       return finalCheckin;
@@ -397,64 +616,65 @@ export const CheckInRepository = {
   },
 
   /**
-   * Checks if a guest is already checked in (via table or guest notes)
+   * Reverts a specific check-in record
    */
-  async getByGuestId(guestId: string): Promise<CheckIn | null> {
-    // 1. Check guest record notes first to respect explicit reversions
+  async deleteCheckin(checkinId: string, guestId: string, eventId?: string): Promise<boolean> {
+    let success = false;
+    let resolvedEventId = eventId || '';
+
+    // 1. Delete from checkins table
+    try {
+      const { error } = await supabase
+        .from('checkins')
+        .delete()
+        .eq('id', checkinId);
+      if (!error) success = true;
+    } catch (e) {
+      console.warn('Error deleting specific checkin from table:', e);
+    }
+
+    // 2. Update guest notes
     try {
       const { data: guest } = await supabase
         .from('guests')
-        .select('*')
+        .select('id, event_id, notes')
         .eq('id', guestId)
         .single();
 
       if (guest) {
-        if (guest.notes?.includes(CHECKIN_REVERTED_TAG_PREFIX)) {
-          return null; // Explicitly reverted!
+        if (!resolvedEventId && guest.event_id) {
+          resolvedEventId = guest.event_id;
         }
-        if (guest.notes?.includes(CHECKIN_NOTE_TAG_PREFIX)) {
-          const parsed = parseGuestCheckinNote(guest.notes);
-          if (parsed) {
-            return {
-              id: `ci_${guest.id}`,
-              guest_id: guest.id,
-              operator: parsed.operator,
-              checked_at: parsed.at,
-              guest,
-            };
-          }
-        }
+
+        const updatedNotes = revertCheckinInNotes(guest.notes, undefined, checkinId);
+        const { error: updateErr } = await supabase
+          .from('guests')
+          .update({ notes: updatedNotes })
+          .eq('id', guestId);
+
+        if (!updateErr) success = true;
       }
-    } catch (e) {}
+    } catch (e) {
+      console.warn('Error updating guest notes for checkin reversion:', e);
+    }
 
-    // 2. Check direct checkins table
-    try {
-      const { data, error } = await supabase
-        .from('checkins')
-        .select('*')
-        .eq('guest_id', guestId)
-        .maybeSingle();
+    // 3. Clean local caches
+    clearCheckinLocalCaches(guestId, resolvedEventId, checkinId);
 
-      if (!error && data) {
-        return data as CheckIn;
-      }
-    } catch (e) {}
+    // 4. Broadcast deletion to all stations
+    broadcastCheckinDelete(guestId, resolvedEventId, checkinId);
 
-    return null;
+    return success;
   },
 
   /**
-   * Reverts/deletes a check-in across:
-   * 1. Public checkins table
-   * 2. Guest notes (applies [CHECKIN_REVERTED] to guarantee suppression in anon access)
-   * 3. Local storage caches (inconditionally cleaned)
-   * 4. Realtime broadcast to all connected devices/tabs
+   * Reverts all check-ins for a guest
    */
   async deleteByGuestId(guestId: string, eventId?: string): Promise<boolean> {
     let success = false;
     let resolvedEventId = eventId || '';
 
-    // 1. Delete from checkins table (succeeds if authenticated admin or permitted)
+    // 1. Delete from checkins table
     try {
       const { error } = await supabase
         .from('checkins')

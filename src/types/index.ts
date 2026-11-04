@@ -61,6 +61,7 @@ export interface CheckIn {
   guest_id: string;
   checked_at: string;
   operator: string;
+  checked_count?: number; // Number of people admitted in this specific checkin event (default: 1)
   guest?: Guest; // joined relation
 }
 

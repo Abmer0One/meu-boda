@@ -6,6 +6,7 @@ import { EventRepository } from '@/repositories/event.repository';
 import { GuestRepository } from '@/repositories/guest.repository';
 import { TableRepository } from '@/repositories/table.repository';
 import { StaffPassRepository } from '@/repositories/staff-pass.repository';
+import { getGuestCheckinStats, GuestCheckinStats } from '@/repositories/checkin.repository';
 import { supabase } from '@/lib/supabase';
 import { Event, Guest, CheckIn, PortariaConfig, Table, StaffPass, StaffCheckin } from '@/types';
 import confetti from 'canvas-confetti';
@@ -160,15 +161,22 @@ function PortariaContent({ slug }: { slug: string }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [manualQrInput, setManualQrInput] = useState('');
   const [scanResult, setScanResult] = useState<{
-    type: 'success' | 'warning' | 'error' | 'staff';
+    type: 'success' | 'warning' | 'error' | 'staff' | 'partial';
     title: string;
     message: string;
     guest?: Guest;
     table?: Table;
     previousCheckin?: CheckIn;
+    allPreviousCheckins?: CheckIn[];
     staffPass?: StaffPass;
     previousStaffCheckin?: StaffCheckin;
+    checkedCount?: number;
+    remainingSlots?: number;
   } | null>(null);
+
+  // Partial checkin modal state
+  const [partialModalGuest, setPartialModalGuest] = useState<Guest | null>(null);
+  const [isExecutingCheckin, setIsExecutingCheckin] = useState(false);
 
   // High-visibility green/red/blue visual alert state
   const [scanVisualAlert, setScanVisualAlert] = useState<'success' | 'error' | 'staff' | null>(null);
@@ -286,13 +294,14 @@ function PortariaContent({ slug }: { slug: string }) {
         if (!p) return;
         if (!p.event_id || p.event_id === event.id) {
           setCheckins((prev) => {
-            if (prev.some((c) => c.guest_id === p.guest_id)) return prev;
+            if (p.id && prev.some((c) => c.id === p.id)) return prev;
             return [
               {
-                id: p.id || `ci_${p.guest_id}`,
+                id: p.id || `ci_${p.guest_id}_${Date.now()}`,
                 guest_id: p.guest_id,
                 operator: p.operator || 'Portaria',
                 checked_at: p.checked_at || new Date().toISOString(),
+                checked_count: Number(p.checked_count) || 1,
               },
               ...prev,
             ];
@@ -303,17 +312,22 @@ function PortariaContent({ slug }: { slug: string }) {
         const p = payload?.payload;
         if (!p) return;
         if (!p.event_id || p.event_id === event.id) {
-          setCheckins((prev) => prev.filter((c) => c.guest_id !== p.guest_id));
+          setCheckins((prev) => {
+            if (p.id && !p.all) {
+              return prev.filter((c) => c.id !== p.id);
+            }
+            return prev.filter((c) => c.guest_id !== p.guest_id);
+          });
           if (typeof window !== 'undefined') {
             try {
               const cacheKey = `portaria_checkins_cache_${event.id}`;
               const raw = localStorage.getItem(cacheKey);
               if (raw) {
                 const list: CheckIn[] = JSON.parse(raw);
-                localStorage.setItem(
-                  cacheKey,
-                  JSON.stringify(list.filter((x) => x.guest_id !== p.guest_id))
-                );
+                const updated = p.id && !p.all
+                  ? list.filter((x) => x.id !== p.id)
+                  : list.filter((x) => x.guest_id !== p.guest_id);
+                localStorage.setItem(cacheKey, JSON.stringify(updated));
               }
             } catch {}
           }
@@ -369,32 +383,49 @@ function PortariaContent({ slug }: { slug: string }) {
     setPinInput('');
   };
 
-  // Perform Check-in
-  const handleProcessCheckin = async (guest: Guest) => {
+  // Perform Check-in (supports single instant entry or partial entry for multi-person invitations)
+  const handleProcessCheckin = async (guest: Guest, countOverride?: number) => {
     if (!event) return;
 
-    // Check if already checked in in local state
-    const existingCi = checkins.find((ci) => ci.guest_id === guest.id);
-    if (existingCi) {
+    const stats = getGuestCheckinStats(guest, checkins);
+
+    // 1. If invitation is fully exhausted (all allowed entries are in)
+    if (stats.isFullyCheckedIn) {
       playFeedbackSound('error');
       triggerVisualAlert('error');
       const table = tables.find((t) => t.id === guest.table_id);
       setScanResult({
         type: 'error',
-        title: 'CÓDIGO JÁ UTILIZADO ANTERIORMENTE!',
-        message: `O convite de '${guest.name}' já foi validado para dar entrada no evento.`,
+        title: 'CONVITE TOTALMENTE ESGOTADO!',
+        message: `Todas as ${stats.maxAllowed} vagas autorizadas para o convite de '${guest.name}' já deram entrada no evento.`,
         guest,
         table,
-        previousCheckin: existingCi,
+        previousCheckin: stats.entries[stats.entries.length - 1],
+        allPreviousCheckins: stats.entries,
       });
       return;
     }
+
+    // 2. If invitation has companions and operator hasn't selected the quantity yet, open the partial modal
+    if (guest.companions > 0 && countOverride === undefined) {
+      setIsScanning(false);
+      setPartialModalGuest(guest);
+      return;
+    }
+
+    // 3. Determine quantity to admit (default to 1 or countOverride, capped by remaining slots)
+    const countToEnter = countOverride !== undefined
+      ? Math.min(countOverride, stats.remainingSlots)
+      : Math.min(1, stats.remainingSlots);
+
+    if (countToEnter <= 0) return;
 
     // Mutex: Check if check-in is already in-flight for this guest
     if (processingGuestIdsRef.current.has(guest.id)) {
       return;
     }
     processingGuestIdsRef.current.add(guest.id);
+    setIsExecutingCheckin(true);
 
     try {
       const newCi = await PortariaRepository.performCheckin(guest.id, activeOperator, {
@@ -402,11 +433,16 @@ function PortariaContent({ slug }: { slug: string }) {
         companions: guest.companions,
         eventId: event.id,
         eventTitle: event.title,
+        checked_count: countToEnter,
       });
 
       if (newCi) {
         // Optimistically add to local checkins state so "Presentes" count increments IMMEDIATELY!
-        setCheckins((prev) => [newCi, ...prev.filter((c) => c.guest_id !== guest.id)]);
+        setCheckins((prev) => [newCi, ...prev]);
+
+        const updatedTotalEntered = stats.totalEntered + countToEnter;
+        const newRemaining = Math.max(0, stats.maxAllowed - updatedTotalEntered);
+        const isComplete = newRemaining === 0;
 
         playFeedbackSound('success');
         triggerVisualAlert('success');
@@ -419,12 +455,22 @@ function PortariaContent({ slug }: { slug: string }) {
 
         const table = tables.find((t) => t.id === guest.table_id);
         setScanResult({
-          type: 'success',
-          title: 'ENTRADA AUTORIZADA!',
-          message: `Bem-vindo(a), ${guest.name}! Acesso validado com sucesso.`,
+          type: isComplete ? 'success' : 'partial',
+          title: isComplete
+            ? (stats.maxAllowed > 1 ? `ENTRADA COMPLETA (${stats.maxAllowed} de ${stats.maxAllowed})!` : 'ENTRADA AUTORIZADA!')
+            : `ENTRADA PARCIAL REGISTADA (${updatedTotalEntered} de ${stats.maxAllowed})!`,
+          message: isComplete
+            ? (stats.maxAllowed > 1
+                ? `Todas as ${stats.maxAllowed} vagas do convite de '${guest.name}' deram entrada.`
+                : `Bem-vindo(a), ${guest.name}! Acesso validado com sucesso.`)
+            : `Entrada autorizada para ${countToEnter} pessoa(s). Resta ${newRemaining} vaga guardada para quando o acompanhante chegar.`,
           guest,
           table,
+          checkedCount: countToEnter,
+          remainingSlots: newRemaining,
         });
+
+        setPartialModalGuest(null);
 
         // Background sync to ensure all stations have latest data
         loadEventData(event.id);
@@ -435,11 +481,12 @@ function PortariaContent({ slug }: { slug: string }) {
         const table = tables.find((t) => t.id === guest.table_id);
         setScanResult({
           type: 'error',
-          title: 'CÓDIGO JÁ UTILIZADO ANTERIORMENTE!',
-          message: `O convite de '${guest.name}' já foi utilizado anteriormente para dar entrada.`,
+          title: 'CONVITE JÁ UTILIZADO ANTERIORMENTE!',
+          message: `Não foi possível validar entrada para '${guest.name}'. As vagas deste convite já se encontram esgotadas.`,
           guest,
           table,
         });
+        setPartialModalGuest(null);
         loadEventData(event.id);
       }
     } catch (err) {
@@ -451,9 +498,10 @@ function PortariaContent({ slug }: { slug: string }) {
         message: 'Ocorreu um erro no servidor ao tentar registar a entrada. Tente novamente.',
       });
     } finally {
+      setIsExecutingCheckin(false);
       setTimeout(() => {
         processingGuestIdsRef.current.delete(guest.id);
-      }, 2500);
+      }, 2000);
     }
   };
 
@@ -743,18 +791,18 @@ function PortariaContent({ slug }: { slug: string }) {
     setManualQrInput('');
   };
 
-  // Revert a Check-in
-  const handleRevert = async (guestId: string) => {
-    if (!confirm('Deseja anular o registo de entrada deste convidado?')) return;
+  // Revert a Check-in (supports single partial entry reversion)
+  const handleRevert = async (checkinId: string, guestId: string) => {
+    if (!confirm('Deseja anular este registo de entrada?')) return;
     if (!event) return;
 
     // Optimistically remove from state so counter and list decrement immediately
-    setCheckins((prev) => prev.filter((ci) => ci.guest_id !== guestId));
+    setCheckins((prev) => prev.filter((ci) => ci.id !== checkinId));
     setScanResult(null);
     setScanVisualAlert(null);
 
     try {
-      await PortariaRepository.revertCheckin(guestId, event.id);
+      await PortariaRepository.revertSingleCheckin(checkinId, guestId, event.id);
     } catch (err) {
       console.warn('Erro ao anular entrada:', err);
     }
@@ -768,8 +816,10 @@ function PortariaContent({ slug }: { slug: string }) {
     return match;
   });
 
-  const checkedInCount = checkins.length;
-  const totalGuests = guests.length;
+  // Physical people presence and slots metrics
+  const totalInvitedPeople = guests.reduce((sum, g) => sum + 1 + (Number(g.companions) || 0), 0);
+  const checkedInCount = checkins.reduce((sum, ci) => sum + (Number(ci.checked_count) || 1), 0);
+  const totalGuests = totalInvitedPeople > 0 ? totalInvitedPeople : guests.length;
   const pendingCount = Math.max(0, totalGuests - checkedInCount);
 
   const availableOperators =
@@ -1048,6 +1098,8 @@ function PortariaContent({ slug }: { slug: string }) {
             className={`p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border-2 transition-all shadow-2xl animate-in zoom-in-95 w-full overflow-hidden ${
               scanResult.type === 'success'
                 ? 'bg-gradient-to-br from-emerald-600 to-emerald-700 border-emerald-300 text-white shadow-emerald-950/70'
+                : scanResult.type === 'partial'
+                ? 'bg-gradient-to-br from-amber-600 via-amber-700 to-amber-800 border-amber-300 text-white shadow-amber-950/70'
                 : scanResult.type === 'staff'
                 ? 'bg-gradient-to-br from-indigo-700 via-indigo-800 to-slate-900 border-indigo-300 text-white shadow-indigo-950/70'
                 : 'bg-gradient-to-br from-red-600 to-red-700 border-red-300 text-white shadow-red-950/70'
@@ -1058,6 +1110,10 @@ function PortariaContent({ slug }: { slug: string }) {
                 {scanResult.type === 'success' ? (
                   <div className="p-1.5 sm:p-2 rounded-xl sm:rounded-2xl bg-white/20 shrink-0 mt-0.5">
                     <CheckCircle className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
+                  </div>
+                ) : scanResult.type === 'partial' ? (
+                  <div className="p-1.5 sm:p-2 rounded-xl sm:rounded-2xl bg-amber-950/40 border border-amber-300/40 shrink-0 mt-0.5">
+                    <UserCheck className="h-6 w-6 sm:h-8 sm:w-8 text-amber-200" />
                   </div>
                 ) : scanResult.type === 'staff' ? (
                   <div className="p-1.5 sm:p-2 rounded-xl sm:rounded-2xl bg-indigo-500/30 border border-indigo-400/40 shrink-0 mt-0.5">
@@ -1074,13 +1130,17 @@ function PortariaContent({ slug }: { slug: string }) {
                       className={`inline-block px-2 sm:px-2.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-wider shrink-0 ${
                         scanResult.type === 'success'
                           ? 'bg-emerald-950/40 text-emerald-100 border border-emerald-300/40'
+                          : scanResult.type === 'partial'
+                          ? 'bg-amber-950/50 text-amber-100 border border-amber-300/50'
                           : scanResult.type === 'staff'
                           ? 'bg-indigo-950/60 text-indigo-200 border border-indigo-300/40'
                           : 'bg-red-950/40 text-red-100 border border-red-300/40'
                       }`}
                     >
                       {scanResult.type === 'success'
-                        ? 'Acesso Permitido'
+                        ? 'Entrada Concluída'
+                        : scanResult.type === 'partial'
+                        ? 'Entrada Parcial Autorizada'
                         : scanResult.type === 'staff'
                         ? 'Prestador de Serviço'
                         : 'Acesso Recusado'}
@@ -1138,16 +1198,23 @@ function PortariaContent({ slug }: { slug: string }) {
                     </div>
                   )}
 
-                  {/* Guest Detailed Card on Successful/Duplicate Scan */}
+                  {/* Guest Detailed Card on Successful/Partial/Duplicate Scan */}
                   {scanResult.guest && (
                     <div className="mt-2.5 sm:mt-3 p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl bg-black/40 border border-white/20 text-xs space-y-1.5 sm:space-y-2 backdrop-blur-sm">
                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2">
                         <span className="font-black text-white text-sm sm:text-base break-words">
                           {scanResult.guest.name}
                         </span>
-                        <span className="self-start sm:self-auto px-2 py-0.5 rounded-full bg-white/20 text-[10px] sm:text-[11px] font-bold text-white shrink-0">
-                          +{scanResult.guest.companions} acomp. (Total: {1 + scanResult.guest.companions} pax)
-                        </span>
+                        <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
+                          <span className="px-2 py-0.5 rounded-full bg-white/20 text-[10px] sm:text-[11px] font-bold text-white">
+                            +{scanResult.guest.companions} acomp. (Total: {1 + scanResult.guest.companions} pax)
+                          </span>
+                          {scanResult.remainingSlots !== undefined && scanResult.remainingSlots > 0 && (
+                            <span className="px-2 py-0.5 rounded-full bg-amber-400/30 text-amber-200 border border-amber-300/40 text-[10px] sm:text-[11px] font-bold">
+                              Resta {scanResult.remainingSlots} vaga
+                            </span>
+                          )}
+                        </div>
                       </div>
 
                       {scanResult.table && (
@@ -1163,7 +1230,29 @@ function PortariaContent({ slug }: { slug: string }) {
                         </p>
                       )}
 
-                      {scanResult.previousCheckin && (
+                      {/* Multi-entry History for Exhausted Invitation */}
+                      {scanResult.allPreviousCheckins && scanResult.allPreviousCheckins.length > 0 ? (
+                        <div className="text-[10px] sm:text-[11px] text-red-100 bg-red-950/70 p-2.5 rounded-xl border border-red-400/40 mt-1.5 sm:mt-2 space-y-1">
+                          <div className="font-bold text-white flex items-center gap-1">
+                            <AlertTriangle className="h-3.5 w-3.5 text-red-300" />
+                            <span>Entradas já efetuadas neste convite:</span>
+                          </div>
+                          {scanResult.allPreviousCheckins.map((entry, idx) => (
+                            <div key={entry.id || idx} className="flex items-center justify-between pl-3 text-zinc-300">
+                              <span>
+                                • {idx + 1}ª Entrada ({entry.checked_count || 1} pax) às{' '}
+                                <strong className="text-white underline">
+                                  {new Date(entry.checked_at).toLocaleTimeString('pt-PT', {
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  })}
+                                </strong>
+                              </span>
+                              <span className="text-[10px] text-zinc-400">Posto: {entry.operator || 'Portaria'}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : scanResult.previousCheckin ? (
                         <div className="text-[10px] sm:text-[11px] text-red-100 bg-red-950/70 p-2 sm:p-2.5 rounded-xl border border-red-400/40 mt-1.5 sm:mt-2 font-medium break-words leading-relaxed">
                           ⚠️ Primeira entrada registada às{' '}
                           <strong className="text-white underline">
@@ -1175,7 +1264,7 @@ function PortariaContent({ slug }: { slug: string }) {
                           </strong>{' '}
                           pelo operador: <strong>{scanResult.previousCheckin.operator || 'Portaria'}</strong>
                         </div>
-                      )}
+                      ) : null}
                     </div>
                   )}
                 </div>
@@ -1382,29 +1471,42 @@ function PortariaContent({ slug }: { slug: string }) {
                 </div>
               ) : filteredGuests.length > 0 ? (
                 filteredGuests.map((guest) => {
-                  const isChecked = checkins.some((ci) => ci.guest_id === guest.id);
+                  const stats = getGuestCheckinStats(guest, checkins);
                   const table = tables.find((t) => t.id === guest.table_id);
 
                   return (
                     <div
                       key={guest.id}
                       className={`p-3 rounded-xl border transition-all flex items-center justify-between gap-3 ${
-                        isChecked
+                        stats.isFullyCheckedIn
                           ? 'bg-emerald-950/20 border-emerald-500/30'
+                          : stats.isPartiallyCheckedIn
+                          ? 'bg-amber-950/20 border-amber-500/40'
                           : 'bg-[#0F0E17] border-[#2D2A3E] hover:border-[#D4AF37]/50'
                       }`}
                     >
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
                           <p className="text-sm font-bold text-white truncate">{guest.name}</p>
-                          {isChecked && (
-                            <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/20 text-emerald-400">
-                              Presente
+                          {stats.isFullyCheckedIn && (
+                            <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                              Presente ({stats.totalEntered}/{stats.maxAllowed})
+                            </span>
+                          )}
+                          {stats.isPartiallyCheckedIn && (
+                            <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                              Parcial ({stats.totalEntered}/{stats.maxAllowed})
                             </span>
                           )}
                         </div>
                         <div className="flex items-center gap-2 text-[11px] text-zinc-400 mt-0.5">
-                          <span>+{guest.companions} acomp. ({1 + guest.companions} pax)</span>
+                          <span>+{guest.companions} acomp. ({stats.maxAllowed} pax)</span>
+                          {stats.isPartiallyCheckedIn && (
+                            <>
+                              <span>•</span>
+                              <span className="text-amber-300 font-semibold">{stats.remainingSlots} vaga(s) restante(s)</span>
+                            </>
+                          )}
                           {table && (
                             <>
                               <span>•</span>
@@ -1414,10 +1516,20 @@ function PortariaContent({ slug }: { slug: string }) {
                         </div>
                       </div>
 
-                      {isChecked ? (
+                      {stats.isFullyCheckedIn ? (
                         <span className="text-xs font-semibold text-emerald-400 flex items-center gap-1 shrink-0">
                           <CheckCircle className="h-4 w-4" /> Entrou
                         </span>
+                      ) : stats.isPartiallyCheckedIn ? (
+                        <button
+                          type="button"
+                          onClick={() => handleProcessCheckin(guest)}
+                          className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs shrink-0 active:scale-95 transition-all cursor-pointer shadow flex items-center gap-1"
+                        >
+                          <UserCheck className="h-3.5 w-3.5" />
+                          <span>+ 1 Vaga</span>
+                          <span className="text-[10px] opacity-75">({stats.remainingSlots} rest.)</span>
+                        </button>
                       ) : (
                         <button
                           type="button"
@@ -1468,7 +1580,7 @@ function PortariaContent({ slug }: { slug: string }) {
                     : 'text-zinc-400 hover:text-white'
                 }`}
               >
-                Convidados ({checkins.length})
+                Convidados ({checkins.length} check-ins • {checkedInCount} pax)
               </button>
               <button
                 type="button"
@@ -1497,7 +1609,12 @@ function PortariaContent({ slug }: { slug: string }) {
                         className="p-3 rounded-xl bg-[#0F0E17] border border-[#2D2A3E] flex items-center justify-between gap-3 text-xs"
                       >
                         <div className="min-w-0">
-                          <p className="font-bold text-white truncate">{guest?.name || 'Convidado'}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-bold text-white truncate">{guest?.name || 'Convidado'}</p>
+                            <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-[#D4AF37]/20 text-[#D4AF37] border border-[#D4AF37]/30">
+                              {ci.checked_count && ci.checked_count > 1 ? `${ci.checked_count} pax` : '1 pax'}
+                            </span>
+                          </div>
                           <div className="flex items-center gap-2 text-[10px] text-zinc-400 mt-0.5">
                             <span className="text-emerald-400 font-semibold">
                               {new Date(ci.checked_at).toLocaleTimeString('pt-PT', {
@@ -1519,7 +1636,7 @@ function PortariaContent({ slug }: { slug: string }) {
 
                         <button
                           type="button"
-                          onClick={() => handleRevert(ci.guest_id)}
+                          onClick={() => handleRevert(ci.id, ci.guest_id)}
                           className="p-1.5 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer shrink-0"
                           title="Anular Entrada"
                         >
@@ -1590,6 +1707,216 @@ function PortariaContent({ slug }: { slug: string }) {
             </div>
           </div>
         )}
+
+        {/* MODAL DE GESTÃO DE ENTRADA PARCIAL / VAGAS POR CONVITE */}
+        {partialModalGuest && (() => {
+          const modalStats = getGuestCheckinStats(partialModalGuest, checkins);
+          const modalTable = tables.find((t) => t.id === partialModalGuest.table_id);
+          const isCompanionArrival = modalStats.totalEntered > 0 && modalStats.remainingSlots > 0;
+
+          return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in">
+              <div className="w-full max-w-md bg-[#1A1926] border border-[#2D2A3E] rounded-3xl p-6 sm:p-7 shadow-2xl space-y-5 text-left relative overflow-hidden">
+                {/* Glow Header Accent */}
+                <div
+                  className={`absolute top-0 inset-x-0 h-1.5 ${
+                    isCompanionArrival
+                      ? 'bg-gradient-to-r from-amber-500 via-amber-400 to-amber-300'
+                      : 'bg-gradient-to-r from-[#D4AF37] via-[#FFE082] to-[#B89742]'
+                  }`}
+                />
+
+                {/* Modal Header */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-1">
+                    <span
+                      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold ${
+                        isCompanionArrival
+                          ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                          : 'bg-[#D4AF37]/15 text-[#D4AF37] border border-[#D4AF37]/30'
+                      }`}
+                    >
+                      <Users className="h-3.5 w-3.5" />
+                      {isCompanionArrival ? 'Chegada de Acompanhante' : 'Controlo de Vagas do Convite'}
+                    </span>
+                    <h3 className="text-xl font-black text-white tracking-tight break-words">
+                      {partialModalGuest.name}
+                    </h3>
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-400">
+                      <span className="font-semibold text-white">
+                        Total do convite: {modalStats.maxAllowed} pessoas
+                      </span>
+                      {modalTable && (
+                        <>
+                          <span>•</span>
+                          <span className="text-[#D4AF37] font-medium flex items-center gap-1">
+                            <UtensilsCrossed className="h-3 w-3" /> Mesa {modalTable.name}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPartialModalGuest(null);
+                      setIsScanning(true);
+                    }}
+                    className="p-1.5 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                {/* Scenario 1: Companion Arrival (2nd scan, remaining slots exist) */}
+                {isCompanionArrival ? (
+                  <div className="space-y-4">
+                    <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-2 text-xs">
+                      <div className="flex items-center gap-2 text-amber-400 font-bold text-sm">
+                        <CheckCircle className="h-4 w-4" />
+                        <span>Entrada Anterior Registada</span>
+                      </div>
+                      <p className="text-zinc-300 leading-relaxed">
+                        Já entrou <strong className="text-white">{modalStats.totalEntered} pessoa(s)</strong> deste convite
+                        {modalStats.entries[0] && (
+                          <>
+                            {' '}às{' '}
+                            <strong className="text-white underline">
+                              {new Date(modalStats.entries[0].checked_at).toLocaleTimeString('pt-PT', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </strong>{' '}
+                            pelo posto <strong>{modalStats.entries[0].operator || 'Portaria'}</strong>
+                          </>
+                        )}.
+                      </p>
+                      <div className="pt-2 flex items-center justify-between text-xs font-bold text-amber-300 border-t border-amber-500/20">
+                        <span>Vagas restantes agora:</span>
+                        <span className="px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 font-black">
+                          {modalStats.remainingSlots} {modalStats.remainingSlots === 1 ? 'vaga disponível' : 'vagas disponíveis'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <p className="text-xs text-zinc-300 leading-relaxed">
+                      O parceiro/acompanhante que chegou agora está a apresentar o mesmo código QR para ocupar a vaga restante. Confirma a sua entrada?
+                    </p>
+
+                    <div className="space-y-2 pt-1">
+                      <button
+                        type="button"
+                        disabled={isExecutingCheckin}
+                        onClick={() => handleProcessCheckin(partialModalGuest, modalStats.remainingSlots)}
+                        className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-bold text-sm shadow-lg shadow-emerald-900/40 flex items-center justify-center gap-2 active:scale-[0.99] transition-all cursor-pointer"
+                      >
+                        {isExecutingCheckin ? (
+                          <Loader2 className="h-4 w-4 animate-spin text-white" />
+                        ) : (
+                          <CheckCircle className="h-5 w-5 text-white" />
+                        )}
+                        <span>
+                          Confirmar Entrada do Acompanhante ({modalStats.remainingSlots === 1 ? 'Última vaga' : modalStats.remainingSlots + ' vagas'})
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPartialModalGuest(null);
+                          setIsScanning(true);
+                        }}
+                        className="w-full py-2.5 px-4 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 text-xs font-semibold transition-colors text-center cursor-pointer"
+                      >
+                        Cancelar / Não Validar Agora
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* Scenario 2: 1st Scan of a Multi-Person Invitation */
+                  <div className="space-y-4">
+                    <div className="p-3.5 rounded-2xl bg-[#0F0E17] border border-[#2D2A3E] space-y-1.5 text-xs">
+                      <p className="text-zinc-300">
+                        Este convite dá direito a <strong className="text-[#D4AF37]">{modalStats.maxAllowed} pessoas</strong>.
+                      </p>
+                      <p className="text-zinc-400 text-[11px] leading-relaxed">
+                        Se os convidados não chegaram juntos, pode registar apenas 1 pessoa agora. O parceiro poderá entrar mais tarde com o mesmo convite.
+                      </p>
+                    </div>
+
+                    <div className="space-y-2.5 pt-1">
+                      {/* Option A: Only 1 person arrives */}
+                      <button
+                        type="button"
+                        disabled={isExecutingCheckin}
+                        onClick={() => handleProcessCheckin(partialModalGuest, 1)}
+                        className="w-full p-4 rounded-2xl bg-[#0F0E17] hover:bg-zinc-800/80 border-2 border-[#D4AF37]/50 hover:border-[#D4AF37] text-left transition-all active:scale-[0.99] cursor-pointer group"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2.5 rounded-xl bg-[#D4AF37]/20 text-[#D4AF37] group-hover:scale-105 transition-transform">
+                              <UserCheck className="h-5 w-5" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-bold text-white flex items-center gap-2">
+                                <span>👤 Só 1 Pessoa Chegou</span>
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#D4AF37]/20 text-[#D4AF37] font-semibold">
+                                  Recomendado
+                                </span>
+                              </p>
+                              <p className="text-[11px] text-zinc-400 mt-0.5">
+                                Regista 1 entrada. Guarda {modalStats.maxAllowed - 1} vaga para o parceiro entrar depois.
+                              </p>
+                            </div>
+                          </div>
+                          <ArrowRight className="h-4 w-4 text-[#D4AF37] shrink-0" />
+                        </div>
+                      </button>
+
+                      {/* Option B: All people arrive together */}
+                      <button
+                        type="button"
+                        disabled={isExecutingCheckin}
+                        onClick={() => handleProcessCheckin(partialModalGuest, modalStats.maxAllowed)}
+                        className="w-full p-4 rounded-2xl bg-[#0F0E17] hover:bg-zinc-800/80 border border-[#2D2A3E] hover:border-emerald-500/60 text-left transition-all active:scale-[0.99] cursor-pointer group"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2.5 rounded-xl bg-emerald-500/20 text-emerald-400 group-hover:scale-105 transition-transform">
+                              <Users className="h-5 w-5" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-bold text-white">
+                                👥 Entram Todos ({modalStats.maxAllowed} Pessoas)
+                              </p>
+                              <p className="text-[11px] text-zinc-400 mt-0.5">
+                                Todos os convidados deste convite chegaram juntos agora.
+                              </p>
+                            </div>
+                          </div>
+                          <ArrowRight className="h-4 w-4 text-emerald-400 shrink-0" />
+                        </div>
+                      </button>
+
+                      {/* Cancel */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPartialModalGuest(null);
+                          setIsScanning(true);
+                        }}
+                        className="w-full py-2 text-zinc-400 hover:text-white text-xs font-semibold transition-colors text-center cursor-pointer"
+                      >
+                        Cancelar Leitura
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
       </main>
 
       {/* Footer */}
