@@ -40,6 +40,12 @@ export interface Table {
   guest_count?: number;
 }
 
+export interface CompanionSeating {
+  index: number; // 1-indexed companion position (1, 2, ...)
+  name?: string; // Optional custom/real companion name (e.g. "Carlos Santos"). Defaults to "Acompanhante de {firstName}"
+  table_id: string | null; // specific table where this companion sits
+}
+
 export interface Guest {
   id: string;
   event_id: string;
@@ -54,6 +60,7 @@ export interface Guest {
   invitation_sent: boolean;
   notes: string | null;
   created_at: string;
+  companion_seating?: CompanionSeating[] | null; // Optional: individual table assignments for companions
 }
 
 export interface CheckIn {

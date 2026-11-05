@@ -184,11 +184,13 @@ export function removeCheckinFromNotes(existingNotes: string | null | undefined)
   return (existingNotes || '')
     .replace(/\[CHECKIN:.*?\]/g, '')
     .replace(/\[CHECKIN_REVERTED:.*?\]/g, '')
+    .replace(/\[COMPANION_SEATING_START\][\s\S]*?\[COMPANION_SEATING_END\]/g, '')
+    .replace(/\[COMPANION_SEATING:.*?\]/g, '')
     .trim();
 }
 
 /**
- * Cleans user-facing guest notes for UI presentation (stripping internal checkin/revert tags)
+ * Cleans user-facing guest notes for UI presentation (stripping internal checkin/revert/seating tags)
  */
 export function cleanGuestNotesForDisplay(notes?: string | null): string {
   return removeCheckinFromNotes(notes);

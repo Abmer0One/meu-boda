@@ -9,6 +9,7 @@ import { StaffPassRepository } from '@/repositories/staff-pass.repository';
 import { getGuestCheckinStats, GuestCheckinStats } from '@/repositories/checkin.repository';
 import { supabase } from '@/lib/supabase';
 import { Event, Guest, CheckIn, PortariaConfig, Table, StaffPass, StaffCheckin } from '@/types';
+import { isGuestSeatingSeparated, getDefaultCompanionName } from '@/lib/seating';
 import confetti from 'canvas-confetti';
 import {
   QrCode,
@@ -1225,11 +1226,47 @@ function PortariaContent({ slug }: { slug: string }) {
                         </div>
                       </div>
 
-                      {scanResult.table && (
-                        <div className="flex items-center gap-1.5 sm:gap-2 text-[#FFE082] font-bold text-xs pt-0.5">
-                          <UtensilsCrossed className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
-                          <span className="break-words">Mesa: {scanResult.table.name}</span>
+                      {/* Table / Seating Info */}
+                      {isGuestSeatingSeparated(scanResult.guest) ? (
+                        <div className="p-2 sm:p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs space-y-1.5 mt-1">
+                          <div className="flex items-center gap-1.5 text-amber-300 font-bold text-[11px] uppercase tracking-wider">
+                            <UtensilsCrossed className="h-3.5 w-3.5 shrink-0" />
+                            <span>Lugares em Mesas Separadas</span>
+                          </div>
+                          <div className="space-y-1 pl-1 text-[11px] sm:text-xs">
+                            <div className="flex items-center justify-between text-white">
+                              <span className="text-zinc-300">👤 {scanResult.guest.name} (Titular):</span>
+                              <span className="font-bold text-[#FFE082]">
+                                {scanResult.table?.name || (tables.find(t => t.id === scanResult.guest?.table_id)?.name) || 'Sem Mesa'}
+                              </span>
+                            </div>
+                            {(scanResult.guest.companion_seating || []).map((comp, idx) => {
+                              const compTable = tables.find((t) => t.id === comp.table_id);
+                              const compName =
+                                comp.name ||
+                                getDefaultCompanionName(
+                                  scanResult.guest!.name,
+                                  comp.index,
+                                  scanResult.guest!.companions
+                                );
+                              return (
+                                <div key={comp.index || idx} className="flex items-center justify-between text-white">
+                                  <span className="text-zinc-300">👥 {compName}:</span>
+                                  <span className="font-bold text-[#FFE082]">
+                                    {compTable ? compTable.name : 'Sem Mesa'}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
+                      ) : (
+                        scanResult.table && (
+                          <div className="flex items-center gap-1.5 sm:gap-2 text-[#FFE082] font-bold text-xs pt-0.5">
+                            <UtensilsCrossed className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
+                            <span className="break-words">Mesa: {scanResult.table.name}</span>
+                          </div>
+                        )
                       )}
 
                       {scanResult.guest.family_group && (
@@ -1515,12 +1552,19 @@ function PortariaContent({ slug }: { slug: string }) {
                               <span className="text-amber-300 font-semibold">{stats.remainingSlots} vaga(s) restante(s)</span>
                             </>
                           )}
-                          {table && (
+                          {isGuestSeatingSeparated(guest) ? (
+                            <>
+                              <span>•</span>
+                              <span className="text-amber-400 font-semibold truncate">
+                                ✂️ Mesas: {table?.name || 'Sem Mesa'} / {(guest.companion_seating || []).map(c => tables.find(t => t.id === c.table_id)?.name || 'Sem Mesa').join(', ')}
+                              </span>
+                            </>
+                          ) : table ? (
                             <>
                               <span>•</span>
                               <span className="text-[#D4AF37] font-medium truncate">{table.name}</span>
                             </>
-                          )}
+                          ) : null}
                         </div>
                       </div>
 
@@ -1633,12 +1677,19 @@ function PortariaContent({ slug }: { slug: string }) {
                             </span>
                             <span>•</span>
                             <span className="text-zinc-500">{ci.operator || 'Portaria'}</span>
-                            {table && (
+                            {guest && isGuestSeatingSeparated(guest) ? (
+                              <>
+                                <span>•</span>
+                                <span className="text-amber-400 truncate">
+                                  Mesas: {table?.name || 'Sem Mesa'} / {(guest.companion_seating || []).map(c => tables.find(t => t.id === c.table_id)?.name || 'Sem Mesa').join(', ')}
+                                </span>
+                              </>
+                            ) : table ? (
                               <>
                                 <span>•</span>
                                 <span className="text-[#D4AF37] truncate">{table.name}</span>
                               </>
-                            )}
+                            ) : null}
                           </div>
                         </div>
 
@@ -1754,7 +1805,7 @@ function PortariaContent({ slug }: { slug: string }) {
                       <span className="font-semibold text-white">
                         Total do convite: {modalStats.maxAllowed} pessoas
                       </span>
-                      {modalTable && (
+                      {modalTable && !isGuestSeatingSeparated(partialModalGuest) && (
                         <>
                           <span>•</span>
                           <span className="text-[#D4AF37] font-medium flex items-center gap-1">
@@ -1763,6 +1814,35 @@ function PortariaContent({ slug }: { slug: string }) {
                         </>
                       )}
                     </div>
+                    {isGuestSeatingSeparated(partialModalGuest) && (
+                      <div className="mt-2 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs space-y-1">
+                        <span className="text-[10px] uppercase font-bold text-amber-300 flex items-center gap-1">
+                          <UtensilsCrossed className="h-3 w-3" /> Mesas Separadas:
+                        </span>
+                        <div className="space-y-0.5 text-zinc-300 text-[11px]">
+                          <div>
+                            👤 <strong className="text-white">{partialModalGuest.name}:</strong>{' '}
+                            <span className="text-amber-300 font-semibold">{modalTable?.name || 'Sem Mesa'}</span>
+                          </div>
+                          {(partialModalGuest.companion_seating || []).map((comp, idx) => {
+                            const compTable = tables.find((t) => t.id === comp.table_id);
+                            const compName =
+                              comp.name ||
+                              getDefaultCompanionName(
+                                partialModalGuest.name,
+                                comp.index,
+                                partialModalGuest.companions
+                              );
+                            return (
+                              <div key={comp.index || idx}>
+                                👥 <strong className="text-white">{compName}:</strong>{' '}
+                                <span className="text-amber-300 font-semibold">{compTable?.name || 'Sem Mesa'}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <button
@@ -1811,6 +1891,34 @@ function PortariaContent({ slug }: { slug: string }) {
                     <p className="text-xs text-zinc-300 leading-relaxed">
                       O parceiro/acompanhante que chegou agora está a apresentar o mesmo código QR para ocupar a vaga restante. Confirma a sua entrada?
                     </p>
+
+                    {isGuestSeatingSeparated(partialModalGuest) && (
+                      <div className="p-3 rounded-2xl bg-amber-500/15 border border-amber-500/40 text-xs space-y-1.5">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-amber-300 flex items-center gap-1">
+                          <UtensilsCrossed className="h-3.5 w-3.5" /> Mesa Atribuída ao Acompanhante:
+                        </span>
+                        <div className="space-y-1 text-white">
+                          {(partialModalGuest.companion_seating || []).map((comp, idx) => {
+                            const compTable = tables.find((t) => t.id === comp.table_id);
+                            const compName =
+                              comp.name ||
+                              getDefaultCompanionName(
+                                partialModalGuest.name,
+                                comp.index,
+                                partialModalGuest.companions
+                              );
+                            return (
+                              <div key={comp.index || idx} className="flex items-center justify-between text-xs">
+                                <span className="text-zinc-300">👥 {compName}:</span>
+                                <span className="font-extrabold text-[#FFE082]">
+                                  {compTable ? compTable.name : 'Sem Mesa'}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
 
                     <div className="space-y-2 pt-1">
                       <button

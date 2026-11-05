@@ -1,5 +1,18 @@
 import { supabase } from '@/lib/supabase';
-import { Guest } from '@/types';
+import { Guest, CompanionSeating } from '@/types';
+import {
+  parseCompanionSeatingFromNotes,
+  attachCompanionSeatingToNotes,
+  removeCompanionSeatingFromNotes,
+} from '@/lib/seating';
+
+function enrichGuestSeating(g: Guest | null): Guest | null {
+  if (!g) return null;
+  return {
+    ...g,
+    companion_seating: parseCompanionSeatingFromNotes(g.notes),
+  };
+}
 
 export const GuestRepository = {
   async getAll(eventId: string): Promise<Guest[]> {
@@ -13,7 +26,7 @@ export const GuestRepository = {
       console.error('Error fetching guests:', error);
       return [];
     }
-    return data as Guest[];
+    return (data as Guest[]).map((g) => enrichGuestSeating(g)!);
   },
 
   async getById(id: string): Promise<Guest | null> {
@@ -24,7 +37,7 @@ export const GuestRepository = {
       .single();
 
     if (error) return null;
-    return data as Guest;
+    return enrichGuestSeating(data as Guest);
   },
 
   async getByToken(token: string): Promise<Guest | null> {
@@ -35,7 +48,7 @@ export const GuestRepository = {
       .single();
 
     if (error) return null;
-    return data as Guest;
+    return enrichGuestSeating(data as Guest);
   },
 
   async create(guest: Omit<Guest, 'id' | 'qr_token' | 'created_at'>): Promise<Guest | null> {
@@ -49,7 +62,7 @@ export const GuestRepository = {
       console.error('Error creating guest:', error);
       return null;
     }
-    return data as Guest;
+    return enrichGuestSeating(data as Guest);
   },
 
   async createMany(guests: Omit<Guest, 'id' | 'qr_token' | 'created_at'>[]): Promise<Guest[]> {
@@ -62,13 +75,25 @@ export const GuestRepository = {
       console.error('Error bulk inserting guests:', error);
       return [];
     }
-    return data as Guest[];
+    return (data as Guest[]).map((g) => enrichGuestSeating(g)!);
   },
 
   async update(id: string, guest: Partial<Omit<Guest, 'id' | 'event_id' | 'qr_token' | 'created_at'>>): Promise<Guest | null> {
+    let payload = { ...guest };
+
+    // If companion_seating was explicitly updated, synchronize notes tag
+    if (guest.companion_seating !== undefined) {
+      const current = await this.getById(id);
+      const baseNotes = guest.notes !== undefined ? guest.notes : current?.notes;
+      payload.notes = guest.companion_seating && guest.companion_seating.length > 0
+        ? attachCompanionSeatingToNotes(baseNotes, guest.companion_seating)
+        : removeCompanionSeatingFromNotes(baseNotes);
+      delete payload.companion_seating;
+    }
+
     const { data, error } = await supabase
       .from('guests')
-      .update(guest)
+      .update(payload)
       .eq('id', id)
       .select()
       .single();
@@ -77,7 +102,18 @@ export const GuestRepository = {
       console.error('Error updating guest:', error);
       return null;
     }
-    return data as Guest;
+    return enrichGuestSeating(data as Guest);
+  },
+
+  async updateCompanionSeating(guestId: string, seating: CompanionSeating[] | null): Promise<Guest | null> {
+    const current = await this.getById(guestId);
+    if (!current) return null;
+
+    const updatedNotes = seating && seating.length > 0
+      ? attachCompanionSeatingToNotes(current.notes, seating)
+      : removeCompanionSeatingFromNotes(current.notes);
+
+    return this.update(guestId, { notes: updatedNotes });
   },
 
   async delete(id: string): Promise<boolean> {

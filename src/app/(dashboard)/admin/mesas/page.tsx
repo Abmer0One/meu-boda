@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useEvent } from '@/contexts/EventContext';
 import { TableRepository } from '@/repositories/table.repository';
 import { GuestRepository } from '@/repositories/guest.repository';
-import { Table, Guest } from '@/types';
+import { Table, Guest, CompanionSeating } from '@/types';
 import { jsPDF } from 'jspdf';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -14,6 +14,12 @@ import { Dialog } from '@/components/ui/Dialog';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { tableSchema } from '@/validations/schemas';
+import {
+  getDefaultCompanionName,
+  isGuestSeatingSeparated,
+  getGuestSeatingUnits,
+  SeatingUnit,
+} from '@/lib/seating';
 import {
   CalendarRange,
   Plus,
@@ -29,6 +35,10 @@ import {
   Sparkles,
   UserMinus,
   X,
+  Scissors,
+  Link2,
+  UserCheck,
+  PenLine,
 } from 'lucide-react';
 
 export default function MesasPage() {
@@ -44,6 +54,17 @@ export default function MesasPage() {
   const [tableToEdit, setTableToEdit] = useState<Table | null>(null);
   const [tableToDelete, setTableToDelete] = useState<Table | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+
+  // Companion Name Edit Modal state
+  const [companionModalOpen, setCompanionModalOpen] = useState(false);
+  const [editingCompanion, setEditingCompanion] = useState<{
+    guestId: string;
+    companionIndex: number;
+    currentName: string;
+    titularName: string;
+  } | null>(null);
+  const [companionNameInput, setCompanionNameInput] = useState('');
+  const [isSavingCompanion, setIsSavingCompanion] = useState(false);
 
   const {
     register,
@@ -118,7 +139,7 @@ export default function MesasPage() {
 
     // Loop through tables
     tables.forEach((table) => {
-      const tableGuests = guests.filter((g) => g.table_id === table.id);
+      const tableUnits = allSeatingUnits.filter((u) => u.tableId === table.id);
 
       if (yPos > 240) {
         doc.addPage();
@@ -134,7 +155,7 @@ export default function MesasPage() {
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(10);
       
-      const seatedCount = tableGuests.reduce((sum, g) => sum + 1 + (g.companions || 0), 0);
+      const seatedCount = tableUnits.length;
       doc.text(`${cleanStr(table.name)} (Capacidade: ${table.capacity} pax | Ocupado: ${seatedCount} pax)`, 18, yPos + 6);
       
       yPos += 12;
@@ -143,8 +164,8 @@ export default function MesasPage() {
       doc.setFontSize(8.5);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(100, 100, 100);
-      doc.text('Convidado', 20, yPos);
-      doc.text('Acompanhantes', 100, yPos);
+      doc.text('Pessoa / Convidado', 20, yPos);
+      doc.text('Tipo / Relação', 100, yPos);
       doc.text('Estado RSVP', 140, yPos);
       doc.line(18, yPos + 1.5, 192, yPos + 1.5);
       
@@ -153,12 +174,12 @@ export default function MesasPage() {
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(60, 60, 60);
 
-      if (tableGuests.length === 0) {
+      if (tableUnits.length === 0) {
         doc.setFont('helvetica', 'italic');
         doc.text('Nenhum convidado sentado nesta mesa.', 20, yPos);
         yPos += 8;
       } else {
-        tableGuests.forEach((guest) => {
+        tableUnits.forEach((unit) => {
           if (yPos > 265) {
             doc.addPage();
             doc.rect(8, 8, 194, 281);
@@ -172,9 +193,11 @@ export default function MesasPage() {
             return 'Pendente';
           };
 
-          doc.text(cleanStr(guest.name), 20, yPos);
-          doc.text(guest.companions ? `+${guest.companions}` : '0', 100, yPos);
-          doc.text(normalizeStatus(guest.status), 140, yPos);
+          const roleText = unit.isCompanion ? `Acomp. de ${unit.titularName}` : 'Titular';
+
+          doc.text(cleanStr(unit.displayName), 20, yPos);
+          doc.text(cleanStr(roleText), 100, yPos);
+          doc.text(normalizeStatus(unit.status), 140, yPos);
           
           yPos += 5.5;
         });
@@ -184,8 +207,8 @@ export default function MesasPage() {
     });
 
     // Add unassigned guests section at the end if there are any
-    const unassignedGuests = guests.filter((g) => !g.table_id);
-    if (unassignedGuests.length > 0) {
+    const unseatedUnitsList = allSeatingUnits.filter((u) => u.tableId === null);
+    if (unseatedUnitsList.length > 0) {
       if (yPos > 240) {
         doc.addPage();
         doc.rect(8, 8, 194, 281);
@@ -199,16 +222,15 @@ export default function MesasPage() {
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(10);
       
-      const unseatedCount = unassignedGuests.reduce((sum, g) => sum + 1 + (g.companions || 0), 0);
-      doc.text(`Convidados sem mesa organizada (Total: ${unassignedGuests.length} convites | ${unseatedCount} pax)`, 18, yPos + 6);
+      doc.text(`Convidados sem mesa organizada (Total: ${unseatedUnitsList.length} lugares pendentes)`, 18, yPos + 6);
       
       yPos += 12;
 
       doc.setFontSize(8.5);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(100, 100, 100);
-      doc.text('Convidado', 20, yPos);
-      doc.text('Acompanhantes', 100, yPos);
+      doc.text('Pessoa / Convidado', 20, yPos);
+      doc.text('Tipo / Relação', 100, yPos);
       doc.text('Estado RSVP', 140, yPos);
       doc.line(18, yPos + 1.5, 192, yPos + 1.5);
       
@@ -217,7 +239,7 @@ export default function MesasPage() {
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(60, 60, 60);
 
-      unassignedGuests.forEach((guest) => {
+      unseatedUnitsList.forEach((unit) => {
         if (yPos > 265) {
           doc.addPage();
           doc.rect(8, 8, 194, 281);
@@ -231,9 +253,11 @@ export default function MesasPage() {
           return 'Pendente';
         };
 
-        doc.text(cleanStr(guest.name), 20, yPos);
-        doc.text(guest.companions ? `+${guest.companions}` : '0', 100, yPos);
-        doc.text(normalizeStatus(guest.status), 140, yPos);
+        const roleText = unit.isCompanion ? `Acomp. de ${unit.titularName}` : 'Titular';
+
+        doc.text(cleanStr(unit.displayName), 20, yPos);
+        doc.text(cleanStr(roleText), 100, yPos);
+        doc.text(normalizeStatus(unit.status), 140, yPos);
         
         yPos += 5.5;
       });
@@ -301,9 +325,27 @@ export default function MesasPage() {
     }
   };
 
-  // NATIVE HTML5 DRAG & DROP HANDLERS
-  const handleDragStart = (e: React.DragEvent, guestId: string) => {
-    e.dataTransfer.setData('text/plain', guestId);
+  // NATIVE HTML5 DRAG & DROP HANDLERS (Supports both individual titulars and separate companions)
+  interface DragUnitPayload {
+    guestId: string;
+    unitKey: string;
+    isCompanion: boolean;
+    companionIndex?: number;
+  }
+
+  const handleDragStart = (e: React.DragEvent, unitOrId: SeatingUnit | string) => {
+    let payload: DragUnitPayload;
+    if (typeof unitOrId === 'string') {
+      payload = { guestId: unitOrId, unitKey: `${unitOrId}_main`, isCompanion: false };
+    } else {
+      payload = {
+        guestId: unitOrId.guestId,
+        unitKey: unitOrId.key,
+        isCompanion: unitOrId.isCompanion,
+        companionIndex: unitOrId.companionIndex,
+      };
+    }
+    e.dataTransfer.setData('text/plain', JSON.stringify(payload));
     e.dataTransfer.effectAllowed = 'move';
   };
 
@@ -313,32 +355,74 @@ export default function MesasPage() {
 
   const handleDropOnTable = async (e: React.DragEvent, tableId: string) => {
     e.preventDefault();
-    const guestId = e.dataTransfer.getData('text/plain');
-    if (!guestId) return;
+    const raw = e.dataTransfer.getData('text/plain');
+    if (!raw) return;
 
-    const guest = guests.find((g) => g.id === guestId);
+    let payload: DragUnitPayload;
+    try {
+      payload = JSON.parse(raw);
+    } catch {
+      payload = { guestId: raw, unitKey: `${raw}_main`, isCompanion: false };
+    }
+
+    const guest = guests.find((g) => g.id === payload.guestId);
     if (!guest) return;
 
-    // Check table capacity limits
     const table = tables.find((t) => t.id === tableId);
     if (!table) return;
 
-    const companionsCount = guest.companions || 0;
-    const guestGroupSize = 1 + companionsCount;
+    const currentSeatedCount = getTableOccupiedCount(tableId);
 
-    const currentSeatedCount = guests
-      .filter((g) => g.table_id === tableId)
-      .reduce((sum, g) => sum + 1 + (g.companions || 0), 0);
+    // If dragging a separated companion:
+    if (payload.isCompanion && payload.companionIndex) {
+      if (currentSeatedCount + 1 > table.capacity) {
+        alert(`Aviso: A mesa '${table.name}' ultrapassará a capacidade máxima!`);
+      }
 
-    if (currentSeatedCount + guestGroupSize > table.capacity) {
+      const existingSeating: CompanionSeating[] = guest.companion_seating && guest.companion_seating.length > 0
+        ? [...guest.companion_seating]
+        : Array.from({ length: guest.companions || 0 }, (_, i) => ({
+            index: i + 1,
+            name: getDefaultCompanionName(guest.name, i + 1, guest.companions),
+            table_id: null,
+          }));
+
+      const compIdx = existingSeating.findIndex((s) => s.index === payload.companionIndex);
+      if (compIdx >= 0) {
+        existingSeating[compIdx] = { ...existingSeating[compIdx], table_id: tableId };
+      } else {
+        existingSeating.push({
+          index: payload.companionIndex,
+          name: getDefaultCompanionName(guest.name, payload.companionIndex, guest.companions),
+          table_id: tableId,
+        });
+      }
+
+      try {
+        await GuestRepository.updateCompanionSeating(guest.id, existingSeating);
+        setGuests((prev) =>
+          prev.map((g) =>
+            g.id === guest.id ? { ...g, companion_seating: existingSeating } : g
+          )
+        );
+      } catch (err) {
+        console.error('Error placing companion in table:', err);
+      }
+      return;
+    }
+
+    // Otherwise, titular guest
+    const isSeparated = isGuestSeatingSeparated(guest);
+    const groupSize = isSeparated ? 1 : 1 + (guest.companions || 0);
+
+    if (currentSeatedCount + groupSize > table.capacity) {
       alert(`Aviso: A mesa '${table.name}' ultrapassará a capacidade máxima!`);
     }
 
     try {
-      await GuestRepository.update(guestId, { table_id: tableId });
-      // Update local state instantly for UI fluid response
+      await GuestRepository.update(guest.id, { table_id: tableId });
       setGuests((prev) =>
-        prev.map((g) => (g.id === guestId ? { ...g, table_id: tableId } : g))
+        prev.map((g) => (g.id === guest.id ? { ...g, table_id: tableId } : g))
       );
     } catch (err) {
       console.error('Error placing guest in table:', err);
@@ -347,45 +431,186 @@ export default function MesasPage() {
 
   const handleDropOnUnseated = async (e: React.DragEvent) => {
     e.preventDefault();
-    const guestId = e.dataTransfer.getData('text/plain');
-    if (!guestId) return;
+    const raw = e.dataTransfer.getData('text/plain');
+    if (!raw) return;
 
+    let payload: DragUnitPayload;
     try {
-      await GuestRepository.update(guestId, { table_id: null });
+      payload = JSON.parse(raw);
+    } catch {
+      payload = { guestId: raw, unitKey: `${raw}_main`, isCompanion: false };
+    }
+
+    const guest = guests.find((g) => g.id === payload.guestId);
+    if (!guest) return;
+
+    if (payload.isCompanion && payload.companionIndex) {
+      const existingSeating = guest.companion_seating ? [...guest.companion_seating] : [];
+      const compIdx = existingSeating.findIndex((s) => s.index === payload.companionIndex);
+      if (compIdx >= 0) {
+        existingSeating[compIdx] = { ...existingSeating[compIdx], table_id: null };
+        try {
+          await GuestRepository.updateCompanionSeating(guest.id, existingSeating);
+          setGuests((prev) =>
+            prev.map((g) =>
+              g.id === guest.id ? { ...g, companion_seating: existingSeating } : g
+            )
+          );
+        } catch (err) {
+          console.error('Error unseating companion:', err);
+        }
+      }
+      return;
+    }
+
+    // Titular unseated
+    try {
+      await GuestRepository.update(guest.id, { table_id: null });
       setGuests((prev) =>
-        prev.map((g) => (g.id === guestId ? { ...g, table_id: null } : g))
+        prev.map((g) => (g.id === guest.id ? { ...g, table_id: null } : g))
       );
     } catch (err) {
       console.error('Error unseating guest:', err);
     }
   };
 
-  // Seating Stats
-  const unseatedGuests = guests.filter((g) => g.table_id === null);
+  // Companion split & join methods
+  const handleSplitGuestSeating = async (guest: Guest) => {
+    const count = guest.companions || 0;
+    if (count <= 0) return;
 
-  const getTableGuests = (tableId: string) => {
-    return guests.filter((g) => g.table_id === tableId);
-  };
+    const initialSeating: CompanionSeating[] = [];
+    for (let c = 1; c <= count; c++) {
+      initialSeating.push({
+        index: c,
+        name: getDefaultCompanionName(guest.name, c, count),
+        table_id: null,
+      });
+    }
 
-  const getTableOccupiedCount = (tableId: string) => {
-    return getTableGuests(tableId).reduce((sum, g) => sum + 1 + (g.companions || 0), 0);
-  };
-
-  const handleUnseatGuest = async (guestId: string) => {
     try {
-      await GuestRepository.update(guestId, { table_id: null });
+      await GuestRepository.updateCompanionSeating(guest.id, initialSeating);
       setGuests((prev) =>
-        prev.map((g) => (g.id === guestId ? { ...g, table_id: null } : g))
+        prev.map((g) =>
+          g.id === guest.id ? { ...g, companion_seating: initialSeating } : g
+        )
+      );
+    } catch (err) {
+      console.error('Error splitting guest seating:', err);
+    }
+  };
+
+  const handleJoinGuestSeating = async (guest: Guest) => {
+    try {
+      await GuestRepository.updateCompanionSeating(guest.id, null);
+      setGuests((prev) =>
+        prev.map((g) =>
+          g.id === guest.id ? { ...g, companion_seating: null } : g
+        )
+      );
+    } catch (err) {
+      console.error('Error joining guest seating:', err);
+    }
+  };
+
+  const handleOpenEditCompanion = (unit: SeatingUnit) => {
+    if (!unit.isCompanion || !unit.companionIndex) return;
+    setEditingCompanion({
+      guestId: unit.guestId,
+      companionIndex: unit.companionIndex,
+      currentName: unit.displayName,
+      titularName: unit.titularName,
+    });
+    setCompanionNameInput(unit.displayName);
+    setCompanionModalOpen(true);
+  };
+
+  const handleSaveCompanionName = async () => {
+    if (!editingCompanion) return;
+    const clean = companionNameInput.trim();
+    if (!clean) return;
+
+    setIsSavingCompanion(true);
+    try {
+      const guest = guests.find((g) => g.id === editingCompanion.guestId);
+      if (guest) {
+        const existingSeating: CompanionSeating[] = guest.companion_seating && guest.companion_seating.length > 0
+          ? [...guest.companion_seating]
+          : Array.from({ length: guest.companions || 0 }, (_, i) => ({
+              index: i + 1,
+              name: getDefaultCompanionName(guest.name, i + 1, guest.companions),
+              table_id: null,
+            }));
+
+        const compIdx = existingSeating.findIndex((s) => s.index === editingCompanion.companionIndex);
+        if (compIdx >= 0) {
+          existingSeating[compIdx] = { ...existingSeating[compIdx], name: clean };
+        } else {
+          existingSeating.push({
+            index: editingCompanion.companionIndex,
+            name: clean,
+            table_id: null,
+          });
+        }
+
+        await GuestRepository.updateCompanionSeating(guest.id, existingSeating);
+        setGuests((prev) =>
+          prev.map((g) =>
+            g.id === guest.id ? { ...g, companion_seating: existingSeating } : g
+          )
+        );
+      }
+      setCompanionModalOpen(false);
+      setEditingCompanion(null);
+    } catch (err) {
+      console.error('Error saving companion name:', err);
+    } finally {
+      setIsSavingCompanion(false);
+    }
+  };
+
+  const handleUnseatUnit = async (unit: SeatingUnit) => {
+    const guest = guests.find((g) => g.id === unit.guestId);
+    if (!guest) return;
+
+    if (unit.isCompanion && unit.companionIndex) {
+      const existingSeating = guest.companion_seating ? [...guest.companion_seating] : [];
+      const compIdx = existingSeating.findIndex((s) => s.index === unit.companionIndex);
+      if (compIdx >= 0) {
+        existingSeating[compIdx] = { ...existingSeating[compIdx], table_id: null };
+        try {
+          await GuestRepository.updateCompanionSeating(guest.id, existingSeating);
+          setGuests((prev) =>
+            prev.map((g) =>
+              g.id === guest.id ? { ...g, companion_seating: existingSeating } : g
+            )
+          );
+        } catch (err) {
+          console.error('Error unseating companion:', err);
+        }
+      }
+      return;
+    }
+
+    // Titular
+    try {
+      await GuestRepository.update(guest.id, { table_id: null });
+      setGuests((prev) =>
+        prev.map((g) => (g.id === guest.id ? { ...g, table_id: null } : g))
       );
     } catch (err) {
       console.error('Error unseating guest:', err);
     }
   };
+
+  // Seating Stats & Units
+  const allSeatingUnits: SeatingUnit[] = guests.flatMap((g) => getGuestSeatingUnits(g, tables));
+  const getTableUnits = (tableId: string): SeatingUnit[] => allSeatingUnits.filter((u) => u.tableId === tableId);
+  const getTableOccupiedCount = (tableId: string): number => getTableUnits(tableId).length;
+  const unseatedUnits = allSeatingUnits.filter((u) => u.tableId === null);
 
   const totalCapacity = tables.reduce((sum, t) => sum + t.capacity, 0);
-  const totalSeated = guests
-    .filter((g) => g.table_id !== null)
-    .reduce((sum, g) => sum + 1 + (g.companions || 0), 0);
+  const totalSeated = allSeatingUnits.filter((u) => u.tableId !== null).length;
   const occupancyPercentage =
     totalCapacity > 0 ? Math.min(100, Math.round((totalSeated / totalCapacity) * 100)) : 0;
 
@@ -499,31 +724,176 @@ export default function MesasPage() {
           >
             <div className="mb-4">
               <h3 className="font-bold flex items-center gap-2 text-sm">
-                <Users className="h-4 w-4 text-primary" /> Convidados Sem Mesa ({unseatedGuests.length})
+                <Users className="h-4 w-4 text-primary" /> Convidados Sem Mesa ({unseatedUnits.length})
               </h3>
               <p className="text-xs text-foreground/50 mt-1">Arraste para uma mesa para acomodar.</p>
             </div>
 
             <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-[250px]">
-              {unseatedGuests.length > 0 ? (
-                unseatedGuests.map((guest) => (
-                  <div
-                    key={guest.id}
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, guest.id)}
-                    className="p-3 border border-border-custom rounded-xl bg-background hover:border-primary active:scale-[0.98] transition-all cursor-grab flex items-center justify-between"
-                  >
-                    <div>
-                      <p className="text-xs font-semibold">{guest.name}</p>
-                      {guest.family_group && (
-                        <p className="text-[10px] text-foreground/50 font-medium">Grupo: {guest.family_group}</p>
-                      )}
-                    </div>
-                    {guest.companions > 0 && (
-                      <Badge variant="secondary">+{guest.companions}</Badge>
-                    )}
-                  </div>
-                ))
+              {unseatedUnits.length > 0 ? (
+                guests
+                  .filter((g) => {
+                    const isSep = isGuestSeatingSeparated(g);
+                    if (!isSep) {
+                      return g.table_id === null;
+                    }
+                    if (g.table_id === null) return true;
+                    const compCount = g.companions || 0;
+                    const seating = g.companion_seating || [];
+                    for (let c = 1; c <= compCount; c++) {
+                      const item = seating.find((s) => s.index === c);
+                      if (!item || !item.table_id) return true;
+                    }
+                    return false;
+                  })
+                  .map((guest) => {
+                    const isSep = isGuestSeatingSeparated(guest);
+                    const compCount = guest.companions || 0;
+
+                    // CASE 1: Joined seating (Titular + Companions together)
+                    if (!isSep) {
+                      return (
+                        <div
+                          key={guest.id}
+                          draggable
+                          onDragStart={(e) => handleDragStart(e, guest.id)}
+                          className="p-3 border border-border-custom rounded-xl bg-background hover:border-primary active:scale-[0.98] transition-all cursor-grab flex items-center justify-between group"
+                        >
+                          <div className="min-w-0 pr-2">
+                            <p className="text-xs font-semibold truncate">{guest.name}</p>
+                            {guest.family_group && (
+                              <p className="text-[10px] text-foreground/50 font-medium">
+                                Grupo: {guest.family_group}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {compCount > 0 && (
+                              <>
+                                <Badge variant="secondary">+{compCount}</Badge>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleSplitGuestSeating(guest);
+                                  }}
+                                  className="p-1 rounded-md text-foreground/50 hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer"
+                                  title="Separar acompanhante em mesa diferente"
+                                >
+                                  <Scissors className="h-3.5 w-3.5" />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    // CASE 2: Separated seating
+                    const titularUnseated = guest.table_id === null;
+                    const seating = guest.companion_seating || [];
+                    const unseatedCompanions: { index: number; name: string }[] = [];
+                    for (let c = 1; c <= compCount; c++) {
+                      const item = seating.find((s) => s.index === c);
+                      if (!item || !item.table_id) {
+                        unseatedCompanions.push({
+                          index: c,
+                          name: item?.name || getDefaultCompanionName(guest.name, c, compCount),
+                        });
+                      }
+                    }
+
+                    return (
+                      <div
+                        key={guest.id}
+                        className="p-2.5 border border-dashed border-primary/40 rounded-xl bg-primary/[0.02] space-y-2"
+                      >
+                        <div className="flex items-center justify-between text-[11px] font-semibold text-primary/80 border-b border-primary/10 pb-1 px-1">
+                          <span className="flex items-center gap-1 truncate">
+                            <Scissors className="h-3 w-3" /> Mesas Separadas ({guest.name})
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleJoinGuestSeating(guest)}
+                            className="text-[10px] text-foreground/60 hover:text-primary flex items-center gap-1 cursor-pointer transition-colors"
+                            title="Juntar novamente todos na mesma mesa"
+                          >
+                            <Link2 className="h-3 w-3" /> Juntar
+                          </button>
+                        </div>
+
+                        {/* Titular if unseated */}
+                        {titularUnseated && (
+                          <div
+                            draggable
+                            onDragStart={(e) =>
+                              handleDragStart(e, {
+                                key: `${guest.id}_main`,
+                                guestId: guest.id,
+                                isCompanion: false,
+                                displayName: guest.name,
+                                titularName: guest.name,
+                                tableId: null,
+                                status: guest.status,
+                              })
+                            }
+                            className="p-2 border border-border-custom rounded-lg bg-background hover:border-primary active:scale-[0.98] transition-all cursor-grab flex items-center justify-between"
+                          >
+                            <div className="min-w-0 pr-2">
+                              <p className="text-xs font-semibold truncate">{guest.name}</p>
+                              <span className="text-[10px] text-foreground/50">Titular</span>
+                            </div>
+                            <Badge variant="secondary" className="text-[9px] py-0">1 pax</Badge>
+                          </div>
+                        )}
+
+                        {/* Companions if unseated */}
+                        {unseatedCompanions.map((comp) => {
+                          const unit: SeatingUnit = {
+                            key: `${guest.id}_comp_${comp.index}`,
+                            guestId: guest.id,
+                            isCompanion: true,
+                            companionIndex: comp.index,
+                            displayName: comp.name,
+                            titularName: guest.name,
+                            tableId: null,
+                            status: guest.status,
+                          };
+                          return (
+                            <div
+                              key={unit.key}
+                              draggable
+                              onDragStart={(e) => handleDragStart(e, unit)}
+                              className="p-2 border border-amber-500/30 rounded-lg bg-amber-500/[0.04] hover:border-amber-500 active:scale-[0.98] transition-all cursor-grab flex items-center justify-between"
+                            >
+                              <div className="min-w-0 pr-2">
+                                <p className="text-xs font-semibold text-amber-900 dark:text-amber-200 truncate">
+                                  {comp.name}
+                                </p>
+                                <span className="text-[10px] text-foreground/50">
+                                  Acomp. de {guest.name}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOpenEditCompanion(unit);
+                                  }}
+                                  className="p-1 rounded text-foreground/50 hover:text-amber-600 transition-colors cursor-pointer"
+                                  title="Editar nome do acompanhante"
+                                >
+                                  <PenLine className="h-3 w-3" />
+                                </button>
+                                <Badge variant="warning" className="text-[9px] py-0">1 pax</Badge>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })
               ) : (
                 <div className="flex flex-col items-center justify-center text-center py-10 text-foreground/40 border border-dashed border-border-custom rounded-xl">
                   <CheckCircle className="h-8 w-8 text-success mb-2" />
@@ -551,26 +921,11 @@ export default function MesasPage() {
                 {tables.length > 0 ? (
                   <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-10 justify-items-center items-center py-4 overflow-y-auto">
                     {tables.map((table) => {
-                      const tableGuests = getTableGuests(table.id);
-                      const seatedCount = getTableOccupiedCount(table.id);
+                      const tableUnits = getTableUnits(table.id);
+                      const seatedCount = tableUnits.length;
                       const isOverCap = seatedCount > table.capacity;
                       const isFull = seatedCount === table.capacity;
-
-                      // Flatten seats for occupants
-                      const seats: { name: string; isCompanion: boolean; rsvp: string; id: string }[] = [];
-                      tableGuests.forEach((g) => {
-                        seats.push({ name: g.name, isCompanion: false, rsvp: g.status, id: g.id });
-                        for (let c = 0; c < (g.companions || 0); c++) {
-                          seats.push({
-                            name: `${g.name} (Acomp. ${c + 1})`,
-                            isCompanion: true,
-                            rsvp: g.status,
-                            id: g.id,
-                          });
-                        }
-                      });
-
-                      const displayCapacity = Math.max(table.capacity, seats.length);
+                      const displayCapacity = Math.max(table.capacity, tableUnits.length);
 
                       return (
                         <div
@@ -585,23 +940,29 @@ export default function MesasPage() {
                             const radius = 86; // px distance from table center
                             const x = 128 + radius * Math.cos(angle) - 14;
                             const y = 128 + radius * Math.sin(angle) - 14;
-                            const seat = seats[i];
+                            const unit = tableUnits[i];
 
                             return (
                               <div
                                 key={i}
                                 style={{ left: `${x}px`, top: `${y}px` }}
                                 className="absolute w-7 h-7 rounded-full transition-all"
-                                title={seat ? `${seat.name} • RSVP: ${seat.rsvp}` : `Lugar ${i + 1} Livre`}
+                                title={
+                                  unit
+                                    ? `${unit.displayName} (${unit.isCompanion ? `Acomp. de ${unit.titularName}` : 'Titular'}) • RSVP: ${unit.status}`
+                                    : `Lugar ${i + 1} Livre`
+                                }
                               >
-                                {seat ? (
+                                {unit ? (
                                   <div
                                     draggable
-                                    onDragStart={(e) => handleDragStart(e, seat.id)}
+                                    onDragStart={(e) => handleDragStart(e, unit)}
                                     onClick={() => setSelectedTableForDetails(table)}
-                                    className="w-full h-full rounded-full bg-primary text-white text-[9px] font-bold flex items-center justify-center shadow-md ring-2 ring-background cursor-grab active:cursor-grabbing hover:scale-115 transition-transform"
+                                    className={`w-full h-full rounded-full text-white text-[9px] font-bold flex items-center justify-center shadow-md ring-2 ring-background cursor-grab active:cursor-grabbing hover:scale-115 transition-transform ${
+                                      unit.isCompanion ? 'bg-amber-600' : 'bg-primary'
+                                    }`}
                                   >
-                                    {seat.name.substring(0, 2).toUpperCase()}
+                                    {unit.displayName.substring(0, 2).toUpperCase()}
                                   </div>
                                 ) : (
                                   <div className="w-full h-full rounded-full border border-dashed border-border-custom bg-background/70 text-[9px] font-semibold text-foreground/35 flex items-center justify-center">
@@ -665,8 +1026,8 @@ export default function MesasPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {tables.length > 0 ? (
                   tables.map((table) => {
-                    const seatedCount = getTableOccupiedCount(table.id);
-                    const tableGuests = getTableGuests(table.id);
+                    const tableUnits = getTableUnits(table.id);
+                    const seatedCount = tableUnits.length;
                     const isOverCap = seatedCount > table.capacity;
 
                     return (
@@ -707,23 +1068,54 @@ export default function MesasPage() {
                           </div>
                         </CardHeader>
 
-                        {/* Table Content (Seated Guests) */}
+                        {/* Table Content (Seated Units) */}
                         <CardContent className="flex-1 overflow-y-auto space-y-1.5 max-h-[160px] pr-1">
-                          {tableGuests.length > 0 ? (
-                            tableGuests.map((guest) => (
+                          {tableUnits.length > 0 ? (
+                            tableUnits.map((unit) => (
                               <div
-                                key={guest.id}
+                                key={unit.key}
                                 draggable
-                                onDragStart={(e) => handleDragStart(e, guest.id)}
+                                onDragStart={(e) => handleDragStart(e, unit)}
                                 className="px-2.5 py-1.5 border border-border-custom/50 rounded-lg bg-background/70 hover:border-primary active:scale-[0.98] transition-all cursor-grab flex items-center justify-between text-xs"
                               >
-                                <span className="font-medium truncate max-w-[150px]">{guest.name}</span>
-                                <span className="text-[10px] text-foreground/50 flex items-center gap-1">
-                                  {guest.companions > 0 && (
-                                    <span className="font-bold text-primary">+{guest.companions}</span>
+                                <div className="flex items-center gap-1.5 min-w-0 pr-1">
+                                  <span className="font-medium truncate max-w-[130px]">{unit.displayName}</span>
+                                  {unit.isCompanion ? (
+                                    <Badge variant="warning" className="text-[9px] px-1.5 py-0 shrink-0">
+                                      Acomp.
+                                    </Badge>
+                                  ) : (
+                                    <Badge variant="secondary" className="text-[9px] px-1.5 py-0 shrink-0">
+                                      Titular
+                                    </Badge>
                                   )}
-                                  <span>({1 + guest.companions}p)</span>
-                                </span>
+                                </div>
+                                <div className="flex items-center gap-1 shrink-0">
+                                  {unit.isCompanion && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleOpenEditCompanion(unit);
+                                      }}
+                                      className="p-1 rounded text-foreground/40 hover:text-amber-600 transition-colors cursor-pointer"
+                                      title="Editar nome do acompanhante"
+                                    >
+                                      <PenLine className="h-3 w-3" />
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleUnseatUnit(unit);
+                                    }}
+                                    className="p-1 rounded text-foreground/40 hover:text-error transition-colors cursor-pointer"
+                                    title="Remover da mesa"
+                                  >
+                                    <UserMinus className="h-3 w-3" />
+                                  </button>
+                                </div>
                               </div>
                             ))
                           ) : (
@@ -797,40 +1189,61 @@ export default function MesasPage() {
                 Convidados Alocados a esta Mesa
               </h4>
               <div className="max-h-[300px] overflow-y-auto divide-y divide-border-custom rounded-xl border border-border-custom bg-card-bg">
-                {getTableGuests(selectedTableForDetails.id).length > 0 ? (
-                  getTableGuests(selectedTableForDetails.id).map((guest) => (
+                {getTableUnits(selectedTableForDetails.id).length > 0 ? (
+                  getTableUnits(selectedTableForDetails.id).map((unit) => (
                     <div
-                      key={guest.id}
+                      key={unit.key}
                       className="p-3 flex items-center justify-between gap-3 hover:bg-secondary/15 transition-colors"
                     >
                       <div className="min-w-0">
-                        <p className="text-xs font-bold text-foreground truncate">{guest.name}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-xs font-bold text-foreground truncate">{unit.displayName}</p>
+                          {unit.isCompanion ? (
+                            <Badge variant="warning" className="text-[9px] py-0 px-1.5">
+                              Acompanhante
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary" className="text-[9px] py-0 px-1.5">
+                              Titular
+                            </Badge>
+                          )}
+                        </div>
                         <p className="text-[10px] text-foreground/50">
-                          {guest.family_group ? `Grupo: ${guest.family_group}` : 'Individual'}
-                          {guest.companions > 0 && ` • +${guest.companions} acompanhante(s)`}
+                          {unit.isCompanion ? `Acomp. de ${unit.titularName}` : 'Convidado Principal'}
                         </p>
                       </div>
 
                       <div className="flex items-center gap-2 shrink-0">
                         <Badge
                           variant={
-                            guest.status === 'Confirmed'
+                            unit.status === 'Confirmed'
                               ? 'success'
-                              : guest.status === 'Declined'
+                              : unit.status === 'Declined'
                               ? 'error'
                               : 'warning'
                           }
                         >
-                          {guest.status === 'Confirmed'
+                          {unit.status === 'Confirmed'
                             ? 'Confirmado'
-                            : guest.status === 'Declined'
+                            : unit.status === 'Declined'
                             ? 'Recusado'
                             : 'Pendente'}
                         </Badge>
+                        {unit.isCompanion && (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditCompanion(unit)}
+                            className="p-1.5 rounded-lg text-foreground/50 hover:bg-amber-500/10 hover:text-amber-600 transition-colors cursor-pointer"
+                            title="Editar nome do acompanhante"
+                          >
+                            <PenLine className="h-4 w-4" />
+                          </button>
+                        )}
                         <button
-                          onClick={() => handleUnseatGuest(guest.id)}
+                          type="button"
+                          onClick={() => handleUnseatUnit(unit)}
                           className="p-1.5 rounded-lg text-foreground/50 hover:bg-error/10 hover:text-error transition-colors cursor-pointer"
-                          title="Tirar convidado desta mesa"
+                          title="Tirar da mesa"
                         >
                           <UserMinus className="h-4 w-4" />
                         </button>
@@ -896,6 +1309,47 @@ export default function MesasPage() {
             </Button>
             <Button variant="danger" onClick={confirmDeleteTable}>
               Eliminar Mesa
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+
+      {/* EDIT COMPANION NAME DIALOG */}
+      <Dialog
+        isOpen={companionModalOpen}
+        onClose={() => setCompanionModalOpen(false)}
+        title="Nome do Acompanhante"
+      >
+        <div className="space-y-4">
+          <p className="text-xs text-foreground/60">
+            Personalize o nome deste acompanhante de{' '}
+            <strong className="text-foreground">{editingCompanion?.titularName}</strong>. Este nome será
+            apresentado na distribuição de mesas, cartões e PDF do salão.
+          </p>
+
+          <Input
+            label="Nome do Acompanhante"
+            value={companionNameInput}
+            onChange={(e) => setCompanionNameInput(e.target.value)}
+            placeholder="Ex: Carlos Santos"
+            autoFocus
+          />
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button
+              variant="outline"
+              type="button"
+              onClick={() => setCompanionModalOpen(false)}
+              disabled={isSavingCompanion}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSaveCompanionName}
+              disabled={isSavingCompanion || !companionNameInput.trim()}
+            >
+              {isSavingCompanion ? 'A guardar...' : 'Guardar Nome'}
             </Button>
           </div>
         </div>
