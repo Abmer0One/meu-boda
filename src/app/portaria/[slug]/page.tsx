@@ -294,7 +294,15 @@ function PortariaContent({ slug }: { slug: string }) {
         if (!p) return;
         if (!p.event_id || p.event_id === event.id) {
           setCheckins((prev) => {
-            if (p.id && prev.some((c) => c.id === p.id)) return prev;
+            const existingIndex = prev.findIndex((c) => p.id && c.id === p.id);
+            if (existingIndex >= 0) {
+              const copy = [...prev];
+              copy[existingIndex] = {
+                ...copy[existingIndex],
+                checked_count: Math.max(copy[existingIndex].checked_count || 1, Number(p.checked_count) || 1),
+              };
+              return copy;
+            }
             return [
               {
                 id: p.id || `ci_${p.guest_id}_${Date.now()}`,
@@ -438,7 +446,7 @@ function PortariaContent({ slug }: { slug: string }) {
 
       if (newCi) {
         // Optimistically add to local checkins state so "Presentes" count increments IMMEDIATELY!
-        setCheckins((prev) => [newCi, ...prev]);
+        setCheckins((prev) => [newCi, ...prev.filter((c) => c.id !== newCi.id)]);
 
         const updatedTotalEntered = stats.totalEntered + countToEnter;
         const newRemaining = Math.max(0, stats.maxAllowed - updatedTotalEntered);

@@ -452,7 +452,14 @@ export default function AdminDashboardPage() {
                   className="flex items-center justify-between border-b border-border-custom pb-2.5 last:border-0 last:pb-0"
                 >
                   <div>
-                    <p className="text-sm font-semibold">{ci.guest?.name || 'Convidado'}</p>
+                    <p className="text-sm font-semibold flex items-center gap-1.5 flex-wrap">
+                      <span>{ci.guest?.name || 'Convidado'}</span>
+                      {Number(ci.checked_count) > 1 && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-bold">
+                          {ci.checked_count} pessoas
+                        </span>
+                      )}
+                    </p>
                     <p className="text-xs text-foreground/50">
                       Operador: <span className="font-medium">{ci.operator}</span>
                     </p>

@@ -17,6 +17,20 @@ export interface GuestCheckinStats {
 }
 
 /**
+ * Extracts and cleans pax count encoded in operator text (fallback when checked_count column is not in SQL schema)
+ */
+export function extractPaxFromOperator(operator?: string | null): { cleanOperator: string; count: number } {
+  if (!operator) return { cleanOperator: 'Portaria', count: 1 };
+  const match = /\[(?:pax|count):(\d+)\]/i.exec(operator);
+  if (match && match[1]) {
+    const count = parseInt(match[1], 10) || 1;
+    const clean = operator.replace(/\[(?:pax|count):\d+\]/gi, '').trim() || 'Portaria';
+    return { cleanOperator: clean, count };
+  }
+  return { cleanOperator: operator.trim() || 'Portaria', count: 1 };
+}
+
+/**
  * Computes live admission statistics and slot availability for a guest based on current check-in records.
  */
 export function getGuestCheckinStats(
@@ -25,10 +39,11 @@ export function getGuestCheckinStats(
 ): GuestCheckinStats {
   const maxAllowed = 1 + (Number(guest?.companions) || 0);
   const guestEntries = (checkins || []).filter((ci) => ci.guest_id === guest.id);
-  const totalEntered = guestEntries.reduce((sum, ci) => sum + (Number(ci.checked_count) || 1), 0);
+  const rawEntered = guestEntries.reduce((sum, ci) => sum + (Number(ci.checked_count) || 1), 0);
+  const totalEntered = Math.min(maxAllowed, rawEntered);
   const remainingSlots = Math.max(0, maxAllowed - totalEntered);
-  const isFullyCheckedIn = totalEntered >= maxAllowed;
-  const isPartiallyCheckedIn = totalEntered > 0 && remainingSlots > 0;
+  const isFullyCheckedIn = rawEntered >= maxAllowed;
+  const isPartiallyCheckedIn = rawEntered > 0 && remainingSlots > 0;
 
   return {
     maxAllowed,
@@ -321,9 +336,12 @@ export const CheckInRepository = {
       if (data && Array.isArray(data)) {
         for (const item of data) {
           const ci = item as unknown as CheckIn;
+          const { cleanOperator, count: paxCount } = extractPaxFromOperator(ci.operator);
+          const initialCount = Number((ci as any).checked_count) || paxCount || 1;
           itemsMap.set(ci.id, {
             ...ci,
-            checked_count: Number((ci as any).checked_count) || 1,
+            operator: cleanOperator,
+            checked_count: initialCount,
           });
           guestsWithCheckinsInTable.add(ci.guest_id);
         }
@@ -332,7 +350,7 @@ export const CheckInRepository = {
       console.warn('Checkins table query skipped or restricted:', err);
     }
 
-    // 2. Query guests table to discover check-ins and explicit reversions
+    // 2. Query guests table to discover check-ins, enrich checked_count, and explicit reversions
     try {
       const { data: guestsWithNotes } = await supabase
         .from('guests')
@@ -351,9 +369,25 @@ export const CheckInRepository = {
               }
             }
           } else if (notes.includes(CHECKIN_NOTE_TAG_PREFIX)) {
-            // If table didn't yield checkins for this guest, load from notes
-            if (!guestsWithCheckinsInTable.has(g.id)) {
-              const parsedEntries = parseAllGuestCheckinNotes(notes);
+            const parsedEntries = parseAllGuestCheckinNotes(notes);
+
+            // Enrich existing table checkin items with authoritative checked_count from notes
+            for (const entry of parsedEntries) {
+              if (entry.id && itemsMap.has(entry.id)) {
+                const existing = itemsMap.get(entry.id)!;
+                if (!existing.checked_count || existing.checked_count < entry.checked_count) {
+                  existing.checked_count = entry.checked_count;
+                }
+              }
+            }
+
+            // Verify total entered count for this guest from itemsMap vs notes
+            const guestTableItems = Array.from(itemsMap.values()).filter((x) => x.guest_id === g.id);
+            const notesTotal = parsedEntries.reduce((sum, e) => sum + (Number(e.checked_count) || 1), 0);
+            const tableTotal = guestTableItems.reduce((sum, x) => sum + (Number(x.checked_count) || 1), 0);
+
+            if (guestTableItems.length === 0) {
+              // Table had no entries for this guest (e.g. anon RLS), load all from notes
               parsedEntries.forEach((entry, idx) => {
                 const entryId = entry.id || `ci_${g.id}_${idx}`;
                 if (!itemsMap.has(entryId)) {
@@ -367,6 +401,10 @@ export const CheckInRepository = {
                   });
                 }
               });
+            } else if (notesTotal > tableTotal) {
+              // The database table rows lacked checked_count column or didn't store all entries.
+              // Boost the latest table entry so the total entered matches notesTotal!
+              guestTableItems[0].checked_count = (guestTableItems[0].checked_count || 1) + (notesTotal - tableTotal);
             }
           }
         }
@@ -404,25 +442,29 @@ export const CheckInRepository = {
 
       if (!error && data && Array.isArray(data)) {
         for (const row of data) {
+          const { cleanOperator, count: paxCount } = extractPaxFromOperator(row.operator);
+          const initialCount = Number((row as any).checked_count) || paxCount || 1;
           list.push({
             ...(row as CheckIn),
-            checked_count: Number((row as any).checked_count) || 1,
+            operator: cleanOperator,
+            checked_count: initialCount,
           });
         }
       }
     } catch (e) {}
 
-    // 2. Fallback to guest notes if table returned nothing
-    if (list.length === 0) {
-      try {
-        const { data: guest } = await supabase
-          .from('guests')
-          .select('*')
-          .eq('id', guestId)
-          .single();
+    // 2. Authoritative check in guest notes to enrich or fallback
+    try {
+      const { data: guest } = await supabase
+        .from('guests')
+        .select('*')
+        .eq('id', guestId)
+        .single();
 
-        if (guest && !guest.notes?.includes(CHECKIN_REVERTED_TAG_PREFIX)) {
-          const parsed = parseAllGuestCheckinNotes(guest.notes);
+      if (guest && !guest.notes?.includes(CHECKIN_REVERTED_TAG_PREFIX)) {
+        const parsed = parseAllGuestCheckinNotes(guest.notes);
+
+        if (list.length === 0) {
           parsed.forEach((p, idx) => {
             list.push({
               id: p.id || `ci_${guest.id}_${idx}`,
@@ -433,9 +475,24 @@ export const CheckInRepository = {
               guest,
             });
           });
+        } else {
+          // Enrich existing list items with checked_count from notes
+          for (const p of parsed) {
+            const existing = list.find((ci) => ci.id === p.id);
+            if (existing) {
+              if (!existing.checked_count || existing.checked_count < p.checked_count) {
+                existing.checked_count = p.checked_count;
+              }
+            }
+          }
+          const listTotal = list.reduce((s, ci) => s + (Number(ci.checked_count) || 1), 0);
+          const notesTotal = parsed.reduce((s, p) => s + (Number(p.checked_count) || 1), 0);
+          if (notesTotal > listTotal && list.length > 0) {
+            list[list.length - 1].checked_count = (list[list.length - 1].checked_count || 1) + (notesTotal - listTotal);
+          }
         }
-      } catch (e) {}
-    }
+      }
+    } catch (e) {}
 
     return list;
   },
@@ -509,6 +566,8 @@ export const CheckInRepository = {
 
       const checkinTimestamp = new Date().toISOString();
       let createdCheckIn: CheckIn | null = null;
+      const paxTag = countToEnter > 1 ? ` [pax:${countToEnter}]` : '';
+      const operatorToSave = `${checkin.operator || 'Portaria'}${paxTag}`;
 
       // 2. Attempt direct insert into public.checkins table
       try {
@@ -517,7 +576,7 @@ export const CheckInRepository = {
           .from('checkins')
           .insert({
             guest_id: checkin.guest_id,
-            operator: checkin.operator,
+            operator: operatorToSave,
             checked_at: checkinTimestamp,
             checked_count: countToEnter,
           })
@@ -527,16 +586,17 @@ export const CheckInRepository = {
         if (!error && data) {
           createdCheckIn = {
             ...(data as CheckIn),
+            operator: checkin.operator || 'Portaria',
             checked_count: countToEnter,
           };
         } else if (error) {
-          // If column checked_count does not exist in schema, retry without it
+          // If column checked_count does not exist in schema, retry without it (pax count is preserved in operator and notes)
           console.warn('Direct checkin with checked_count failed, falling back:', error.message);
           const fallbackRes = await supabase
             .from('checkins')
             .insert({
               guest_id: checkin.guest_id,
-              operator: checkin.operator,
+              operator: operatorToSave,
               checked_at: checkinTimestamp,
             })
             .select()
@@ -545,6 +605,7 @@ export const CheckInRepository = {
           if (!fallbackRes.error && fallbackRes.data) {
             createdCheckIn = {
               ...(fallbackRes.data as CheckIn),
+              operator: checkin.operator || 'Portaria',
               checked_count: countToEnter,
             };
           }
