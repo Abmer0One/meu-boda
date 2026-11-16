@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useEvent } from '@/contexts/EventContext';
 import { supabase } from '@/lib/supabase';
 import { GuestRepository } from '@/repositories/guest.repository';
@@ -13,7 +13,12 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Badge } from '@/components/ui/Badge';
 import { Dialog } from '@/components/ui/Dialog';
-import { exportGuestsToExcel, importGuestsFromExcel } from '@/utils/excel';
+import {
+  exportGuestsToExcel,
+  importGuestsFromExcel,
+  downloadGuestTemplateExcel,
+  ParsedExcelGuest,
+} from '@/utils/excel';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { guestSchema } from '@/validations/schemas';
@@ -49,9 +54,23 @@ export default function ConvidadosPage() {
   const [editingGuest, setEditingGuest] = useState<Guest | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [guestToDelete, setGuestToDelete] = useState<Guest | null>(null);
-  const [importingExcel, setImportingExcel] = useState(false);
   const [rsvpModalOpen, setRsvpModalOpen] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // Excel Import state
+  const [importModalOpen, setImportModalOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [parsedGuests, setParsedGuests] = useState<ParsedExcelGuest[]>([]);
+  const [duplicateGuests, setDuplicateGuests] = useState<{
+    guest: ParsedExcelGuest;
+    existingGuest: Guest;
+    reason: string;
+  }[]>([]);
+  const [ignoreDuplicates, setIgnoreDuplicates] = useState(true);
+  const [isParsingExcel, setIsParsingExcel] = useState(false);
+  const [isImportingExcel, setIsImportingExcel] = useState(false);
+  const [importSuccessMessage, setImportSuccessMessage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const {
     register,
@@ -205,35 +224,117 @@ export default function ConvidadosPage() {
     }
   };
 
-  const handleExcelImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !currentEvent) return;
+    if (!file) return;
+    await processFile(file);
+    e.target.value = '';
+  };
 
-    setImportingExcel(true);
+  const processFile = async (file: File) => {
+    setImportFile(file);
+    setIsParsingExcel(true);
+    setImportSuccessMessage(null);
     try {
-      const parsedGuests = await importGuestsFromExcel(file);
-      const readyGuests = parsedGuests.map((pg) => ({
-        ...pg,
-        event_id: currentEvent.id,
-        invitation_sent: false,
-      })) as Omit<Guest, 'id' | 'qr_token' | 'created_at'>[];
+      const parsed = await importGuestsFromExcel(file);
+      setParsedGuests(parsed);
 
-      if (readyGuests.length > 0) {
-        await GuestRepository.createMany(readyGuests);
-        loadData();
-      }
-    } catch (err) {
-      console.error('Error importing Excel:', err);
+      // Check duplicates against existing guests in currentEvent (Option A)
+      const duplicates: { guest: ParsedExcelGuest; existingGuest: Guest; reason: string }[] = [];
+
+      parsed.forEach((pg) => {
+        const existingByName = guests.find(
+          (g) => g.name.trim().toLowerCase() === pg.name.trim().toLowerCase()
+        );
+        const existingByPhone = pg.phone
+          ? guests.find((g) => g.phone && g.phone === pg.phone)
+          : undefined;
+
+        if (existingByName) {
+          duplicates.push({
+            guest: pg,
+            existingGuest: existingByName,
+            reason: `Nome "${existingByName.name}" já existente`,
+          });
+        } else if (existingByPhone) {
+          duplicates.push({
+            guest: pg,
+            existingGuest: existingByPhone,
+            reason: `Telefone ${pg.phone} já associado a "${existingByPhone.name}"`,
+          });
+        }
+      });
+
+      setDuplicateGuests(duplicates);
+    } catch (err: any) {
+      console.error('Erro ao ler Excel:', err);
+      alert('Erro ao processar o ficheiro. Certifique-se de que é uma folha de cálculo válida (.xlsx, .xls ou .csv).');
+      setImportFile(null);
+      setParsedGuests([]);
+      setDuplicateGuests([]);
     } finally {
-      setImportingExcel(false);
-      // Reset input value
-      e.target.value = '';
+      setIsParsingExcel(false);
     }
   };
 
-  const handleExcelTemplateDownload = () => {
-    const emptyTemplate: Guest[] = [];
-    exportGuestsToExcel(emptyTemplate, 'modelo_convidados.xlsx');
+  const handleConfirmImport = async () => {
+    if (!currentEvent || parsedGuests.length === 0) return;
+    setIsImportingExcel(true);
+
+    try {
+      const duplicateRowIndices = new Set(duplicateGuests.map((d) => d.guest.rawRowIndex));
+      const guestsToInsert = ignoreDuplicates
+        ? parsedGuests.filter((pg) => !duplicateRowIndices.has(pg.rawRowIndex))
+        : parsedGuests;
+
+      if (guestsToInsert.length === 0) {
+        alert('Todos os convidados da folha de cálculo já existem no evento e a opção de ignorar duplicados está ativada.');
+        setIsImportingExcel(false);
+        return;
+      }
+
+      // Map table names to table_id if table exists in currentEvent
+      const tableMap = new Map(tables.map((t) => [t.name.trim().toLowerCase(), t.id]));
+
+      const readyGuests: Omit<Guest, 'id' | 'qr_token' | 'created_at'>[] = guestsToInsert.map((pg) => {
+        const tableId = pg.tableName ? tableMap.get(pg.tableName.trim().toLowerCase()) || null : null;
+        return {
+          event_id: currentEvent.id,
+          name: pg.name,
+          phone: pg.phone,
+          email: pg.email,
+          family_group: pg.family_group,
+          companions: pg.companions,
+          table_id: tableId,
+          status: pg.status,
+          notes: pg.notes,
+          invitation_sent: false,
+        };
+      });
+
+      const inserted = await GuestRepository.createMany(readyGuests);
+      await loadData();
+
+      const skippedCount = parsedGuests.length - inserted.length;
+      let msg = `🎉 Sucesso! ${inserted.length} convidados foram adicionados à lista.`;
+      if (skippedCount > 0) {
+        msg += ` (${skippedCount} duplicados ignorados)`;
+      }
+      setImportSuccessMessage(msg);
+
+      setTimeout(() => {
+        setImportModalOpen(false);
+        setImportFile(null);
+        setParsedGuests([]);
+        setDuplicateGuests([]);
+        setImportSuccessMessage(null);
+      }, 2000);
+    } catch (err) {
+      console.error('Erro ao importar convidados:', err);
+      alert('Ocorreu um erro ao gravar os convidados na base de dados.');
+    } finally {
+      setIsImportingExcel(false);
+    }
   };
 
   // Filtered Guests list
@@ -367,12 +468,28 @@ export default function ConvidadosPage() {
             Lembretes RSVP ({pendingGuests.length})
           </Button>
 
+          {/* Import from Excel */}
+          <Button
+            variant="outline"
+            size="sm"
+            leftIcon={<Upload className="h-4 w-4 text-emerald-600" />}
+            onClick={() => {
+              setImportFile(null);
+              setParsedGuests([]);
+              setDuplicateGuests([]);
+              setImportSuccessMessage(null);
+              setImportModalOpen(true);
+            }}
+          >
+            Importar Excel
+          </Button>
+
           {/* Export to Excel */}
           <Button
             variant="outline"
             size="sm"
             leftIcon={<Download className="h-4 w-4" />}
-            onClick={() => exportGuestsToExcel(guests, `convidados_${currentEvent.slug}.xlsx`)}
+            onClick={() => exportGuestsToExcel(guests, `convidados_${currentEvent.slug}.xlsx`, tables)}
             disabled={guests.length === 0}
           >
             Exportar Lista
@@ -693,6 +810,266 @@ export default function ConvidadosPage() {
               Fechar
             </Button>
           </div>
+        </div>
+      </Dialog>
+
+      {/* IMPORT EXCEL DIALOG */}
+      <Dialog
+        isOpen={importModalOpen}
+        onClose={() => {
+          if (!isImportingExcel) {
+            setImportModalOpen(false);
+            setImportFile(null);
+            setParsedGuests([]);
+            setDuplicateGuests([]);
+            setImportSuccessMessage(null);
+          }
+        }}
+        title="Importar Convidados via Excel / CSV"
+        size="lg"
+      >
+        <div className="space-y-4">
+          {importSuccessMessage ? (
+            <div className="py-8 flex flex-col items-center justify-center text-center space-y-3">
+              <div className="w-12 h-12 rounded-full bg-emerald-500/20 text-emerald-600 flex items-center justify-center">
+                <Check className="h-6 w-6" />
+              </div>
+              <p className="text-sm font-bold text-foreground">{importSuccessMessage}</p>
+              <p className="text-xs text-foreground/50">A atualizar a sua lista de convidados...</p>
+            </div>
+          ) : (
+            <>
+              {/* Header template download helper banner */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3.5 rounded-2xl bg-secondary/30 border border-border-custom text-xs">
+                <div>
+                  <p className="font-semibold text-foreground">Precisa do modelo de preenchimento?</p>
+                  <p className="text-[11px] text-foreground/60 mt-0.5">
+                    Descarregue o modelo oficial com as colunas certas e linhas de exemplo.
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  leftIcon={<FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600" />}
+                  onClick={() => downloadGuestTemplateExcel('modelo_convidados_meuboda.xlsx')}
+                  className="shrink-0 text-xs h-8"
+                >
+                  Baixar Modelo Excel
+                </Button>
+              </div>
+
+              {/* Upload Dropzone */}
+              {!importFile ? (
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="border-2 border-dashed border-border-custom hover:border-primary/60 rounded-2xl p-8 text-center cursor-pointer transition-all hover:bg-secondary/20 flex flex-col items-center justify-center space-y-2 group"
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".xlsx, .xls, .csv"
+                    className="hidden"
+                    onChange={handleFileChange}
+                  />
+                  <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Upload className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-foreground">
+                      Clique para selecionar ou arraste o ficheiro aqui
+                    </p>
+                    <p className="text-xs text-foreground/50 mt-0.5">
+                      Ficheiros suportados: .xlsx, .xls ou .csv
+                    </p>
+                  </div>
+                </div>
+              ) : isParsingExcel ? (
+                <div className="py-12 flex flex-col items-center justify-center text-center space-y-2 text-xs text-foreground/50">
+                  <Loader2 className="h-7 w-7 animate-spin text-primary" />
+                  <span>A analisar dados da folha de cálculo...</span>
+                </div>
+              ) : (
+                /* Preview and confirmation section */
+                <div className="space-y-4">
+                  {/* Summary Bar */}
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 p-3 rounded-xl bg-card-bg border border-border-custom text-xs">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <FileSpreadsheet className="h-4 w-4 text-emerald-600 shrink-0" />
+                      <span className="font-bold text-foreground truncate">{importFile.name}</span>
+                      <span className="text-foreground/40 text-[10px]">
+                        ({Math.round(importFile.size / 1024)} KB)
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Badge variant="secondary" className="font-semibold text-xs">
+                        {parsedGuests.length} {parsedGuests.length === 1 ? 'convidado' : 'convidados'}
+                      </Badge>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setImportFile(null);
+                          setParsedGuests([]);
+                          setDuplicateGuests([]);
+                        }}
+                        className="text-xs text-foreground/50 hover:text-foreground underline cursor-pointer"
+                      >
+                        Trocar ficheiro
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Duplicate warning (Option A) */}
+                  {duplicateGuests.length > 0 && (
+                    <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-xs space-y-2">
+                      <div className="flex items-start gap-2 text-amber-600 dark:text-amber-400 font-bold">
+                        <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                        <div>
+                          <span>Atenção: Detectámos {duplicateGuests.length} convidado(s) já existente(s) no evento.</span>
+                          <p className="text-[11px] font-normal text-foreground/70 mt-0.5">
+                            Estes convidados possuem o mesmo nome ou número de telefone que já constam na sua lista.
+                          </p>
+                        </div>
+                      </div>
+
+                      <label className="flex items-center gap-2 pt-1 border-t border-amber-500/20 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={ignoreDuplicates}
+                          onChange={(e) => setIgnoreDuplicates(e.target.checked)}
+                          className="rounded border-amber-400 text-primary focus:ring-primary h-4 w-4"
+                        />
+                        <span className="font-bold text-foreground text-xs">
+                          Ignorar duplicados já existentes (não importar repetidos) — Recomendado
+                        </span>
+                      </label>
+                    </div>
+                  )}
+
+                  {/* Preview Table */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-xs text-foreground/60 px-1">
+                      <span className="font-semibold">
+                        Pré-visualização (Primeiros {Math.min(parsedGuests.length, 6)} de {parsedGuests.length}):
+                      </span>
+                      {parsedGuests.length > 6 && (
+                        <span className="text-[10px] italic">
+                          +{parsedGuests.length - 6} convidados adicionais serão importados
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="border border-border-custom rounded-xl overflow-hidden overflow-x-auto max-h-[220px]">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead className="bg-secondary/40 text-foreground/70 font-semibold border-b border-border-custom">
+                          <tr>
+                            <th className="py-2 px-3">Nome</th>
+                            <th className="py-2 px-3">Telefone</th>
+                            <th className="py-2 px-3 text-center">Acomp.</th>
+                            <th className="py-2 px-3">Grupo</th>
+                            <th className="py-2 px-3">Mesa</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border-custom/60 bg-card-bg">
+                          {parsedGuests.slice(0, 6).map((g, idx) => {
+                            const isDup = duplicateGuests.some((d) => d.guest.rawRowIndex === g.rawRowIndex);
+                            return (
+                              <tr
+                                key={idx}
+                                className={`transition-colors ${
+                                  isDup && ignoreDuplicates ? 'opacity-40 bg-amber-500/5' : 'hover:bg-secondary/15'
+                                }`}
+                              >
+                                <td className="py-2 px-3 font-medium text-foreground">
+                                  <div className="flex items-center gap-1.5">
+                                    <span>{g.name}</span>
+                                    {isDup && (
+                                      <Badge variant="warning" className="text-[9px] py-0 px-1">
+                                        Existente
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="py-2 px-3 font-mono text-foreground/80">
+                                  {g.phone || <span className="text-foreground/30 italic">Sem telefone</span>}
+                                </td>
+                                <td className="py-2 px-3 text-center">
+                                  {g.companions > 0 ? (
+                                    <Badge variant="secondary" className="text-[10px] py-0 px-1.5 font-bold">
+                                      +{g.companions}
+                                    </Badge>
+                                  ) : (
+                                    <span className="text-foreground/40">0</span>
+                                  )}
+                                </td>
+                                <td className="py-2 px-3 text-foreground/70">
+                                  {g.family_group || <span className="text-foreground/30 italic">-</span>}
+                                </td>
+                                <td className="py-2 px-3">
+                                  {g.tableName ? (
+                                    <span className="text-[#D4AF37] font-semibold">{g.tableName}</span>
+                                  ) : (
+                                    <span className="text-foreground/40 italic">Sem Mesa</span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Actions Footer */}
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-3 border-t border-border-custom">
+                    <p className="text-xs text-foreground/60">
+                      Serão criados{' '}
+                      <strong className="text-primary font-bold">
+                        {ignoreDuplicates ? parsedGuests.length - duplicateGuests.length : parsedGuests.length}
+                      </strong>{' '}
+                      convites no seu evento.
+                    </p>
+
+                    <div className="flex items-center gap-2 justify-end">
+                      <Button
+                        variant="outline"
+                        type="button"
+                        onClick={() => {
+                          setImportModalOpen(false);
+                          setImportFile(null);
+                          setParsedGuests([]);
+                          setDuplicateGuests([]);
+                        }}
+                        disabled={isImportingExcel}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={handleConfirmImport}
+                        disabled={
+                          isImportingExcel ||
+                          (ignoreDuplicates && parsedGuests.length - duplicateGuests.length === 0)
+                        }
+                        leftIcon={
+                          isImportingExcel ? (
+                            <Loader2 className="h-4 w-4 animate-spin text-white" />
+                          ) : (
+                            <Upload className="h-4 w-4" />
+                          )
+                        }
+                      >
+                        {isImportingExcel
+                          ? 'A importar...'
+                          : `Confirmar Importação (${
+                              ignoreDuplicates ? parsedGuests.length - duplicateGuests.length : parsedGuests.length
+                            })`}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </div>
       </Dialog>
     </div>
