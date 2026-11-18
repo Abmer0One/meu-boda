@@ -39,8 +39,6 @@ export default function EventosPage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
-  const [isUploadingBg, setIsUploadingBg] = useState(false);
   const [slugStatus, setSlugStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
 
   // Canva Template States
@@ -116,8 +114,6 @@ export default function EventosPage() {
     resolver: zodResolver(eventSchema),
   });
 
-  const coverImageUrl = watch('cover_image');
-  const backgroundImage = watch('background_image');
   const watchedSlug = watch('slug');
   const watchedType = watch('type') || currentEvent?.type || 'casamento';
 
@@ -243,8 +239,8 @@ export default function EventosPage() {
     setIsLoadingBlocks(true);
     try {
       const data = await InfoBlockRepository.getAll(currentEvent.id);
-      // Filter out internal canva config block so user only sees their real custom blocks
-      const realBlocks = data.filter((b) => b.title !== CANVA_CONFIG_BLOCK_TITLE);
+      // Filter out internal system metadata blocks (__canva_template_config__, __event_staff_..., __portaria_config__)
+      const realBlocks = data.filter((b) => !b.title.startsWith('__'));
       setInfoBlocks(realBlocks);
 
       // Check if there is an internal canva config block to restore values
@@ -289,68 +285,6 @@ export default function EventosPage() {
     loadSchedules();
     loadInfoBlocks();
   }, [currentEvent]);
-
-  // Handle Cover Image Upload
-  const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !currentEvent) return;
-
-    setIsUploading(true);
-    try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${currentEvent.id}/capa_${Date.now()}.${fileExt}`;
-
-      const { data, error } = await supabase.storage
-        .from('invitations')
-        .upload(fileName, file, {
-          cacheControl: '3600',
-          upsert: true,
-        });
-
-      if (error) throw error;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('invitations')
-        .getPublicUrl(fileName);
-
-      setValue('cover_image', publicUrl);
-    } catch (err: any) {
-      alert('Erro ao carregar a imagem: ' + err.message);
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  // Handle Background Image Upload
-  const handleBgUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !currentEvent) return;
-
-    setIsUploadingBg(true);
-    try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${currentEvent.id}/fundo_${Date.now()}.${fileExt}`;
-
-      const { data, error } = await supabase.storage
-        .from('invitations')
-        .upload(fileName, file, {
-          cacheControl: '3600',
-          upsert: true,
-        });
-
-      if (error) throw error;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('invitations')
-        .getPublicUrl(fileName);
-
-      setValue('background_image', publicUrl);
-    } catch (err: any) {
-      alert('Erro ao carregar a imagem de fundo: ' + err.message);
-    } finally {
-      setIsUploadingBg(false);
-    }
-  };
 
   // Handle Canva Cover Image Upload
   const handleCanvaCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1025,8 +959,8 @@ export default function EventosPage() {
         ceremony_location: data.ceremony_location || null,
         party_location: data.party_location || null,
         theme: data.theme || null,
-        cover_image: data.cover_image || null,
-        background_image: data.background_image || null,
+        cover_image: canvaCoverUrl || data.cover_image || currentEvent.cover_image || null,
+        background_image: data.background_image || currentEvent.background_image || null,
         description: data.description || null,
         ceremony_time: data.ceremony_time || null,
         ceremony_maps_url: data.ceremony_maps_url || null,
@@ -1239,108 +1173,24 @@ export default function EventosPage() {
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold text-foreground/75 tracking-wide block">
-                    Imagem de Capa / Convite
-                  </label>
-                  
-                  {coverImageUrl && (
-                    <div className="relative rounded-xl overflow-hidden border border-border-custom bg-secondary/10 h-40 w-full mb-3 group">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={coverImageUrl}
-                        alt="Preview da Capa"
-                        className="w-full h-full object-cover"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setValue('cover_image', '')}
-                        className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1.5 hover:bg-red-700 transition-colors shadow-md text-xs font-bold"
-                      >
-                        Remover
-                      </button>
+                {/* Banner de Direcionamento para Template Canva */}
+                <div className="rounded-2xl border border-border-custom bg-secondary/20 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs">
+                  <div className="flex items-start sm:items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                      <Sparkles className="h-5 w-5 text-[#d4af37]" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-foreground">Design Oficial e Imagem do Convite</p>
+                      <p className="text-[11px] text-foreground/60 mt-0.5">
+                        O design gráfico, capa do convite, QR codes e posicionamento de nomes são configurados com precisão visual no card <strong>Template Canva do Convite (PDF / Impressão)</strong> abaixo.
+                      </p>
+                    </div>
+                  </div>
+                  {canvaCoverUrl && (
+                    <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 font-semibold text-[11px]">
+                      <span>Template Configurado</span>
                     </div>
                   )}
-
-                  <div className="flex gap-4 items-center">
-                    <Input
-                      placeholder="Cole o URL da imagem ou carregue um ficheiro..."
-                      error={errors.cover_image?.message}
-                      className="flex-1"
-                      {...register('cover_image')}
-                    />
-                    <label className="shrink-0">
-                      <div className="flex items-center gap-1.5 px-4 py-2 bg-primary text-white rounded-xl text-sm font-semibold hover:bg-primary/95 transition-all cursor-pointer shadow-md">
-                        {isUploading ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          'Carregar Ficheiro'
-                        )}
-                      </div>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleCoverUpload}
-                        disabled={isUploading}
-                        className="hidden"
-                      />
-                    </label>
-                  </div>
-                </div>
-
-                <div className="space-y-2 border-t border-border-custom pt-4">
-                  <label className="text-xs font-semibold text-foreground/75 tracking-wide block">
-                    Foto de Fundo / Galeria do Evento (Website)
-                  </label>
-                  <p className="text-[11px] text-foreground/60">
-                    Foto do casal ou textura para o fundo do website. Para o design do convite em PDF / impressão, configure na secção &quot;Template Canva&quot; mais abaixo.
-                  </p>
-                  
-                  {backgroundImage && (
-                    <div className="relative rounded-xl overflow-hidden border border-border-custom bg-secondary/10 h-40 w-full mb-3 group">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={backgroundImage}
-                        alt="Preview do Fundo"
-                        className="w-full h-full object-cover"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setValue('background_image', '')}
-                        className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1.5 hover:bg-red-700 transition-colors shadow-md text-xs font-bold"
-                      >
-                        Remover
-                      </button>
-                    </div>
-                  )}
-
-                  <div className="flex gap-4 items-center">
-                    <Input
-                      placeholder="Cole o URL da imagem de fundo ou carregue um ficheiro..."
-                      error={errors.background_image?.message}
-                      className="flex-1"
-                      {...register('background_image')}
-                    />
-                    <label className="shrink-0">
-                      <div className="flex items-center gap-1.5 px-4 py-2 bg-primary text-white rounded-xl text-sm font-semibold hover:bg-primary/95 transition-all cursor-pointer shadow-md">
-                        {isUploadingBg ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          'Carregar Ficheiro'
-                        )}
-                      </div>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleBgUpload}
-                        disabled={isUploadingBg}
-                        className="hidden"
-                      />
-                    </label>
-                  </div>
-                  <p className="text-[10px] text-foreground/50">
-                    *Esta imagem de fundo será usada nas outras páginas do PDF do convite (como a página do QR Code, agenda, etc.).
-                  </p>
                 </div>
 
                 <div className="flex flex-col gap-1.5">
@@ -3001,10 +2851,10 @@ export default function EventosPage() {
         <div className="lg:col-span-4 space-y-4">
           <Card className="bg-card-bg overflow-hidden p-0 border border-border-custom lg:sticky lg:top-8">
             <div className="h-32 bg-primary/20 relative">
-              {currentEvent.cover_image ? (
+              {(canvaCoverUrl || currentEvent.cover_image) ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={currentEvent.cover_image}
+                  src={canvaCoverUrl || currentEvent.cover_image || undefined}
                   alt="Capa"
                   className="w-full h-full object-cover"
                 />
