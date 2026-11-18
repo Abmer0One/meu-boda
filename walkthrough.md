@@ -55,3 +55,57 @@ Resolvemos a questão reportada no ambiente da Portaria (`https://www.meuboda.co
    - `npm run build` executado com sucesso em 18.7s com zero erros de tipagem TypeScript em todas as 35 rotas da aplicação.
 3. **Implementação:**
    - As alterações foram integradas e enviadas para o repositório principal no branch `main` (commit `4f1f45b`), prontas para disponibilização na Vercel (`https://www.meuboda.com`).
+
+---
+
+# Walkthrough - Sistema Dual-Theme para Convites Digitais (Ouro Real Noturno vs Pérola & Champagne)
+
+Implementámos o sistema de duplo tema nos convites digitais do Meu Boda, permitindo:
+1. **Aos Noivos / Organizadores:** Definir o tema padrão do evento (🌙 *Ouro Real Noturno* ou ☀️ *Pérola & Champagne*) diretamente no painel de administração em `/admin/eventos`.
+2. **Aos Convidados:** Alternar livremente entre o modo escuro e claro ao visualizarem o convite digital (`/convite/[token]`) através de um botão discreto e elegante no canto superior direito.
+
+---
+
+## Modificações Realizadas
+
+### 1. Modelo de Configuração e Persistência
+- **Ficheiro:** [`canvaConfig.ts`](file:///c:/Users/amota/Documents/PROJECTS/event_plan/src/utils/canvaConfig.ts)
+  - Adicionado `invitation_theme?: 'dark' | 'light'` à interface `CanvaTemplateConfig`.
+  - Atualizado `resolveCanvaConfig` para resolver a hierarquia de configuração em 4 níveis (`template_config` -> `__canva_template_config__` nos blocos de informação -> `localStorage` -> fallback padrão `'dark'`).
+
+### 2. Painel Administrativo de Eventos
+- **Ficheiro:** [`page.tsx`](file:///c:/Users/amota/Documents/PROJECTS/event_plan/src/app/(dashboard)/admin/eventos/page.tsx)
+  - Criado cartão interativo com seletor visual de tema:
+    - 🌙 **Ouro Real Noturno (Escuro):** Fundo preto obsidiana luxuoso, detalhes em dourado e alto contraste para leitura noturna.
+    - ☀️ **Pérola & Champagne (Claro):** Fundo papel marfim acetinado (`#FAF8F5`), cartões em branco puro e dourado champanhe suave.
+  - Auto-salvamento imediato ao clicar na opção com toast de confirmação e sincronização automática com o modelo do evento.
+
+### 3. Template Interativo do Convite Digital
+- **Ficheiro:** [`DefaultTemplate.tsx`](file:///c:/Users/amota/Documents/PROJECTS/event_plan/src/components/templates/invitations/DefaultTemplate.tsx)
+  - Suporte total a `theme?: 'dark' | 'light'` (propriedade `isLight`):
+    - **Envelope Fechado:** Transição suave entre capa preta ônix com filetes dourados e envelope branco linho com cantos e monograma dourado.
+    - **Painel de Detalhes (Esquerda):** Cartões de data, hora e locais adaptados para marfim/cinza suave com texto grafite escuro (`#1C1917`) e links de rota com destaque dourado champanhe.
+    - **Lâmina de Convite Principal (Centro):** Textura acrílica acetinada em branco puro com letras em folha dourada nobre (`gold-foil-text`), garantindo legibilidade perfeita sob qualquer luminosidade.
+    - **Painel RSVP e Passe (Direita):** Botões de presença ("Vou" / "Não vou") com contraste ergonómico, caixa de observações e passe digital adaptados.
+    - **Agenda do Dia e Blocos de Informação:** Marcadores temporais e cartões de cronograma harmonizados.
+    - **Modal de Mapas:** Ecrã modal com fundo branco/ouro para o tema claro.
+
+### 4. Galeria Colaborativa e Rodapé Institucional
+- **Ficheiro:** [`page.tsx`](file:///c:/Users/amota/Documents/PROJECTS/event_plan/src/app/convite/[token]/page.tsx)
+  - Inicialização do tema padrão configurado pelos noivos no carregamento do convite.
+  - Injeção de botão flutuante discreto com efeito vidro fosco (`backdrop-blur-xl`) e alternância imediata (☀️ *Modo Claro* / 🌙 *Modo Noturno*).
+  - Adaptação dinâmica da Galeria Colaborativa (Meu Boda Live) e do cartão de carregamento de fotografias e vídeos em tempo real.
+- **Ficheiro:** [`InvitationLeadBadge.tsx`](file:///c:/Users/amota/Documents/PROJECTS/event_plan/src/components/common/InvitationLeadBadge.tsx)
+  - Cartão de captura de potenciais noivos e link para WhatsApp adaptado com paleta clara nobre quando no modo claro.
+
+---
+
+## Validação e Resultados
+
+1. **Tipagem e Segurança de Código:**
+   - `npx tsc --noEmit` executado com 0 erros.
+2. **Build de Produção:**
+   - `npm run build` gerou com sucesso todas as 35 rotas estáticas e dinâmicas da aplicação.
+3. **Compatibilidade Total:**
+   - 100% retrocompatível com todos os eventos anteriores (padrão `'dark'`).
+   - O convite de teste partilhado (`https://www.meuboda.com/convite/4f3a3f105ec6af57012933f1b04fc9d0`) suporta agora alternância instantânea entre ambos os modos.

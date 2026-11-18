@@ -42,6 +42,7 @@ export default function EventosPage() {
   const [slugStatus, setSlugStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
 
   // Canva Template States
+  const [invitationTheme, setInvitationTheme] = useState<'dark' | 'light'>('dark');
   const [templateSource, setTemplateSource] = useState<'basic' | 'custom'>('basic');
   const [pdfMode, setPdfMode] = useState<'double_page' | 'single_page'>('double_page');
   const [pdfOrientation, setPdfOrientation] = useState<'portrait' | 'landscape'>('landscape');
@@ -216,6 +217,7 @@ export default function EventosPage() {
       setGuestNameAlign(resolved.guest_name_align || 'center');
       setGuestNameFontFamily(resolved.guest_name_font_family || 'serif');
       setGuestNameFontWeight(resolved.guest_name_font_weight || 'bold');
+      setInvitationTheme(resolved.invitation_theme || 'dark');
     }
   }, [currentEvent, reset]);
 
@@ -272,6 +274,7 @@ export default function EventosPage() {
           if (parsed.guest_name_align) setGuestNameAlign(parsed.guest_name_align);
           if (parsed.guest_name_font_family) setGuestNameFontFamily(parsed.guest_name_font_family);
           if (parsed.guest_name_font_weight) setGuestNameFontWeight(parsed.guest_name_font_weight);
+          if (parsed.invitation_theme) setInvitationTheme(parsed.invitation_theme);
         } catch (e) {}
       }
     } catch (err) {
@@ -569,6 +572,7 @@ export default function EventosPage() {
         guest_name_align: guestNameAlign,
         guest_name_font_family: guestNameFontFamily,
         guest_name_font_weight: guestNameFontWeight,
+        invitation_theme: invitationTheme,
       };
       await persistCanvaConfig(currentEvent.id, updatedConfig);
       setCurrentEvent({
@@ -581,6 +585,48 @@ export default function EventosPage() {
       alert('Erro ao guardar configurações do Canva: ' + err.message);
     } finally {
       setIsSavingCanva(false);
+    }
+  };
+
+  // Change Invitation Default Theme (Light vs Dark)
+  const handleThemeChange = async (newTheme: 'dark' | 'light') => {
+    setInvitationTheme(newTheme);
+    if (!currentEvent) return;
+    try {
+      const updatedConfig = {
+        ...(currentEvent.template_config || {}),
+        template_source: templateSource,
+        canva_cover_url: canvaCoverUrl || null,
+        canva_info_url: canvaInfoUrl || null,
+        qr_locations_coords: qrLocCoords,
+        qr_access_coords: qrAccessCoords,
+        pdf_mode: pdfMode,
+        pdf_orientation: pdfOrientation,
+        show_locations_qr: showLocationsQr,
+        show_access_qr: showAccessQr,
+        show_guest_name: showGuestName,
+        guest_name_page: guestNamePage,
+        guest_name_coords: guestNameCoords,
+        guest_name_font_size: guestNameFontSize,
+        guest_name_color: guestNameColor,
+        guest_name_align: guestNameAlign,
+        guest_name_font_family: guestNameFontFamily,
+        guest_name_font_weight: guestNameFontWeight,
+        invitation_theme: newTheme,
+      };
+      await persistCanvaConfig(currentEvent.id, updatedConfig);
+      setCurrentEvent({
+        ...currentEvent,
+        template_config: updatedConfig,
+      });
+      setCanvaSuccessMessage(
+        newTheme === 'light'
+          ? 'Tema padrão alterado para Pérola & Champagne (Claro)!'
+          : 'Tema padrão alterado para Ouro Real Noturno (Escuro)!'
+      );
+      setTimeout(() => setCanvaSuccessMessage(null), 3500);
+    } catch (e) {
+      console.error('Error saving invitation theme:', e);
     }
   };
 
@@ -947,6 +993,7 @@ export default function EventosPage() {
         pdf_mode: pdfMode,
         show_locations_qr: showLocationsQr,
         show_access_qr: showAccessQr,
+        invitation_theme: invitationTheme,
       };
 
       await persistCanvaConfig(currentEvent.id, updatedConfig);
@@ -1248,6 +1295,69 @@ export default function EventosPage() {
                   <span>{canvaSuccessMessage}</span>
                 </div>
               )}
+
+              {/* Seletor de Tema Padrão do Convite Virtual */}
+              <div className="bg-secondary/15 p-4 rounded-2xl border border-border-custom space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <label className="text-xs font-bold text-foreground flex items-center gap-1.5 uppercase tracking-wider">
+                      <Palette className="h-4 w-4 text-[#d4af37]" /> Tema Padrão do Convite Virtual
+                    </label>
+                    <p className="text-[11px] text-foreground/60 mt-0.5">
+                      Escolha o ambiente visual com que o convite abre aos convidados no telemóvel. O convidado terá também um botão para alternar se preferir.
+                    </p>
+                  </div>
+                  <Badge variant="secondary" className="self-start sm:self-auto text-[10px] font-bold border-primary/30 text-primary">
+                    {invitationTheme === 'light' ? '☀️ Pérola & Champagne' : '🌙 Ouro Real Noturno'}
+                  </Badge>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => handleThemeChange('dark')}
+                    className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                      invitationTheme === 'dark'
+                        ? 'border-[#d4af37] bg-[#0c0c10] text-white shadow-md ring-1 ring-[#d4af37]'
+                        : 'border-border-custom bg-card-bg/60 hover:bg-secondary/30 text-foreground/75'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold flex items-center gap-2">
+                        <span>🌙</span> Ouro Real Noturno (Escuro)
+                      </span>
+                      {invitationTheme === 'dark' && (
+                        <CheckCircle2 className="h-4 w-4 text-[#d4af37] shrink-0" />
+                      )}
+                    </div>
+                    <p className="text-[11px] text-zinc-400 mt-1.5 leading-relaxed">
+                      Fundo preto nobre com detalhes dourados. Ideal para celebrações noturnas, galas e ambientes com iluminação cénica.
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleThemeChange('light')}
+                    className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                      invitationTheme === 'light'
+                        ? 'border-[#b89742] bg-[#FAF8F5] text-[#1c1917] shadow-md ring-1 ring-[#b89742]'
+                        : 'border-border-custom bg-card-bg/60 hover:bg-secondary/30 text-foreground/75'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold flex items-center gap-2 text-[#1c1917]">
+                        <span>☀️</span> Pérola & Champagne (Claro)
+                      </span>
+                      {invitationTheme === 'light' && (
+                        <CheckCircle2 className="h-4 w-4 text-[#b89742] shrink-0" />
+                      )}
+                    </div>
+                    <p className="text-[11px] text-stone-600 mt-1.5 leading-relaxed">
+                      Fundo marfim suave com cartões papel linho e tipografia carvão nobre. Perfeito para casamentos de dia e ao ar livre.
+                    </p>
+                  </button>
+                </div>
+              </div>
 
               {/* Seletor de Modelo: Básico vs Canva Personalizado */}
               <div className="bg-secondary/15 p-4 rounded-2xl border border-border-custom space-y-3">

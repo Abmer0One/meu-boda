@@ -29,6 +29,8 @@ import {
   Camera,
   Upload,
   Clock,
+  Sun,
+  Moon,
 } from 'lucide-react';
 
 import DefaultTemplate from '@/components/templates/invitations/DefaultTemplate';
@@ -36,6 +38,7 @@ import ModernTicketTemplate from '@/components/templates/invitations/ModernTicke
 import RoyalParisienneTemplate from '@/components/templates/invitations/RoyalParisienneTemplate';
 import GlobalBroadcastBanner from '@/components/common/GlobalBroadcastBanner';
 import InvitationLeadBadge from '@/components/common/InvitationLeadBadge';
+import { resolveCanvaConfig } from '@/utils/canvaConfig';
 
 interface RSVPPageProps {
   params: Promise<{ token: string }>;
@@ -62,6 +65,7 @@ export default function PublicRSVPPage({ params }: RSVPPageProps) {
   const [qrCodeUrl, setQrCodeUrl] = useState('');
   const [schedules, setSchedules] = useState<EventSchedule[]>([]);
   const [infoBlocks, setInfoBlocks] = useState<EventInfoBlock[]>([]);
+  const [invitationTheme, setInvitationTheme] = useState<'dark' | 'light'>('dark');
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -107,6 +111,14 @@ export default function PublicRSVPPage({ params }: RSVPPageProps) {
       setInfoBlocks(fetchedInfoBlocks);
 
       setEvent(fetchedEvent);
+
+      if (fetchedEvent) {
+        // Resolve default theme defined by the couple in Canva Template Config
+        const canvaCfg = resolveCanvaConfig(fetchedEvent.id, fetchedEvent.template_config, fetchedInfoBlocks, null, fetchedEvent);
+        if (canvaCfg?.invitation_theme) {
+          setInvitationTheme(canvaCfg.invitation_theme);
+        }
+      }
 
       if (fetchedGuest.table_id) {
         const foundTable = fetchedTables.find((t) => t.id === fetchedGuest.table_id);
@@ -279,43 +291,66 @@ export default function PublicRSVPPage({ params }: RSVPPageProps) {
     handleRSVPSubmit,
     handleDownloadInvite,
     getGoogleMapsLink,
+    theme: invitationTheme,
   };
 
   const renderTemplate = () => {
     // Fallback template_id if undefined
     const templateId = event.template_id || 'default';
+    const isLight = invitationTheme === 'light';
 
     const galleryChildren = (
       <div 
-        className="mt-10 rounded-3xl border-2 border-[#d4af37]/35 shadow-2xl text-left overflow-hidden relative backdrop-blur-xl"
-        style={{ backgroundColor: '#0c0c10', color: '#ffffff' }}
+        className={`mt-10 rounded-3xl border-2 shadow-2xl text-left overflow-hidden relative backdrop-blur-xl transition-all ${
+          isLight
+            ? 'border-[#b89742]/35 bg-white text-stone-900 shadow-[0_20px_50px_rgba(212,175,55,0.12)]'
+            : 'border-[#d4af37]/35 bg-[#0c0c10] text-white'
+        }`}
       >
         {/* Luxury inner decorative frame */}
-        <div className="absolute inset-3 border border-[#d4af37]/20 rounded-[20px] pointer-events-none" />
+        <div className={`absolute inset-3 border rounded-[20px] pointer-events-none ${
+          isLight ? 'border-[#b89742]/20' : 'border-[#d4af37]/20'
+        }`} />
         
         {/* Ambient gold glow */}
-        <div className="absolute -top-20 -right-20 w-64 h-64 bg-[#d4af37]/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-[#b89742]/10 rounded-full blur-3xl pointer-events-none" />
+        <div className={`absolute -top-20 -right-20 w-64 h-64 rounded-full blur-3xl pointer-events-none ${
+          isLight ? 'bg-[#d4af37]/5' : 'bg-[#d4af37]/10'
+        }`} />
+        <div className={`absolute -bottom-20 -left-20 w-64 h-64 rounded-full blur-3xl pointer-events-none ${
+          isLight ? 'bg-[#b89742]/5' : 'bg-[#b89742]/10'
+        }`} />
 
         {/* Section Header */}
-        <div className="p-6 md:p-8 border-b border-[#d4af37]/20 relative z-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className={`p-6 md:p-8 border-b relative z-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 ${
+          isLight ? 'border-[#b89742]/20' : 'border-[#d4af37]/20'
+        }`}>
           <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-[#d4af37]/15 border border-[#d4af37]/40 flex items-center justify-center shrink-0 shadow-[0_0_15px_rgba(212,175,55,0.2)]">
-              <Camera className="h-6 w-6 text-[#f3e0aa]" />
+            <div className={`w-12 h-12 rounded-2xl border flex items-center justify-center shrink-0 shadow-[0_0_15px_rgba(212,175,55,0.2)] ${
+              isLight ? 'bg-[#b89742]/15 border-[#b89742]/40' : 'bg-[#d4af37]/15 border-[#d4af37]/40'
+            }`}>
+              <Camera className={`h-6 w-6 ${isLight ? 'text-[#8A6D2B]' : 'text-[#f3e0aa]'}`} />
             </div>
             <div>
-              <h3 className="font-cinzel text-lg md:text-2xl font-black tracking-wider text-[#f3e0aa]">
+              <h3 className={`font-cinzel text-lg md:text-2xl font-black tracking-wider ${
+                isLight ? 'text-[#8A6D2B]' : 'text-[#f3e0aa]'
+              }`}>
                 Galeria Colaborativa (Meu Boda Live)
               </h3>
-              <p className="text-xs text-white/80 font-medium tracking-wide mt-0.5">
+              <p className={`text-xs font-medium tracking-wide mt-0.5 ${
+                isLight ? 'text-stone-600' : 'text-white/80'
+              }`}>
                 Transmissão e partilha de fotos e vídeos em tempo real
               </p>
             </div>
           </div>
 
-          <div className="inline-flex items-center gap-2 self-start sm:self-auto px-3.5 py-1.5 rounded-full bg-[#d4af37]/15 border border-[#d4af37]/40 shadow-sm">
-            <span className="h-2 w-2 rounded-full bg-[#d4af37] animate-pulse" />
-            <span className="text-[10px] font-black tracking-[2px] text-[#f3e0aa] uppercase">
+          <div className={`inline-flex items-center gap-2 self-start sm:self-auto px-3.5 py-1.5 rounded-full border shadow-sm ${
+            isLight ? 'bg-[#b89742]/10 border-[#b89742]/30' : 'bg-[#d4af37]/15 border-[#d4af37]/40'
+          }`}>
+            <span className={`h-2 w-2 rounded-full animate-pulse ${isLight ? 'bg-[#b89742]' : 'bg-[#d4af37]'}`} />
+            <span className={`text-[10px] font-black tracking-[2px] uppercase ${
+              isLight ? 'text-[#8A6D2B]' : 'text-[#f3e0aa]'
+            }`}>
               Ao Vivo
             </span>
           </div>
@@ -323,27 +358,35 @@ export default function PublicRSVPPage({ params }: RSVPPageProps) {
 
         {/* Section Body */}
         <div className="p-6 md:p-8 space-y-6 relative z-10">
-          <p className="text-sm text-white font-normal leading-relaxed max-w-3xl">
-            Partilhe as suas fotos e vídeos da festa em direto! As memórias enviadas serão projetadas no telão do evento e guardadas na <span className="text-[#f3e0aa] font-semibold">galeria oficial dos noivos</span>.
+          <p className={`text-sm font-normal leading-relaxed max-w-3xl ${
+            isLight ? 'text-stone-700' : 'text-white'
+          }`}>
+            Partilhe as suas fotos e vídeos da festa em direto! As memórias enviadas serão projetadas no telão do evento e guardadas na <span className={`font-semibold ${isLight ? 'text-[#8A6D2B]' : 'text-[#f3e0aa]'}`}>galeria oficial dos noivos</span>.
           </p>
 
           {/* Upload Form Box */}
           <div 
-            className="flex flex-col md:flex-row items-stretch md:items-end gap-4 max-w-2xl p-5 rounded-2xl border border-[#d4af37]/30 shadow-inner"
-            style={{ backgroundColor: '#14141a' }}
+            className={`flex flex-col md:flex-row items-stretch md:items-end gap-4 max-w-2xl p-5 rounded-2xl border shadow-inner ${
+              isLight ? 'bg-stone-50 border-stone-200 text-stone-900' : 'bg-[#14141a] border-[#d4af37]/30 text-white'
+            }`}
           >
             <div className="flex-1 flex flex-col gap-2">
-              <label className="text-xs font-bold text-[#f3e0aa] uppercase tracking-wider flex items-center gap-1.5">
+              <label className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
+                isLight ? 'text-[#8A6D2B]' : 'text-[#f3e0aa]'
+              }`}>
                 <span>✍️ Legenda da Foto ou Vídeo</span>
-                <span className="text-[10px] text-white/60 font-normal lowercase">(opcional)</span>
+                <span className={`text-[10px] font-normal lowercase ${isLight ? 'text-stone-500' : 'text-white/60'}`}>(opcional)</span>
               </label>
               <input
                 type="text"
                 placeholder="Escreva uma mensagem de carinho..."
                 value={mediaCaption}
                 onChange={(e) => setMediaCaption(e.target.value)}
-                className="w-full rounded-xl border border-[#d4af37]/35 px-4 py-2.5 text-sm focus:border-[#f3e0aa] focus:ring-1 focus:ring-[#f3e0aa] focus:outline-none transition-all text-white placeholder:text-zinc-500 font-medium"
-                style={{ backgroundColor: '#09090c' }}
+                className={`w-full rounded-xl border px-4 py-2.5 text-sm focus:ring-1 focus:outline-none transition-all font-medium ${
+                  isLight
+                    ? 'border-stone-300 bg-white text-stone-900 placeholder:text-stone-400 focus:border-[#b89742] focus:ring-[#b89742]'
+                    : 'border-[#d4af37]/35 bg-[#09090c] text-white placeholder:text-zinc-500 focus:border-[#f3e0aa] focus:ring-[#f3e0aa]'
+                }`}
                 disabled={uploadingMedia}
               />
             </div>
@@ -374,35 +417,50 @@ export default function PublicRSVPPage({ params }: RSVPPageProps) {
 
           {/* Media list */}
           <div className="space-y-4 pt-2">
-            <div className="flex items-center justify-between border-b border-[#d4af37]/20 pb-3">
-              <h4 className="text-xs md:text-sm font-bold text-[#f3e0aa] uppercase tracking-wider flex items-center gap-2.5 font-cinzel">
+            <div className={`flex items-center justify-between border-b pb-3 ${
+              isLight ? 'border-[#b89742]/20' : 'border-[#d4af37]/20'
+            }`}>
+              <h4 className={`text-xs md:text-sm font-bold uppercase tracking-wider flex items-center gap-2.5 font-cinzel ${
+                isLight ? 'text-[#8A6D2B]' : 'text-[#f3e0aa]'
+              }`}>
                 <span>Fotos do Evento</span>
-                <span className="text-[11px] font-sans font-extrabold bg-[#d4af37]/20 text-[#f3e0aa] border border-[#d4af37]/40 px-2.5 py-0.5 rounded-full">
+                <span className={`text-[11px] font-sans font-extrabold px-2.5 py-0.5 rounded-full border ${
+                  isLight
+                    ? 'bg-[#b89742]/10 text-[#8A6D2B] border-[#b89742]/30'
+                    : 'bg-[#d4af37]/20 text-[#f3e0aa] border-[#d4af37]/40'
+                }`}>
                   {galleryList.length}
                 </span>
               </h4>
-              <span className="text-[11px] text-white/70 font-medium">
+              <span className={`text-[11px] font-medium ${isLight ? 'text-stone-500' : 'text-white/70'}`}>
                 Atualização automática
               </span>
             </div>
 
             {galleryList.length === 0 ? (
               <div 
-                className="flex flex-col items-center justify-center text-center py-14 px-4 border border-dashed border-[#d4af37]/35 rounded-2xl"
-                style={{ backgroundColor: '#14141a' }}
+                className={`flex flex-col items-center justify-center text-center py-14 px-4 border border-dashed rounded-2xl ${
+                  isLight ? 'border-[#b89742]/35 bg-stone-50' : 'border-[#d4af37]/35 bg-[#14141a]'
+                }`}
               >
-                <div className="w-14 h-14 rounded-full bg-[#d4af37]/10 border border-[#d4af37]/25 flex items-center justify-center mb-3">
-                  <Camera className="h-7 w-7 text-[#f3e0aa]" />
+                <div className={`w-14 h-14 rounded-full border flex items-center justify-center mb-3 ${
+                  isLight ? 'bg-[#b89742]/10 border-[#b89742]/25' : 'bg-[#d4af37]/10 border-[#d4af37]/25'
+                }`}>
+                  <Camera className={`h-7 w-7 ${isLight ? 'text-[#8A6D2B]' : 'text-[#f3e0aa]'}`} />
                 </div>
-                <p className="text-sm font-bold text-white">Ainda nenhuma foto foi partilhada.</p>
-                <p className="text-xs text-[#f3e0aa] mt-1 font-medium">Seja o primeiro a enviar uma recordação!</p>
+                <p className={`text-sm font-bold ${isLight ? 'text-stone-900' : 'text-white'}`}>Ainda nenhuma foto foi partilhada.</p>
+                <p className={`text-xs mt-1 font-medium ${isLight ? 'text-[#8A6D2B]' : 'text-[#f3e0aa]'}`}>Seja o primeiro a enviar uma recordação!</p>
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                 {galleryList.map((item) => (
                   <div
                     key={item.id}
-                    className="relative aspect-square rounded-2xl overflow-hidden border border-[#d4af37]/35 bg-[#09090c] group shadow-lg hover:border-[#f3e0aa] transition-all"
+                    className={`relative aspect-square rounded-2xl overflow-hidden border group shadow-lg transition-all ${
+                      isLight
+                        ? 'border-[#b89742]/35 bg-stone-100 hover:border-[#b89742]'
+                        : 'border-[#d4af37]/35 bg-[#09090c] hover:border-[#f3e0aa]'
+                    }`}
                   >
                     {item.media_type === 'video' ? (
                       <video
@@ -420,11 +478,19 @@ export default function PublicRSVPPage({ params }: RSVPPageProps) {
                       />
                     )}
                     {item.caption && (
-                      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#09090c] via-[#09090c]/80 to-transparent p-2.5 text-[10px] text-white font-medium leading-tight">
-                        <p className="line-clamp-2 italic text-white">&quot;{item.caption}&quot;</p>
+                      <div className={`absolute inset-x-0 bottom-0 p-2.5 text-[10px] font-medium leading-tight ${
+                        isLight
+                          ? 'bg-gradient-to-t from-white via-white/80 to-transparent text-stone-900'
+                          : 'bg-gradient-to-t from-[#09090c] via-[#09090c]/80 to-transparent text-white'
+                      }`}>
+                        <p className={`line-clamp-2 italic ${isLight ? 'text-stone-900' : 'text-white'}`}>&quot;{item.caption}&quot;</p>
                       </div>
                     )}
-                    <div className="absolute top-2 right-2 bg-[#09090c]/90 backdrop-blur-md border border-[#d4af37]/40 rounded-full px-2.5 py-0.5 text-[9px] text-[#f3e0aa] font-bold shadow-md">
+                    <div className={`absolute top-2 right-2 backdrop-blur-md border rounded-full px-2.5 py-0.5 text-[9px] font-bold shadow-md ${
+                      isLight
+                        ? 'bg-white/90 border-[#b89742]/40 text-[#8A6D2B]'
+                        : 'bg-[#09090c]/90 border-[#d4af37]/40 text-[#f3e0aa]'
+                    }`}>
                       {item.guest_name}
                     </div>
                   </div>
@@ -439,7 +505,7 @@ export default function PublicRSVPPage({ params }: RSVPPageProps) {
     const combinedChildren = (
       <>
         {galleryChildren}
-        <InvitationLeadBadge />
+        <InvitationLeadBadge theme={invitationTheme} />
       </>
     );
 
@@ -454,6 +520,27 @@ export default function PublicRSVPPage({ params }: RSVPPageProps) {
 
   return (
     <>
+      {/* Floating Theme Toggle Switch (Dark / Light) */}
+      <button
+        type="button"
+        onClick={() => setInvitationTheme((prev) => (prev === 'light' ? 'dark' : 'light'))}
+        className={`fixed top-4 right-4 z-40 flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all shadow-xl backdrop-blur-xl border cursor-pointer active:scale-95 ${
+          invitationTheme === 'light'
+            ? 'bg-white/95 text-stone-800 border-[#b89742]/40 hover:bg-white shadow-[0_4px_20px_rgba(212,175,55,0.2)]'
+            : 'bg-[#121215]/95 text-[#f3e0aa] border-[#d4af37]/40 hover:bg-[#1a1a20] shadow-[0_4px_20px_rgba(0,0,0,0.5)]'
+        }`}
+        title={invitationTheme === 'light' ? 'Mudar para Modo Noturno' : 'Mudar para Modo Claro'}
+      >
+        {invitationTheme === 'light' ? (
+          <Moon className="h-3.5 w-3.5 text-[#b89742]" />
+        ) : (
+          <Sun className="h-3.5 w-3.5 text-[#f3e0aa]" />
+        )}
+        <span className="hidden sm:inline font-cinzel text-[11px] tracking-wider">
+          {invitationTheme === 'light' ? 'Modo Noturno' : 'Modo Claro'}
+        </span>
+      </button>
+
       <div className="fixed top-3 inset-x-3 z-50 max-w-xl mx-auto pointer-events-auto">
         <GlobalBroadcastBanner className="backdrop-blur-md shadow-xl" />
       </div>

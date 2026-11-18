@@ -5,9 +5,11 @@ import { Sparkles, ArrowRight, ShieldCheck } from 'lucide-react';
 
 interface InvitationLeadBadgeProps {
   className?: string;
+  theme?: 'dark' | 'light';
 }
 
-export default function InvitationLeadBadge({ className = '' }: InvitationLeadBadgeProps) {
+export default function InvitationLeadBadge({ className = '', theme = 'dark' }: InvitationLeadBadgeProps) {
+  const isLight = theme === 'light';
   const whatsappUrl =
     'https://wa.me/244936952391?text=' +
     encodeURIComponent(
@@ -16,36 +18,60 @@ export default function InvitationLeadBadge({ className = '' }: InvitationLeadBa
 
   return (
     <div className={`w-full max-w-3xl mx-auto mt-10 mb-6 px-4 ${className}`}>
-      <div className="relative overflow-hidden rounded-3xl border border-[#d4af37]/35 bg-gradient-to-b from-[#181820]/95 via-[#121217]/95 to-[#0b0b0e]/95 p-6 sm:p-8 shadow-2xl backdrop-blur-xl text-center">
+      <div className={`relative overflow-hidden rounded-3xl border p-6 sm:p-8 shadow-2xl backdrop-blur-xl text-center transition-all ${
+        isLight
+          ? 'border-[#b89742]/40 bg-gradient-to-b from-white via-stone-50 to-stone-100 text-stone-900 shadow-[0_15px_35px_rgba(212,175,55,0.12)]'
+          : 'border-[#d4af37]/35 bg-gradient-to-b from-[#181820]/95 via-[#121217]/95 to-[#0b0b0e]/95 text-white'
+      }`}>
         {/* Subtle decorative glow accents */}
-        <div className="absolute -top-16 left-1/2 -translate-x-1/2 w-48 h-24 bg-[#d4af37]/15 rounded-full blur-2xl pointer-events-none" />
-        <div className="absolute inset-2 border border-[#d4af37]/10 rounded-[20px] pointer-events-none" />
+        <div className={`absolute -top-16 left-1/2 -translate-x-1/2 w-48 h-24 rounded-full blur-2xl pointer-events-none ${
+          isLight ? 'bg-[#d4af37]/10' : 'bg-[#d4af37]/15'
+        }`} />
+        <div className={`absolute inset-2 border rounded-[20px] pointer-events-none ${
+          isLight ? 'border-[#b89742]/20' : 'border-[#d4af37]/10'
+        }`} />
 
         {/* Category micro-tag */}
-        <div className="relative z-10 inline-flex items-center gap-1.5 rounded-full bg-[#d4af37]/15 border border-[#d4af37]/30 px-3.5 py-1 text-[10px] font-extrabold uppercase tracking-widest text-[#f3e0aa] mb-3.5 shadow-sm">
-          <Sparkles className="h-3 w-3 text-[#d4af37]" />
+        <div className={`relative z-10 inline-flex items-center gap-1.5 rounded-full px-3.5 py-1 text-[10px] font-extrabold uppercase tracking-widest mb-3.5 shadow-sm border ${
+          isLight
+            ? 'bg-[#b89742]/10 border-[#b89742]/30 text-[#8A6D2B]'
+            : 'bg-[#d4af37]/15 border-[#d4af37]/30 text-[#f3e0aa]'
+        }`}>
+          <Sparkles className={`h-3 w-3 ${isLight ? 'text-[#8A6D2B]' : 'text-[#d4af37]'}`} />
           <span>Tecnologia & Protocolo para Eventos</span>
         </div>
 
         {/* Headline */}
-        <h3 className="relative z-10 text-base sm:text-lg md:text-xl font-bold tracking-tight text-white mb-2 font-serif">
+        <h3 className={`relative z-10 text-base sm:text-lg md:text-xl font-bold tracking-tight mb-2 font-serif ${
+          isLight ? 'text-stone-900' : 'text-white'
+        }`}>
           A planear o seu Casamento ou Alambamento?
         </h3>
 
         {/* Subtitle */}
-        <p className="relative z-10 text-xs sm:text-sm text-zinc-300 max-w-xl mx-auto leading-relaxed mb-6">
+        <p className={`relative z-10 text-xs sm:text-sm max-w-xl mx-auto leading-relaxed mb-6 ${
+          isLight ? 'text-stone-600' : 'text-zinc-300'
+        }`}>
           Elimine penetras com passes QR Code individuais, receba confirmações de presença automáticas e organize as mesas sem listas de papel.
         </p>
 
         {/* Value badges */}
-        <div className="relative z-10 flex flex-wrap items-center justify-center gap-2 sm:gap-3 text-[11px] font-semibold text-[#f3e0aa]/90 mb-6">
-          <span className="inline-flex items-center gap-1 bg-white/5 border border-white/10 px-2.5 py-1 rounded-full">
-            <ShieldCheck className="h-3 w-3 text-emerald-400" /> Portaria Antifraude
+        <div className={`relative z-10 flex flex-wrap items-center justify-center gap-2 sm:gap-3 text-[11px] font-semibold mb-6 ${
+          isLight ? 'text-[#8A6D2B]' : 'text-[#f3e0aa]/90'
+        }`}>
+          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border ${
+            isLight ? 'bg-white border-[#b89742]/30 text-stone-800' : 'bg-white/5 border-white/10 text-white'
+          }`}>
+            <ShieldCheck className="h-3 w-3 text-emerald-500" /> Portaria Antifraude
           </span>
-          <span className="inline-flex items-center gap-1 bg-white/5 border border-white/10 px-2.5 py-1 rounded-full">
+          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border ${
+            isLight ? 'bg-white border-[#b89742]/30 text-stone-800' : 'bg-white/5 border-white/10 text-white'
+          }`}>
             ✨ Convites com RSVP Digital
           </span>
-          <span className="inline-flex items-center gap-1 bg-white/5 border border-white/10 px-2.5 py-1 rounded-full">
+          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border ${
+            isLight ? 'bg-white border-[#b89742]/30 text-stone-800' : 'bg-white/5 border-white/10 text-white'
+          }`}>
             🍽️ Mapa de Mesas 2D
           </span>
         </div>
@@ -69,14 +95,20 @@ export default function InvitationLeadBadge({ className = '' }: InvitationLeadBa
             href="/"
             target="_blank"
             rel="noopener noreferrer"
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 rounded-full border border-[#d4af37]/40 bg-white/5 hover:bg-[#d4af37]/10 text-[#f3e0aa] text-xs font-semibold px-5 py-3 transition-all hover:scale-105 active:scale-95 cursor-pointer"
+            className={`w-full sm:w-auto inline-flex items-center justify-center gap-1.5 rounded-full border text-xs font-semibold px-5 py-3 transition-all hover:scale-105 active:scale-95 cursor-pointer ${
+              isLight
+                ? 'border-[#b89742]/50 bg-white hover:bg-stone-50 text-[#8A6D2B] shadow-sm'
+                : 'border-[#d4af37]/40 bg-white/5 hover:bg-[#d4af37]/10 text-[#f3e0aa]'
+            }`}
           >
             Conhecer o Meu Boda <ArrowRight className="h-3.5 w-3.5" />
           </a>
         </div>
 
         {/* Micro-branding */}
-        <p className="relative z-10 text-[10px] text-zinc-500 font-medium mt-5 tracking-wider uppercase">
+        <p className={`relative z-10 text-[10px] font-medium mt-5 tracking-wider uppercase ${
+          isLight ? 'text-stone-500' : 'text-zinc-500'
+        }`}>
           Meu Boda • Tecnologia de Protocolo e Gestão de Casamentos em Angola
         </p>
       </div>

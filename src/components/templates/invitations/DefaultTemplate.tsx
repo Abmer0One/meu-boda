@@ -48,6 +48,7 @@ export interface TemplateProps {
   forceOpen?: boolean;
   isPrinting?: boolean;
   renderPage?: 'cover' | 'info';
+  theme?: 'dark' | 'light';
 }
 
 export default function DefaultTemplate({
@@ -71,12 +72,14 @@ export default function DefaultTemplate({
   forceOpen,
   isPrinting = false,
   renderPage = 'info',
+  theme = 'dark',
 }: TemplateProps) {
   const [isOpen, setIsOpen] = useState(forceOpen ?? false);
   const [showMapsModal, setShowMapsModal] = useState(false);
   
   const isConfirmed = rsvpStatus === 'Confirmed';
   const isDeclined = rsvpStatus === 'Declined';
+  const isLight = theme === 'light';
 
   // Modal map trigger for public invitation scan
   useEffect(() => {
@@ -599,7 +602,7 @@ export default function DefaultTemplate({
      NORMAL INTERACTIVE TEMPLATE
      ========================================================================= */
   return (
-    <div className="min-h-screen bg-[#0d0d0f] text-[#f4f4f5] py-8 px-4 flex flex-col justify-between max-w-6xl mx-auto font-sans relative overflow-hidden select-none">
+    <div className={`min-h-screen py-8 px-4 flex flex-col justify-between max-w-6xl mx-auto font-sans relative overflow-hidden select-none transition-colors duration-500 ${isLight ? 'bg-[#FAF8F5] text-[#1c1917]' : 'bg-[#0d0d0f] text-[#f4f4f5]'}`}>
       
       {/* Styles injecting Playfair Display, Cinzel, and Alex Brush fonts */}
       <style jsx global>{`
@@ -625,8 +628,8 @@ export default function DefaultTemplate({
       `}</style>
 
       {/* Decorative Golden Ambient Blur Lights */}
-      <div className="absolute top-10 left-1/4 w-[350px] h-[350px] bg-[#d4af37]/5 rounded-full blur-[140px] pointer-events-none" />
-      <div className="absolute bottom-10 right-1/4 w-[350px] h-[350px] bg-[#b89742]/5 rounded-full blur-[140px] pointer-events-none" />
+      <div className={`absolute top-10 left-1/4 w-[350px] h-[350px] bg-[#d4af37]/5 rounded-full blur-[140px] pointer-events-none ${isLight ? 'opacity-30' : 'opacity-100'}`} />
+      <div className={`absolute bottom-10 right-1/4 w-[350px] h-[350px] bg-[#b89742]/5 rounded-full blur-[140px] pointer-events-none ${isLight ? 'opacity-30' : 'opacity-100'}`} />
 
       {/* Dynamic Maps Selection Modal for Scanned Locations QR */}
       <AnimatePresence>
@@ -636,18 +639,18 @@ export default function DefaultTemplate({
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-[#121215] border border-[#d4af37]/30 rounded-3xl p-6 w-full max-w-sm text-center space-y-6 relative"
+              className={`border rounded-3xl p-6 w-full max-w-sm text-center space-y-6 relative ${isLight ? 'bg-white border-[#b89742]/40 text-[#1c1917] shadow-2xl' : 'bg-[#121215] border-[#d4af37]/30 text-white'}`}
             >
               <button
                 onClick={() => setShowMapsModal(false)}
-                className="absolute top-4 right-4 text-white/50 hover:text-white text-sm"
+                className={`absolute top-4 right-4 text-sm ${isLight ? 'text-stone-400 hover:text-stone-800' : 'text-white/50 hover:text-white'}`}
               >
                 ✕
               </button>
-              <h3 className="font-cinzel font-bold text-sm text-[#f3e0aa] tracking-wider border-b border-[#d4af37]/20 pb-3">
+              <h3 className={`font-cinzel font-bold text-sm tracking-wider border-b pb-3 ${isLight ? 'text-[#8A6D2B] border-[#b89742]/20' : 'text-[#f3e0aa] border-[#d4af37]/20'}`}>
                 📍 COMO CHEGAR AO EVENTO
               </h3>
-              <p className="text-[11px] text-white/70">Escolha o local para o qual deseja obter direções:</p>
+              <p className={`text-[11px] ${isLight ? 'text-stone-600' : 'text-white/70'}`}>Escolha o local para o qual deseja obter direções:</p>
               
               <div className="space-y-3">
                 {event.ceremony_location && (
@@ -665,7 +668,7 @@ export default function DefaultTemplate({
                     href={getGoogleMapsLink(event.party_location, event.party_maps_url) || '#'}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-2 w-full py-3 border border-[#d4af37]/40 hover:bg-[#d4af37]/10 text-white font-bold rounded-xl text-xs uppercase transition-all"
+                    className={`flex items-center justify-center gap-2 w-full py-3 border font-bold rounded-xl text-xs uppercase transition-all ${isLight ? 'border-[#b89742]/40 hover:bg-[#b89742]/10 text-stone-900' : 'border-[#d4af37]/40 hover:bg-[#d4af37]/10 text-white'}`}
                   >
                     🎉 Copo d&apos;Água / Salão
                   </a>
@@ -687,19 +690,19 @@ export default function DefaultTemplate({
             transition={{ duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
             className="flex-1 flex items-center justify-center py-10"
           >
-            <div className="relative w-full max-w-[420px] aspect-[1/1.4] rounded-[24px] border border-[#d4af37]/20 bg-[#121215] p-8 flex flex-col justify-between items-center shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8)] overflow-hidden">
+            <div className={`relative w-full max-w-[420px] aspect-[1/1.4] rounded-[24px] border p-8 flex flex-col justify-between items-center overflow-hidden transition-all duration-300 ${isLight ? 'border-[#b89742]/30 bg-white shadow-[0_20px_50px_rgba(212,175,55,0.15)] text-[#1c1917]' : 'border-[#d4af37]/20 bg-[#121215] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8)] text-white'}`}>
               {/* Outer double border */}
-              <div className="absolute inset-4 border border-[#d4af37]/10 rounded-[18px] pointer-events-none" />
-              <div className="absolute inset-5 border border-[#d4af37]/5 rounded-[16px] pointer-events-none" />
+              <div className={`absolute inset-4 border rounded-[18px] pointer-events-none ${isLight ? 'border-[#b89742]/20' : 'border-[#d4af37]/10'}`} />
+              <div className={`absolute inset-5 border rounded-[16px] pointer-events-none ${isLight ? 'border-[#b89742]/10' : 'border-[#d4af37]/5'}`} />
               
               {/* Gold corners */}
-              <div className="absolute top-6 left-6 w-8 h-8 border-t border-l border-[#d4af37]/40" />
-              <div className="absolute top-6 right-6 w-8 h-8 border-t border-r border-[#d4af37]/40" />
-              <div className="absolute bottom-6 left-6 w-8 h-8 border-b border-l border-[#d4af37]/40" />
-              <div className="absolute bottom-6 right-6 w-8 h-8 border-b border-r border-[#d4af37]/40" />
+              <div className={`absolute top-6 left-6 w-8 h-8 border-t border-l ${isLight ? 'border-[#b89742]/50' : 'border-[#d4af37]/40'}`} />
+              <div className={`absolute top-6 right-6 w-8 h-8 border-t border-r ${isLight ? 'border-[#b89742]/50' : 'border-[#d4af37]/40'}`} />
+              <div className={`absolute bottom-6 left-6 w-8 h-8 border-b border-l ${isLight ? 'border-[#b89742]/50' : 'border-[#d4af37]/40'}`} />
+              <div className={`absolute bottom-6 right-6 w-8 h-8 border-b border-r ${isLight ? 'border-[#b89742]/50' : 'border-[#d4af37]/40'}`} />
 
               <div className="text-center space-y-4 z-10 pt-6">
-                <span className="text-[10px] font-black uppercase tracking-[5px] text-[#d4af37]">
+                <span className={`text-[10px] font-black uppercase tracking-[5px] ${isLight ? 'text-[#8A6D2B]' : 'text-[#d4af37]'}`}>
                   {eventLabels.invitation}
                 </span>
                 <div className="h-[1px] w-16 bg-gradient-to-r from-transparent via-[#d4af37]/40 to-transparent mx-auto" />
@@ -710,9 +713,9 @@ export default function DefaultTemplate({
                 <motion.div 
                   animate={{ rotate: 360 }}
                   transition={{ duration: 40, repeat: Infinity, ease: 'linear' }}
-                  className="absolute w-32 h-32 border border-dashed border-[#d4af37]/20 rounded-full"
+                  className={`absolute w-32 h-32 border border-dashed rounded-full ${isLight ? 'border-[#b89742]/30' : 'border-[#d4af37]/20'}`}
                 />
-                <div className="w-28 h-28 rounded-full bg-gradient-to-tr from-[#16161a] to-[#242429] border border-[#d4af37]/40 flex flex-col items-center justify-center shadow-2xl relative">
+                <div className={`w-28 h-28 rounded-full border flex flex-col items-center justify-center shadow-2xl relative ${isLight ? 'bg-gradient-to-tr from-[#FAF8F5] to-white border-[#b89742]/40' : 'bg-gradient-to-tr from-[#16161a] to-[#242429] border-[#d4af37]/40'}`}>
                   <span className="text-3xl font-cinzel font-black tracking-widest gold-foil-text">
                     {hosts.initials}
                   </span>
@@ -721,7 +724,7 @@ export default function DefaultTemplate({
 
               <div className="text-center space-y-6 z-10 pb-6 w-full">
                 <div className="space-y-1">
-                  <h2 className="text-[10px] uppercase font-bold tracking-[3px] text-[#8a8a93]">
+                  <h2 className={`text-[10px] uppercase font-bold tracking-[3px] ${isLight ? 'text-stone-500' : 'text-[#8a8a93]'}`}>
                     Convidado(a):
                   </h2>
                   <p className="text-lg font-playfair font-bold gold-foil-text">
@@ -753,22 +756,22 @@ export default function DefaultTemplate({
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
               
               {/* LEFT COLUMN: Details / Important Info Panel */}
-              <div className="bg-[#121215]/90 border border-[#d4af37]/20 rounded-3xl p-6 md:p-8 flex flex-col justify-between shadow-xl relative backdrop-blur-md">
-                <div className="absolute inset-3 border border-[#d4af37]/5 rounded-[20px] pointer-events-none" />
+              <div className={`border rounded-3xl p-6 md:p-8 flex flex-col justify-between shadow-xl relative backdrop-blur-md ${isLight ? 'bg-white/95 border-[#b89742]/30 text-stone-900' : 'bg-[#121215]/90 border-[#d4af37]/20 text-white'}`}>
+                <div className={`absolute inset-3 border rounded-[20px] pointer-events-none ${isLight ? 'border-[#b89742]/10' : 'border-[#d4af37]/5'}`} />
                 
                 <div className="space-y-6 relative z-10">
-                  <div className="text-center space-y-2 border-b border-[#d4af37]/15 pb-4">
-                    <h3 className="font-cinzel font-bold text-sm tracking-[3px] gold-foil-text">
+                  <div className={`text-center space-y-2 border-b pb-4 ${isLight ? 'border-[#b89742]/20' : 'border-[#d4af37]/15'}`}>
+                    <h3 className={`font-cinzel font-bold text-sm tracking-[3px] ${isLight ? 'text-[#8A6D2B]' : 'gold-foil-text'}`}>
                       DETALHES
                     </h3>
                   </div>
 
-                  <div className="space-y-4 text-xs leading-relaxed text-white/90">
-                    <div className="flex items-start gap-3 p-3.5 bg-white/5 rounded-xl border border-white/10">
-                      <Calendar className="h-5 w-5 text-[#d4af37] shrink-0 mt-0.5" />
+                  <div className={`space-y-4 text-xs leading-relaxed ${isLight ? 'text-stone-800' : 'text-white/90'}`}>
+                    <div className={`flex items-start gap-3 p-3.5 rounded-xl border ${isLight ? 'bg-stone-50 border-stone-200/80 text-stone-800' : 'bg-white/5 border-white/10 text-white/90'}`}>
+                      <Calendar className={`h-5 w-5 shrink-0 mt-0.5 ${isLight ? 'text-[#997328]' : 'text-[#d4af37]'}`} />
                       <div>
-                        <h4 className="font-bold text-[10px] uppercase tracking-wider text-[#f3e0aa]">Data e Hora</h4>
-                        <p className="font-semibold text-white text-sm mt-0.5">
+                        <h4 className={`font-bold text-[10px] uppercase tracking-wider ${isLight ? 'text-[#8A6D2B]' : 'text-[#f3e0aa]'}`}>Data e Hora</h4>
+                        <p className={`font-semibold text-sm mt-0.5 ${isLight ? 'text-stone-900' : 'text-white'}`}>
                           {new Date(event.date).toLocaleDateString('pt-PT', {
                             weekday: 'long',
                             day: '2-digit',
@@ -781,22 +784,22 @@ export default function DefaultTemplate({
                     </div>
 
                     {event.ceremony_location && (
-                      <div className="flex items-start gap-3 p-3.5 bg-white/5 rounded-xl border border-white/10">
-                        <MapPin className="h-5 w-5 text-[#d4af37] shrink-0 mt-0.5" />
+                      <div className={`flex items-start gap-3 p-3.5 rounded-xl border ${isLight ? 'bg-stone-50 border-stone-200/80 text-stone-800' : 'bg-white/5 border-white/10 text-white/90'}`}>
+                        <MapPin className={`h-5 w-5 shrink-0 mt-0.5 ${isLight ? 'text-[#997328]' : 'text-[#d4af37]'}`} />
                         <div className="flex-1">
-                          <h4 className="font-bold text-[10px] uppercase tracking-wider text-[#f3e0aa]">
+                          <h4 className={`font-bold text-[10px] uppercase tracking-wider ${isLight ? 'text-[#8A6D2B]' : 'text-[#f3e0aa]'}`}>
                             {event.type === 'casamento' ? 'Cerimónia' : 'Local'}
                           </h4>
-                          <p className="font-semibold text-white text-sm mt-0.5">{event.ceremony_location}</p>
+                          <p className={`font-semibold text-sm mt-0.5 ${isLight ? 'text-stone-900' : 'text-white'}`}>{event.ceremony_location}</p>
                           {event.ceremony_time && (
-                            <p className="text-xs text-zinc-300 mt-0.5">Hora: {event.ceremony_time}</p>
+                            <p className={`text-xs mt-0.5 ${isLight ? 'text-stone-600' : 'text-zinc-300'}`}>Hora: {event.ceremony_time}</p>
                           )}
                           {getGoogleMapsLink(event.ceremony_location, event.ceremony_maps_url) && (
                             <a
                               href={getGoogleMapsLink(event.ceremony_location, event.ceremony_maps_url)!}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1.5 text-xs font-bold text-[#d4af37] hover:text-[#f3e0aa] mt-2 transition-colors"
+                              className={`inline-flex items-center gap-1.5 text-xs font-bold mt-2 transition-colors ${isLight ? 'text-[#997328] hover:text-[#b89742]' : 'text-[#d4af37] hover:text-[#f3e0aa]'}`}
                             >
                               <Map className="h-3.5 w-3.5" /> Ver localização no mapa
                             </a>
@@ -806,22 +809,22 @@ export default function DefaultTemplate({
                     )}
 
                     {event.party_location && (
-                      <div className="flex items-start gap-3 p-3.5 bg-white/5 rounded-xl border border-white/10">
-                        <MapPin className="h-5 w-5 text-[#d4af37] shrink-0 mt-0.5" />
+                      <div className={`flex items-start gap-3 p-3.5 rounded-xl border ${isLight ? 'bg-stone-50 border-stone-200/80 text-stone-800' : 'bg-white/5 border-white/10 text-white/90'}`}>
+                        <MapPin className={`h-5 w-5 shrink-0 mt-0.5 ${isLight ? 'text-[#997328]' : 'text-[#d4af37]'}`} />
                         <div className="flex-1">
-                          <h4 className="font-bold text-[10px] uppercase tracking-wider text-[#f3e0aa]">
+                          <h4 className={`font-bold text-[10px] uppercase tracking-wider ${isLight ? 'text-[#8A6D2B]' : 'text-[#f3e0aa]'}`}>
                             {event.type === 'casamento' ? 'Copo d\'Água' : 'Recepção'}
                           </h4>
-                          <p className="font-semibold text-white text-sm mt-0.5">{event.party_location}</p>
+                          <p className={`font-semibold text-sm mt-0.5 ${isLight ? 'text-stone-900' : 'text-white'}`}>{event.party_location}</p>
                           {event.party_time && (
-                            <p className="text-xs text-zinc-300 mt-0.5">Hora: {event.party_time}</p>
+                            <p className={`text-xs mt-0.5 ${isLight ? 'text-stone-600' : 'text-zinc-300'}`}>Hora: {event.party_time}</p>
                           )}
                           {getGoogleMapsLink(event.party_location, event.party_maps_url) && (
                             <a
                               href={getGoogleMapsLink(event.party_location, event.party_maps_url)!}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1.5 text-xs font-bold text-[#d4af37] hover:text-[#f3e0aa] mt-2 transition-colors"
+                              className={`inline-flex items-center gap-1.5 text-xs font-bold mt-2 transition-colors ${isLight ? 'text-[#997328] hover:text-[#b89742]' : 'text-[#d4af37] hover:text-[#f3e0aa]'}`}
                             >
                               <Map className="h-3.5 w-3.5" /> Ver localização no mapa
                             </a>
@@ -835,98 +838,98 @@ export default function DefaultTemplate({
                 {/* Info Blocks / Dress code under details */}
                 <div className="space-y-3 relative z-10 pt-4">
                   {(event.dress_code_style || event.dress_code_colors) && (
-                    <div className="p-3.5 border border-[#d4af37]/20 bg-white/5 rounded-xl text-xs space-y-1">
-                      <h4 className="font-bold text-[10px] uppercase tracking-wider text-[#f3e0aa]">👗 Dress Code</h4>
-                      {event.dress_code_style && <p className="text-white font-medium text-xs mt-0.5">{event.dress_code_style}</p>}
+                    <div className={`p-3.5 border rounded-xl text-xs space-y-1 ${isLight ? 'border-[#b89742]/20 bg-stone-50 text-stone-800' : 'border-[#d4af37]/20 bg-white/5 text-white'}`}>
+                      <h4 className={`font-bold text-[10px] uppercase tracking-wider ${isLight ? 'text-[#8A6D2B]' : 'text-[#f3e0aa]'}`}>👗 Dress Code</h4>
+                      {event.dress_code_style && <p className={`font-medium text-xs mt-0.5 ${isLight ? 'text-stone-900' : 'text-white'}`}>{event.dress_code_style}</p>}
                       {event.dress_code_colors && (
-                        <p className="text-xs text-zinc-300">Sugerido: {event.dress_code_colors}</p>
+                        <p className={`text-xs ${isLight ? 'text-stone-600' : 'text-zinc-300'}`}>Sugerido: {event.dress_code_colors}</p>
                       )}
                     </div>
                   )}
 
                   {event.gift_suggestions && (
-                    <div className="p-3.5 border border-[#d4af37]/20 bg-white/5 rounded-xl text-xs space-y-1">
-                      <h4 className="font-bold text-[10px] uppercase tracking-wider text-[#f3e0aa]">🎁 Sugestões de Presentes</h4>
-                      <p className="text-white/90 text-xs mt-0.5">{event.gift_suggestions}</p>
+                    <div className={`p-3.5 border rounded-xl text-xs space-y-1 ${isLight ? 'border-[#b89742]/20 bg-stone-50 text-stone-800' : 'border-[#d4af37]/20 bg-white/5 text-white'}`}>
+                      <h4 className={`font-bold text-[10px] uppercase tracking-wider ${isLight ? 'text-[#8A6D2B]' : 'text-[#f3e0aa]'}`}>🎁 Sugestões de Presentes</h4>
+                      <p className={`text-xs mt-0.5 ${isLight ? 'text-stone-900' : 'text-white/90'}`}>{event.gift_suggestions}</p>
                     </div>
                   )}
 
                   {event.kids_restriction_note && (
-                    <div className="p-3.5 border border-[#d4af37]/20 bg-white/5 rounded-xl text-xs space-y-1">
-                      <h4 className="font-bold text-[10px] uppercase tracking-wider text-[#f3e0aa]">ℹ️ Nota Importante</h4>
-                      <p className="text-white/90 text-xs mt-0.5">{event.kids_restriction_note}</p>
+                    <div className={`p-3.5 border rounded-xl text-xs space-y-1 ${isLight ? 'border-[#b89742]/20 bg-stone-50 text-stone-800' : 'border-[#d4af37]/20 bg-white/5 text-white'}`}>
+                      <h4 className={`font-bold text-[10px] uppercase tracking-wider ${isLight ? 'text-[#8A6D2B]' : 'text-[#f3e0aa]'}`}>ℹ️ Nota Importante</h4>
+                      <p className={`text-xs mt-0.5 ${isLight ? 'text-stone-900' : 'text-white/90'}`}>{event.kids_restriction_note}</p>
                     </div>
                   )}
 
                   {event.rsvp_deadline && (
-                    <div className="p-3.5 border border-[#d4af37]/20 bg-white/5 rounded-xl text-xs space-y-1">
-                      <h4 className="font-bold text-[10px] uppercase tracking-wider text-[#f3e0aa]">⏰ Confirmação Até</h4>
-                      <p className="text-white/90 text-xs mt-0.5">{event.rsvp_deadline}</p>
+                    <div className={`p-3.5 border rounded-xl text-xs space-y-1 ${isLight ? 'border-[#b89742]/20 bg-stone-50 text-stone-800' : 'border-[#d4af37]/20 bg-white/5 text-white'}`}>
+                      <h4 className={`font-bold text-[10px] uppercase tracking-wider ${isLight ? 'text-[#8A6D2B]' : 'text-[#f3e0aa]'}`}>⏰ Confirmação Até</h4>
+                      <p className={`text-xs mt-0.5 ${isLight ? 'text-stone-900' : 'text-white/90'}`}>{event.rsvp_deadline}</p>
                     </div>
                   )}
                 </div>
               </div>
 
               {/* CENTER COLUMN: The Acrylic Sheet Main Invitation */}
-              <div className="bg-[#121215] border border-[#d4af37]/35 rounded-3xl p-8 md:p-10 flex flex-col justify-between items-center text-center shadow-2xl relative overflow-hidden min-h-[500px]">
+              <div className={`border rounded-3xl p-8 md:p-10 flex flex-col justify-between items-center text-center shadow-2xl relative overflow-hidden min-h-[500px] ${isLight ? 'bg-white border-[#b89742]/35 text-stone-900' : 'bg-[#121215] border-[#d4af37]/35 text-white'}`}>
                 
                 {/* Simulated Raw Gold Leaf Torn Edges Border inside the card */}
-                <div className="absolute inset-3 border border-dashed border-[#d4af37]/20 rounded-[20px] pointer-events-none" />
-                <div className="absolute inset-4 bg-gradient-to-b from-[#b89742]/5 to-[#d4af37]/0 rounded-[18px] pointer-events-none" />
+                <div className={`absolute inset-3 border border-dashed rounded-[20px] pointer-events-none ${isLight ? 'border-[#b89742]/20' : 'border-[#d4af37]/20'}`} />
+                <div className={`absolute inset-4 rounded-[18px] pointer-events-none ${isLight ? 'bg-gradient-to-b from-[#b89742]/10 to-[#d4af37]/0' : 'bg-gradient-to-b from-[#b89742]/5 to-[#d4af37]/0'}`} />
 
                 {/* Monogram header */}
                 <div className="space-y-2 relative z-10">
-                  <div className="w-14 h-14 rounded-full border border-[#d4af37]/30 flex items-center justify-center mx-auto bg-[#0d0d0f]/60">
-                    <span className="text-xs font-cinzel font-bold tracking-widest text-[#d4af37]">
+                  <div className={`w-14 h-14 rounded-full border flex items-center justify-center mx-auto ${isLight ? 'bg-[#FAF8F5] border-[#b89742]/35 text-[#8A6D2B]' : 'bg-[#0d0d0f]/60 border-[#d4af37]/30 text-[#d4af37]'}`}>
+                    <span className={`text-xs font-cinzel font-bold tracking-widest ${isLight ? 'text-[#8A6D2B]' : 'text-[#d4af37]'}`}>
                       {hosts.initials}
                     </span>
                   </div>
-                  <span className="text-[9px] font-black uppercase tracking-[4px] text-white/40 block mt-2">
+                  <span className={`text-[9px] font-black uppercase tracking-[4px] block mt-2 ${isLight ? 'text-stone-400' : 'text-white/40'}`}>
                     {eventLabels.invitation}
                   </span>
                 </div>
 
                 {/* Hosts / Main Text */}
                 <div className="space-y-6 relative z-10 py-6 my-auto">
-                  <h1 className="text-3xl md:text-5xl font-alex tracking-wide text-white px-2 py-1 leading-tight gold-foil-text font-medium">
+                  <h1 className="text-3xl md:text-5xl font-alex tracking-wide px-2 py-1 leading-tight gold-foil-text font-medium">
                     {event.title}
                   </h1>
 
-                  <p className="text-xs md:text-sm font-playfair italic max-w-sm mx-auto leading-relaxed text-white/90 px-4">
+                  <p className={`text-xs md:text-sm font-playfair italic max-w-sm mx-auto leading-relaxed px-4 ${isLight ? 'text-stone-700' : 'text-white/90'}`}>
                     {phrases.intro}
                   </p>
                   
                   {event.description && (
-                    <p className="text-xs font-playfair italic text-[#f3e0aa] mt-4">
+                    <p className={`text-xs font-playfair italic mt-4 ${isLight ? 'text-[#8A6D2B]' : 'text-[#f3e0aa]'}`}>
                       &quot;{event.description}&quot;
                     </p>
                   )}
                 </div>
 
                 {/* Footer Monogram Date */}
-                <div className="space-y-1 relative z-10 w-full pt-4 border-t border-[#d4af37]/15">
-                  <p className="text-[10px] font-cinzel tracking-[3px] text-[#f3e0aa] uppercase">
+                <div className={`space-y-1 relative z-10 w-full pt-4 border-t ${isLight ? 'border-[#b89742]/20' : 'border-[#d4af37]/15'}`}>
+                  <p className={`text-[10px] font-cinzel tracking-[3px] uppercase ${isLight ? 'text-[#8A6D2B]' : 'text-[#f3e0aa]'}`}>
                     {new Date(event.date).toLocaleDateString('pt-PT', { month: 'long', year: 'numeric' })}
                   </p>
                 </div>
               </div>
 
               {/* RIGHT COLUMN: Ticket access & RSVP Panel */}
-              <div className="bg-[#121215]/90 border border-[#d4af37]/20 rounded-3xl p-6 md:p-8 flex flex-col justify-between shadow-xl relative backdrop-blur-md">
-                <div className="absolute inset-3 border border-[#d4af37]/5 rounded-[20px] pointer-events-none" />
+              <div className={`border rounded-3xl p-6 md:p-8 flex flex-col justify-between shadow-xl relative backdrop-blur-md ${isLight ? 'bg-white/95 border-[#b89742]/30 text-stone-900' : 'bg-[#121215]/90 border-[#d4af37]/20 text-white'}`}>
+                <div className={`absolute inset-3 border rounded-[20px] pointer-events-none ${isLight ? 'border-[#b89742]/10' : 'border-[#d4af37]/5'}`} />
                 
                 <div className="space-y-6 relative z-10">
-                  <div className="text-center space-y-2 border-b border-[#d4af37]/15 pb-4">
-                    <h3 className="font-cinzel font-bold text-sm tracking-[3px] gold-foil-text">
+                  <div className={`text-center space-y-2 border-b pb-4 ${isLight ? 'border-[#b89742]/20' : 'border-[#d4af37]/15'}`}>
+                    <h3 className={`font-cinzel font-bold text-sm tracking-[3px] ${isLight ? 'text-[#8A6D2B]' : 'gold-foil-text'}`}>
                       RSVP / PASSE
                     </h3>
                   </div>
 
                   {/* Access QR Ticket */}
                   {isConfirmed && qrCodeUrl ? (
-                    <div className="bg-white/5 border border-[#d4af37]/20 rounded-2xl p-4 flex flex-col items-center gap-3.5 relative overflow-hidden">
+                    <div className={`border rounded-2xl p-4 flex flex-col items-center gap-3.5 relative overflow-hidden ${isLight ? 'bg-stone-50 border-[#b89742]/30 text-stone-900' : 'bg-white/5 border-[#d4af37]/20 text-white'}`}>
                       {/* Ticket header label */}
-                      <span className="text-[9px] font-black tracking-[3px] text-[#f3e0aa] uppercase">PASSE DIGITAL INDIVIDUAL</span>
+                      <span className={`text-[9px] font-black tracking-[3px] uppercase ${isLight ? 'text-[#8A6D2B]' : 'text-[#f3e0aa]'}`}>PASSE DIGITAL INDIVIDUAL</span>
                       
                       <div className="bg-white p-2.5 rounded-xl border-2 border-[#d4af37]/30 shadow-md">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -934,8 +937,8 @@ export default function DefaultTemplate({
                       </div>
 
                       <div className="text-center space-y-1 text-xs">
-                        <p className="font-bold text-white text-sm">{guest.name}</p>
-                        <p className="text-xs text-[#f3e0aa] font-semibold">
+                        <p className={`font-bold text-sm ${isLight ? 'text-stone-900' : 'text-white'}`}>{guest.name}</p>
+                        <p className={`text-xs font-semibold ${isLight ? 'text-[#8A6D2B]' : 'text-[#f3e0aa]'}`}>
                           {table ? `Mesa: ${table.name}` : 'Mesa: Confirmada'}
                         </p>
                       </div>
@@ -943,7 +946,7 @@ export default function DefaultTemplate({
                       <Button
                         onClick={handleDownloadInvite}
                         disabled={downloading}
-                        className="w-full justify-center rounded-xl border border-[#d4af37]/40 text-[#f3e0aa] bg-[#d4af37]/10 hover:bg-[#d4af37]/20 font-bold py-2.5 text-xs tracking-wider uppercase transition-all"
+                        className={`w-full justify-center rounded-xl border font-bold py-2.5 text-xs tracking-wider uppercase transition-all ${isLight ? 'border-[#b89742]/40 text-[#8A6D2B] bg-[#b89742]/10 hover:bg-[#b89742]/20' : 'border-[#d4af37]/40 text-[#f3e0aa] bg-[#d4af37]/10 hover:bg-[#d4af37]/20'}`}
                         leftIcon={downloading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
                       >
                         Baixar PDF
@@ -952,8 +955,8 @@ export default function DefaultTemplate({
                   ) : (
                     /* RSVP selection buttons */
                     <div className="space-y-4">
-                      <p className="text-xs text-center text-white/90 px-2 leading-relaxed">
-                        Olá <span className="font-bold text-[#f3e0aa]">{guest.name}</span>, confirme a sua presença no evento abaixo:
+                      <p className={`text-xs text-center px-2 leading-relaxed ${isLight ? 'text-stone-700' : 'text-white/90'}`}>
+                        Olá <span className={`font-bold ${isLight ? 'text-[#8A6D2B]' : 'text-[#f3e0aa]'}`}>{guest.name}</span>, confirme a sua presença no evento abaixo:
                       </p>
 
                       <div className="grid grid-cols-2 gap-3">
@@ -963,8 +966,8 @@ export default function DefaultTemplate({
                           disabled={saving}
                           className={`flex flex-col items-center justify-center p-3 border rounded-xl cursor-pointer active:scale-95 transition-all gap-1.5 ${
                             isConfirmed
-                              ? 'border-success bg-success/20 text-success font-bold'
-                              : 'border-[#d4af37]/20 hover:bg-white/10 text-white font-semibold'
+                              ? (isLight ? 'border-emerald-600 bg-emerald-50 text-emerald-700 font-bold' : 'border-success bg-success/20 text-success font-bold')
+                              : (isLight ? 'border-stone-300 hover:bg-stone-100 text-stone-800 font-semibold' : 'border-[#d4af37]/20 hover:bg-white/10 text-white font-semibold')
                           }`}
                         >
                           <CheckCircle className="h-5 w-5" />
@@ -977,8 +980,8 @@ export default function DefaultTemplate({
                           disabled={saving}
                           className={`flex flex-col items-center justify-center p-3 border rounded-xl cursor-pointer active:scale-95 transition-all gap-1.5 ${
                             isDeclined
-                              ? 'border-error bg-error/20 text-error font-bold'
-                              : 'border-[#d4af37]/20 hover:bg-white/10 text-white font-semibold'
+                              ? (isLight ? 'border-red-600 bg-red-50 text-red-700 font-bold' : 'border-error bg-error/20 text-error font-bold')
+                              : (isLight ? 'border-stone-300 hover:bg-stone-100 text-stone-800 font-semibold' : 'border-[#d4af37]/20 hover:bg-white/10 text-white font-semibold')
                           }`}
                         >
                           <XCircle className="h-5 w-5" />
@@ -989,13 +992,13 @@ export default function DefaultTemplate({
                       {/* Extra food restriction note input */}
                       {isConfirmed && (
                         <div className="flex flex-col gap-1.5 pt-1">
-                          <label className="text-[10px] font-bold text-zinc-300 uppercase tracking-wide">Observações / Restrições</label>
+                          <label className={`text-[10px] font-bold uppercase tracking-wide ${isLight ? 'text-stone-600' : 'text-zinc-300'}`}>Observações / Restrições</label>
                           <textarea
                             rows={2}
                             placeholder="Vegetariano, alergias..."
                             value={notes}
                             onChange={(e) => setNotes(e.target.value)}
-                            className="w-full rounded-xl border border-white/20 bg-[#0d0d0f] px-3.5 py-2 text-xs focus:border-[#d4af37] focus:outline-none transition-all text-white placeholder:text-zinc-500"
+                            className={`w-full rounded-xl border px-3.5 py-2 text-xs focus:outline-none transition-all ${isLight ? 'border-stone-300 bg-[#FAF8F5] text-stone-900 placeholder:text-stone-400 focus:border-[#b89742]' : 'border-white/20 bg-[#0d0d0f] text-white placeholder:text-zinc-500 focus:border-[#d4af37]'}`}
                           />
                         </div>
                       )}
@@ -1003,12 +1006,12 @@ export default function DefaultTemplate({
                   )}
                 </div>
 
-                <div className="text-center pt-4 border-t border-[#d4af37]/15 relative z-10">
+                <div className={`text-center pt-4 border-t relative z-10 ${isLight ? 'border-[#b89742]/20' : 'border-[#d4af37]/15'}`}>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => setIsOpen(false)}
-                    className="text-[11px] text-zinc-300 hover:text-white border-white/10 hover:border-[#d4af37]/40 rounded-full"
+                    className={`text-[11px] rounded-full ${isLight ? 'text-stone-600 hover:text-stone-900 border-stone-300 hover:border-[#b89742]' : 'text-zinc-300 hover:text-white border-white/10 hover:border-[#d4af37]/40'}`}
                   >
                     Voltar à Capa
                   </Button>
@@ -1019,27 +1022,27 @@ export default function DefaultTemplate({
 
             {/* Timelines and Schedules below panels */}
             {schedules.length > 0 && (
-              <Card className="bg-[#121215]/90 border border-[#d4af37]/20 shadow-xl backdrop-blur-md relative overflow-hidden">
-                <div className="absolute inset-3 border border-[#d4af37]/5 rounded-[20px] pointer-events-none" />
-                <CardHeader className="border-b border-[#d4af37]/15 relative z-10">
-                  <CardTitle className="flex items-center gap-2 font-cinzel font-bold text-sm tracking-[3px] gold-foil-text">
-                    <Clock className="h-4.5 w-4.5 text-[#d4af37]" /> AGENDA DO DIA
+              <Card className={`shadow-xl backdrop-blur-md relative overflow-hidden border ${isLight ? 'bg-white/95 border-[#b89742]/30 text-stone-900' : 'bg-[#121215]/90 border-[#d4af37]/20 text-white'}`}>
+                <div className={`absolute inset-3 border rounded-[20px] pointer-events-none ${isLight ? 'border-[#b89742]/10' : 'border-[#d4af37]/5'}`} />
+                <CardHeader className={`border-b relative z-10 ${isLight ? 'border-[#b89742]/20' : 'border-[#d4af37]/15'}`}>
+                  <CardTitle className={`flex items-center gap-2 font-cinzel font-bold text-sm tracking-[3px] ${isLight ? 'text-[#8A6D2B]' : 'gold-foil-text'}`}>
+                    <Clock className={`h-4.5 w-4.5 ${isLight ? 'text-[#997328]' : 'text-[#d4af37]'}`} /> AGENDA DO DIA
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4 py-6 relative z-10">
-                  <div className="relative border-l-2 border-[#d4af37]/30 ml-3 pl-6 space-y-5 py-2">
+                  <div className={`relative border-l-2 ml-3 pl-6 space-y-5 py-2 ${isLight ? 'border-[#b89742]/30' : 'border-[#d4af37]/30'}`}>
                     {schedules.map((sched) => (
                       <div key={sched.id} className="relative">
-                        <span className="absolute -left-[31px] top-1.5 flex h-4 w-4 items-center justify-center rounded-full border border-[#d4af37] bg-[#0d0d0f]">
-                          <span className="h-1.5 w-1.5 rounded-full bg-[#d4af37]" />
+                        <span className={`absolute -left-[31px] top-1.5 flex h-4 w-4 items-center justify-center rounded-full border ${isLight ? 'border-[#b89742] bg-[#FAF8F5]' : 'border-[#d4af37] bg-[#0d0d0f]'}`}>
+                          <span className={`h-1.5 w-1.5 rounded-full ${isLight ? 'bg-[#b89742]' : 'bg-[#d4af37]'}`} />
                         </span>
                         <div className="space-y-1 text-left">
-                          <span className="inline-flex items-center gap-1 text-[10px] font-black text-[#f3e0aa] uppercase tracking-wider">
+                          <span className={`inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider ${isLight ? 'text-[#8A6D2B]' : 'text-[#f3e0aa]'}`}>
                             <Clock className="h-3 w-3" /> {sched.time}
                           </span>
-                          <h4 className="text-sm font-semibold text-white">{sched.title}</h4>
+                          <h4 className={`text-sm font-semibold ${isLight ? 'text-stone-900' : 'text-white'}`}>{sched.title}</h4>
                           {sched.location && (
-                            <span className="text-xs text-zinc-300 flex items-center gap-1">
+                            <span className={`text-xs flex items-center gap-1 ${isLight ? 'text-stone-600' : 'text-zinc-300'}`}>
                               <MapPin className="h-3.5 w-3.5 opacity-70" /> {sched.location}
                             </span>
                           )}
@@ -1060,14 +1063,13 @@ export default function DefaultTemplate({
                   {visibleInfoBlocks.map((block) => (
                     <div 
                       key={block.id} 
-                      className="rounded-3xl border border-[#d4af37]/25 shadow-xl backdrop-blur-md relative overflow-hidden p-6 text-left"
-                      style={{ backgroundColor: '#121215', color: '#ffffff' }}
+                      className={`rounded-3xl border shadow-xl backdrop-blur-md relative overflow-hidden p-6 text-left ${isLight ? 'bg-white border-[#b89742]/30 text-stone-900' : 'bg-[#121215] border-[#d4af37]/25 text-white'}`}
                     >
-                      <div className="absolute inset-3 border border-[#d4af37]/10 rounded-[20px] pointer-events-none" />
-                      <h4 className="font-cinzel font-bold text-xs tracking-[2px] text-[#f3e0aa] uppercase border-b border-[#d4af37]/15 pb-2.5 mb-3.5 relative z-10">
+                      <div className={`absolute inset-3 border rounded-[20px] pointer-events-none ${isLight ? 'border-[#b89742]/10' : 'border-[#d4af37]/10'}`} />
+                      <h4 className={`font-cinzel font-bold text-xs tracking-[2px] uppercase border-b pb-2.5 mb-3.5 relative z-10 ${isLight ? 'text-[#8A6D2B] border-[#b89742]/20' : 'text-[#f3e0aa] border-[#d4af37]/15'}`}>
                         {block.title}
                       </h4>
-                      <p className="text-xs text-white/90 leading-relaxed relative z-10">
+                      <p className={`text-xs leading-relaxed relative z-10 ${isLight ? 'text-stone-700' : 'text-white/90'}`}>
                         {block.content}
                       </p>
                     </div>

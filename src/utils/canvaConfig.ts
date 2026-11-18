@@ -28,6 +28,7 @@ export interface CanvaTemplateConfig {
   guest_name_align?: 'left' | 'center' | 'right';
   guest_name_font_family?: 'serif' | 'sans';
   guest_name_font_weight?: 'normal' | 'bold';
+  invitation_theme?: 'dark' | 'light';
   [key: string]: any;
 }
 
@@ -220,6 +221,7 @@ export function resolveCanvaConfig(
     if (templateConfig.guest_name_align) resolved.guest_name_align = templateConfig.guest_name_align;
     if (templateConfig.guest_name_font_family) resolved.guest_name_font_family = templateConfig.guest_name_font_family;
     if (templateConfig.guest_name_font_weight) resolved.guest_name_font_weight = templateConfig.guest_name_font_weight;
+    if (templateConfig.invitation_theme) resolved.invitation_theme = templateConfig.invitation_theme;
   }
 
   // 2. From info blocks if present (database persistent config)
@@ -249,6 +251,7 @@ export function resolveCanvaConfig(
         if (parsed.guest_name_align) resolved.guest_name_align = parsed.guest_name_align;
         if (parsed.guest_name_font_family) resolved.guest_name_font_family = parsed.guest_name_font_family;
         if (parsed.guest_name_font_weight) resolved.guest_name_font_weight = parsed.guest_name_font_weight;
+        if (parsed.invitation_theme) resolved.invitation_theme = parsed.invitation_theme;
       } catch (err) {
         console.error('Error parsing info_block canva config:', err);
       }
@@ -282,6 +285,7 @@ export function resolveCanvaConfig(
         if (parsed.guest_name_align) resolved.guest_name_align = parsed.guest_name_align;
         if (parsed.guest_name_font_family) resolved.guest_name_font_family = parsed.guest_name_font_family;
         if (parsed.guest_name_font_weight) resolved.guest_name_font_weight = parsed.guest_name_font_weight;
+        if (parsed.invitation_theme) resolved.invitation_theme = parsed.invitation_theme;
       }
     } catch (err) {
       console.error('Error reading localStorage canva config:', err);
@@ -308,6 +312,8 @@ export function resolveCanvaConfig(
       resolved.is_basic_template = !hasUpload;
     }
   }
+
+  resolved.invitation_theme = resolved.invitation_theme || 'dark';
 
   return resolved;
 }
