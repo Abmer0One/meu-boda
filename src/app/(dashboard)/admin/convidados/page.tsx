@@ -22,6 +22,9 @@ import {
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { guestSchema } from '@/validations/schemas';
+import { useAuth } from '@/contexts/AuthContext';
+import { PlatformPaymentRepository } from '@/repositories/platformPayment.repository';
+import EventActivationModal from '@/components/modals/EventActivationModal';
 import {
   Users,
   Search,
@@ -37,10 +40,14 @@ import {
   BellRing,
   Copy,
   Check,
+  Sparkles,
 } from 'lucide-react';
 
 export default function ConvidadosPage() {
   const { currentEvent } = useEvent();
+  const { user } = useAuth();
+  const [isLicensed, setIsLicensed] = useState(true);
+  const [isActivationModalOpen, setIsActivationModalOpen] = useState(false);
   const [guests, setGuests] = useState<Guest[]>([]);
   const [tables, setTables] = useState<Table[]>([]);
   const [loading, setLoading] = useState(true);
@@ -85,12 +92,14 @@ export default function ConvidadosPage() {
     if (!currentEvent) return;
     setLoading(true);
     try {
-      const [fetchedGuests, fetchedTables] = await Promise.all([
+      const [fetchedGuests, fetchedTables, licenseRes] = await Promise.all([
         GuestRepository.getAll(currentEvent.id),
         TableRepository.getAll(currentEvent.id),
+        PlatformPaymentRepository.isEventLicensed(currentEvent, user?.role),
       ]);
       setGuests(fetchedGuests);
       setTables(fetchedTables);
+      setIsLicensed(licenseRes.isLicensed);
     } catch (err) {
       console.error(err);
     } finally {
@@ -138,6 +147,12 @@ export default function ConvidadosPage() {
 
   // Open modal for creating a new guest
   const handleNewGuestClick = () => {
+    // Limite de 10 convidados no modo demonstração
+    if (!isLicensed && guests.length >= 10) {
+      setIsActivationModalOpen(true);
+      return;
+    }
+
     setEditingGuest(null);
     reset({
       name: '',
@@ -175,6 +190,12 @@ export default function ConvidadosPage() {
 
   const handleFormSubmit = async (data: any) => {
     if (!currentEvent) return;
+
+    if (!editingGuest && !isLicensed && guests.length >= 10) {
+      setGuestModalOpen(false);
+      setIsActivationModalOpen(true);
+      return;
+    }
 
     const checkinTag = editingGuest?.notes?.match(/\[CHECKIN:.*?\]/)?.[0];
     const combinedNotes = data.notes
@@ -286,6 +307,14 @@ export default function ConvidadosPage() {
       const guestsToInsert = ignoreDuplicates
         ? parsedGuests.filter((pg) => !duplicateRowIndices.has(pg.rawRowIndex))
         : parsedGuests;
+
+      // Limite de 10 convidados no modo demonstração
+      if (!isLicensed && guests.length + guestsToInsert.length > 10) {
+        setIsImportingExcel(false);
+        setImportModalOpen(false);
+        setIsActivationModalOpen(true);
+        return;
+      }
 
       if (guestsToInsert.length === 0) {
         alert('Todos os convidados da folha de cálculo já existem no evento e a opção de ignorar duplicados está ativada.');
@@ -447,8 +476,13 @@ export default function ConvidadosPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2 flex-wrap">
             <Users className="h-6 w-6 text-primary" /> Lista de Convidados
+            {!isLicensed && (
+              <Badge variant="warning" className="text-[10px] py-0.5 px-2 font-bold ml-1">
+                Modo Demonstração: {guests.length} / 10 Grátis
+              </Badge>
+            )}
           </h1>
           <p className="text-sm text-foreground/60">
             Adicione, edite, organize por grupos de famílias e controle a mesa de cada convidado.
@@ -1019,6 +1053,34 @@ export default function ConvidadosPage() {
                     </div>
                   </div>
 
+                  {/* Warning: Trial Limit Exceeded in Excel Import */}
+                  {!isLicensed && (guests.length + (ignoreDuplicates ? parsedGuests.length - duplicateGuests.length : parsedGuests.length)) > 10 && (
+                    <div className="p-3.5 rounded-2xl bg-gradient-to-r from-[#1a1a24] via-[#2a2211] to-[#1a1a24] border border-[#d4af37]/40 text-white flex flex-col sm:flex-row items-center justify-between gap-3 shadow-md my-2">
+                      <div className="flex items-center gap-2.5 text-xs">
+                        <div className="p-1 rounded-full bg-[#d4af37]/20 border border-[#d4af37]/40 text-[#f3e0aa] shrink-0">
+                          <Sparkles className="h-3.5 w-3.5 text-[#d4af37]" />
+                        </div>
+                        <div>
+                          <p className="font-bold text-[#f3e0aa]">Limite de Demonstração (10 Convidados Grátis)</p>
+                          <p className="text-zinc-300 text-[11px] mt-0.5">
+                            A sua folha tem mais convidados do que o plano gratuito de teste. Ative a licença oficial de 45.000 Kz para importar toda a sua lista.
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        type="button"
+                        onClick={() => {
+                          setImportModalOpen(false);
+                          setIsActivationModalOpen(true);
+                        }}
+                        className="rounded-full bg-[#d4af37] hover:bg-[#b59226] text-black font-extrabold text-xs px-4 py-1.5 shrink-0"
+                      >
+                        Ativar Licença
+                      </Button>
+                    </div>
+                  )}
+
                   {/* Actions Footer */}
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-3 border-t border-border-custom">
                     <p className="text-xs text-foreground/60">
@@ -1050,6 +1112,11 @@ export default function ConvidadosPage() {
                           isImportingExcel ||
                           (ignoreDuplicates && parsedGuests.length - duplicateGuests.length === 0)
                         }
+                        className={
+                          !isLicensed && (guests.length + (ignoreDuplicates ? parsedGuests.length - duplicateGuests.length : parsedGuests.length)) > 10
+                            ? 'bg-[#d4af37] hover:bg-[#b59226] text-black font-extrabold'
+                            : ''
+                        }
                         leftIcon={
                           isImportingExcel ? (
                             <Loader2 className="h-4 w-4 animate-spin text-white" />
@@ -1060,6 +1127,10 @@ export default function ConvidadosPage() {
                       >
                         {isImportingExcel
                           ? 'A importar...'
+                          : !isLicensed && (guests.length + (ignoreDuplicates ? parsedGuests.length - duplicateGuests.length : parsedGuests.length)) > 10
+                          ? `Ativar Licença para Importar (${
+                              ignoreDuplicates ? parsedGuests.length - duplicateGuests.length : parsedGuests.length
+                            })`
                           : `Confirmar Importação (${
                               ignoreDuplicates ? parsedGuests.length - duplicateGuests.length : parsedGuests.length
                             })`}
@@ -1072,6 +1143,16 @@ export default function ConvidadosPage() {
           )}
         </div>
       </Dialog>
+
+      {/* Modal de Ativação Oficial de Licença */}
+      <EventActivationModal
+        isOpen={isActivationModalOpen}
+        onClose={() => setIsActivationModalOpen(false)}
+        event={currentEvent}
+        onPaymentSubmitted={() => {
+          loadData();
+        }}
+      />
     </div>
   );
 }
