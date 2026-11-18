@@ -93,13 +93,16 @@ export default function CheckinPage() {
 
     let html5QrCode: any;
 
-    import('html5-qrcode').then(({ Html5Qrcode }) => {
-      html5QrCode = new Html5Qrcode("reader");
+    import('html5-qrcode').then(({ Html5Qrcode, Html5QrcodeSupportedFormats }) => {
+      html5QrCode = new Html5Qrcode("reader", {
+        formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+        verbose: false,
+      });
       html5QrCode.start(
         { facingMode: "environment" },
         {
-          fps: 10,
-          qrbox: { width: 250, height: 250 },
+          fps: 24,
+          aspectRatio: 1.0,
         },
         async (decodedText: string) => {
           const now = Date.now();
@@ -108,7 +111,7 @@ export default function CheckinPage() {
           if (isScanningBusyRef.current) return;
           if (
             lastScannedTokenRef.current === text &&
-            now - lastScanTimestampRef.current < 4000
+            now - lastScanTimestampRef.current < 3000
           ) {
             return;
           }
@@ -122,7 +125,7 @@ export default function CheckinPage() {
           } finally {
             setTimeout(() => {
               isScanningBusyRef.current = false;
-            }, 2000);
+            }, 1200);
           }
         },
         () => {} // Quiet frame errors

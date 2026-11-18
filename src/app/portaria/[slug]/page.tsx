@@ -727,14 +727,17 @@ function PortariaContent({ slug }: { slug: string }) {
     let html5QrCode: any;
 
     import('html5-qrcode')
-      .then(({ Html5Qrcode }) => {
-        html5QrCode = new Html5Qrcode('portaria-reader');
+      .then(({ Html5Qrcode, Html5QrcodeSupportedFormats }) => {
+        html5QrCode = new Html5Qrcode('portaria-reader', {
+          formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+          verbose: false,
+        });
         html5QrCode
           .start(
             { facingMode: 'environment' },
             {
-              fps: 10,
-              qrbox: { width: 250, height: 250 },
+              fps: 24,
+              aspectRatio: 1.0,
             },
             async (decodedText: string) => {
               const now = Date.now();
@@ -743,10 +746,10 @@ function PortariaContent({ slug }: { slug: string }) {
               // 1. If currently busy processing a scan, drop frame immediately
               if (isScanningBusyRef.current) return;
 
-              // 2. Debounce identical QR code within 4 seconds
+              // 2. Debounce identical QR code within 3 seconds
               if (
                 lastScannedTokenRef.current === text &&
-                now - lastScanTimestampRef.current < 4000
+                now - lastScanTimestampRef.current < 3000
               ) {
                 return;
               }
@@ -758,10 +761,10 @@ function PortariaContent({ slug }: { slug: string }) {
               try {
                 await handleScanSuccess(text);
               } finally {
-                // Keep scanner lock for 2 seconds to let operator move to next guest
+                // Short lock (1.2s) for instant transition to next guest
                 setTimeout(() => {
                   isScanningBusyRef.current = false;
-                }, 2000);
+                }, 1200);
               }
             },
             () => {}
