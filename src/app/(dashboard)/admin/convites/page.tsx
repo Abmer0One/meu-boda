@@ -17,6 +17,9 @@ import { generateGuestPDF } from '@/utils/pdf';
 import { resolveCanvaConfig } from '@/utils/canvaConfig';
 import { getEventLabels } from '@/utils/eventHelpers';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
+import { PlatformPaymentRepository } from '@/repositories/platformPayment.repository';
+import EventActivationModal from '@/components/modals/EventActivationModal';
 import DefaultTemplate from '@/components/templates/invitations/DefaultTemplate';
 import {
   MailOpen,
@@ -45,6 +48,8 @@ import {
 
 export default function ConvitesPage() {
   const { currentEvent, setCurrentEvent, refreshEvents } = useEvent();
+  const { user } = useAuth();
+  const [isActivationModalOpen, setIsActivationModalOpen] = useState(false);
   const [guests, setGuests] = useState<Guest[]>([]);
   const [tables, setTables] = useState<Table[]>([]);
   const [schedules, setSchedules] = useState<EventSchedule[]>([]);
@@ -483,6 +488,14 @@ export default function ConvitesPage() {
   // Bulk download PDFs with filtering options
   const handleBulkDownloadFiltered = async (mode: BulkExportFilter = 'as_selected') => {
     if (!currentEvent || activeGuests.length === 0) return;
+
+    // Verificar licença antes de descarregar passes oficiais em lote
+    const licenseCheck = await PlatformPaymentRepository.isEventLicensed(currentEvent, user?.role);
+    if (!licenseCheck.isLicensed) {
+      setExportModalOpen(false);
+      setIsActivationModalOpen(true);
+      return;
+    }
 
     let targetGuests = activeGuests;
     if (mode === 'only_with_name') {
@@ -1752,6 +1765,12 @@ export default function ConvitesPage() {
           </div>
         </div>
       </Dialog>
+
+      <EventActivationModal
+        isOpen={isActivationModalOpen}
+        onClose={() => setIsActivationModalOpen(false)}
+        event={currentEvent}
+      />
     </div>
   );
 }

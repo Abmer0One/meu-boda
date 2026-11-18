@@ -50,6 +50,7 @@ import {
 import { VendorProfileRepository } from '@/repositories/marketplace.repository';
 import { VendorProfile } from '@/types';
 import GlobalBroadcastBanner from '@/components/common/GlobalBroadcastBanner';
+import EventStatusBanner from '@/components/common/EventStatusBanner';
 import { isSuperAdmin } from '@/utils/admin';
 
 interface SidebarItem {
@@ -485,6 +486,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </button>
           </div>
         </header>
+
+        {/* EVENT STATUS BANNER (Product-Led Monetization) */}
+        {!isAdmin && !isVendor && <EventStatusBanner />}
 
         {/* MAIN PAGE BODY */}
         <main className="flex-1 overflow-y-auto p-4 pb-24 md:p-8 bg-background relative">

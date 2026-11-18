@@ -535,12 +535,45 @@ export const SuperAdminRepository = {
         return false;
       }
 
-      // If approved, automatically credit slots/roles
-      if (status === 'Aprovado' && userId) {
-        if (planType?.toLowerCase().includes('planner')) {
-          await this.updateUserMeta(userId, 'planner', 5);
-        } else {
-          await this.updateUserMeta(userId, 'user', 2);
+      // If approved, automatically credit slots/roles and mark event as licensed
+      if (status === 'Aprovado') {
+        if (userId) {
+          if (planType?.toLowerCase().includes('planner')) {
+            await this.updateUserMeta(userId, 'planner', 5);
+          } else {
+            await this.updateUserMeta(userId, 'user', 2);
+          }
+        }
+
+        try {
+          const { data: pData } = await supabase
+            .from('platform_payments')
+            .select('event_id')
+            .eq('id', paymentId)
+            .single();
+
+          if (pData?.event_id) {
+            const { data: ev } = await supabase
+              .from('events')
+              .select('template_config')
+              .eq('id', pData.event_id)
+              .single();
+
+            if (ev) {
+              await supabase
+                .from('events')
+                .update({
+                  template_config: {
+                    ...(ev.template_config || {}),
+                    is_licensed: true,
+                    payment_status: 'Aprovado',
+                  },
+                })
+                .eq('id', pData.event_id);
+            }
+          }
+        } catch (evErr) {
+          console.warn('Could not update event is_licensed in template_config:', evErr);
         }
       }
 

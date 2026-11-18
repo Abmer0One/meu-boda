@@ -10,6 +10,9 @@ import {
 } from '@/repositories/portaria.repository';
 import { StaffPassRepository } from '@/repositories/staff-pass.repository';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
+import { PlatformPaymentRepository } from '@/repositories/platformPayment.repository';
+import EventActivationModal from '@/components/modals/EventActivationModal';
 import { Guest, CheckIn, PortariaConfig, StaffPass, StaffCheckin } from '@/types';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -40,10 +43,14 @@ import {
   UserCheck,
   ArrowRight,
   UtensilsCrossed,
+  Sparkles,
 } from 'lucide-react';
 
 export default function CheckinPage() {
   const { currentEvent } = useEvent();
+  const { user } = useAuth();
+  const [isLicensed, setIsLicensed] = useState(true);
+  const [isActivationModalOpen, setIsActivationModalOpen] = useState(false);
   const [guests, setGuests] = useState<Guest[]>([]);
   const [checkins, setCheckins] = useState<CheckIn[]>([]);
   const [staffPasses, setStaffPasses] = useState<StaffPass[]>([]);
@@ -147,12 +154,13 @@ export default function CheckinPage() {
     if (!currentEvent) return;
     setLoading(true);
     try {
-      const [g, ci, pConfig, sp, sc] = await Promise.all([
+      const [g, ci, pConfig, sp, sc, licenseRes] = await Promise.all([
         GuestRepository.getAll(currentEvent.id),
         CheckInRepository.getAll(currentEvent.id),
         PortariaRepository.getConfig(currentEvent.id),
         StaffPassRepository.getAll(currentEvent.id),
         StaffPassRepository.getCheckins(currentEvent.id),
+        PlatformPaymentRepository.isEventLicensed(currentEvent, user?.role),
       ]);
       setGuests(g);
       setCheckins(ci);
@@ -160,6 +168,7 @@ export default function CheckinPage() {
       setCustomPinInput(pConfig.pin);
       setStaffPasses(sp);
       setStaffCheckins(sc);
+      setIsLicensed(licenseRes.isLicensed);
     } catch (err) {
       console.error(err);
     } finally {
@@ -606,6 +615,30 @@ export default function CheckinPage() {
           Aponte o leitor de QR Code para os convites ou procure nomes manualmente para validar as entradas no salão.
         </p>
       </div>
+
+      {/* Portaria Demonstration Alert */}
+      {!isLicensed && (
+        <div className="p-4 rounded-2xl bg-gradient-to-r from-[#1a1a24] via-[#2a2211] to-[#1a1a24] border border-[#d4af37]/35 text-white flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg">
+          <div className="flex items-center gap-2.5 text-xs">
+            <div className="p-1.5 rounded-full bg-[#d4af37]/20 border border-[#d4af37]/40 text-[#f3e0aa] shrink-0">
+              <Sparkles className="h-4 w-4" />
+            </div>
+            <div>
+              <p className="font-bold text-white">Portaria em Modo Demonstração</p>
+              <p className="text-zinc-300 mt-0.5 text-[11px]">
+                A validação ao vivo na porta do salão no dia do casamento requer a ativação da licença oficial de 45.000 Kz.
+              </p>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            onClick={() => setIsActivationModalOpen(true)}
+            className="rounded-full bg-[#d4af37] hover:bg-[#b59226] text-black font-extrabold text-xs px-4 py-2 shrink-0 shadow-md shadow-[#d4af37]/20"
+          >
+            Ativar Licença Oficial
+          </Button>
+        </div>
+      )}
 
       {/* Card de Configuração & Partilha de Acesso da Portaria (Protocolo & Segurança) */}
       <Card className="bg-card-bg border-border-custom overflow-hidden shadow-sm">
@@ -1321,6 +1354,20 @@ export default function CheckinPage() {
           </div>
         );
       })()}
+
+      {/* Modal de Ativação Oficial de Licença */}
+      <EventActivationModal
+        isOpen={isActivationModalOpen}
+        onClose={() => setIsActivationModalOpen(false)}
+        event={currentEvent}
+        onPaymentSubmitted={() => {
+          if (currentEvent) {
+            PlatformPaymentRepository.isEventLicensed(currentEvent, user?.role).then((res) => {
+              setIsLicensed(res.isLicensed);
+            });
+          }
+        }}
+      />
     </div>
   );
 }
