@@ -35,6 +35,7 @@ import DefaultTemplate from '@/components/templates/invitations/DefaultTemplate'
 import ModernTicketTemplate from '@/components/templates/invitations/ModernTicketTemplate';
 import RoyalParisienneTemplate from '@/components/templates/invitations/RoyalParisienneTemplate';
 import GlobalBroadcastBanner from '@/components/common/GlobalBroadcastBanner';
+import InvitationLeadBadge from '@/components/common/InvitationLeadBadge';
 
 interface RSVPPageProps {
   params: Promise<{ token: string }>;
@@ -435,13 +436,20 @@ export default function PublicRSVPPage({ params }: RSVPPageProps) {
       </div>
     );
 
+    const combinedChildren = (
+      <>
+        {galleryChildren}
+        <InvitationLeadBadge />
+      </>
+    );
+
     if (templateId === 'royal_parisienne' || templateId === 'royal') {
-      return <RoyalParisienneTemplate {...templateProps}>{galleryChildren}</RoyalParisienneTemplate>;
+      return <RoyalParisienneTemplate {...templateProps}>{combinedChildren}</RoyalParisienneTemplate>;
     }
     if (templateId === 'modern_ticket' || templateId === 'ticket') {
-      return <ModernTicketTemplate {...templateProps}>{galleryChildren}</ModernTicketTemplate>;
+      return <ModernTicketTemplate {...templateProps}>{combinedChildren}</ModernTicketTemplate>;
     }
-    return <DefaultTemplate {...templateProps}>{galleryChildren}</DefaultTemplate>;
+    return <DefaultTemplate {...templateProps}>{combinedChildren}</DefaultTemplate>;
   };
 
   return (
