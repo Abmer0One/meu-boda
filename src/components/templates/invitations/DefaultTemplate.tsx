@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import {
@@ -1022,36 +1021,83 @@ export default function DefaultTemplate({
 
             {/* Timelines and Schedules below panels */}
             {schedules.length > 0 && (
-              <Card className={`shadow-xl backdrop-blur-md relative overflow-hidden border ${isLight ? 'bg-white/95 border-[#b89742]/30 text-stone-900' : 'bg-[#121215]/90 border-[#d4af37]/20 text-white'}`}>
+              <div 
+                className={`rounded-3xl border shadow-xl backdrop-blur-md relative overflow-hidden p-6 md:p-8 text-left transition-all ${
+                  isLight 
+                    ? 'border-[#b89742]/30 text-stone-900 shadow-[0_20px_50px_rgba(212,175,55,0.12)]' 
+                    : 'border-[#d4af37]/20 text-white'
+                }`}
+                style={{
+                  backgroundColor: isLight ? 'rgba(255, 255, 255, 0.95)' : '#121215',
+                  color: isLight ? '#1c1917' : '#ffffff',
+                }}
+              >
+                {/* Luxury inner decorative frame matching Left/Right columns */}
                 <div className={`absolute inset-3 border rounded-[20px] pointer-events-none ${isLight ? 'border-[#b89742]/10' : 'border-[#d4af37]/5'}`} />
-                <CardHeader className={`border-b relative z-10 ${isLight ? 'border-[#b89742]/20' : 'border-[#d4af37]/15'}`}>
-                  <CardTitle className={`flex items-center gap-2 font-cinzel font-bold text-sm tracking-[3px] ${isLight ? 'text-[#8A6D2B]' : 'gold-foil-text'}`}>
-                    <Clock className={`h-4.5 w-4.5 ${isLight ? 'text-[#997328]' : 'text-[#d4af37]'}`} /> AGENDA DO DIA
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4 py-6 relative z-10">
-                  <div className={`relative border-l-2 ml-3 pl-6 space-y-5 py-2 ${isLight ? 'border-[#b89742]/30' : 'border-[#d4af37]/30'}`}>
+
+                {/* Ambient glow accent matching Left/Right columns */}
+                <div className={`absolute -top-16 -right-16 w-48 h-48 rounded-full blur-3xl pointer-events-none ${isLight ? 'bg-[#d4af37]/5' : 'bg-[#d4af37]/10'}`} />
+
+                {/* Section Header */}
+                <div className={`flex items-center gap-2.5 border-b pb-4 mb-6 relative z-10 ${isLight ? 'border-[#b89742]/20' : 'border-[#d4af37]/15'}`}>
+                  <div className={`w-8 h-8 rounded-lg border flex items-center justify-center shrink-0 ${
+                    isLight 
+                      ? 'bg-[#b89742]/15 border-[#b89742]/35 text-[#8A6D2B]' 
+                      : 'bg-[#d4af37]/15 border-[#d4af37]/35 text-[#f3e0aa]'
+                  }`}>
+                    <Clock className="h-4 w-4" />
+                  </div>
+                  <h3 className={`font-cinzel font-bold text-sm tracking-[3px] ${isLight ? 'text-[#8A6D2B]' : 'gold-foil-text'}`}>
+                    AGENDA DO DIA
+                  </h3>
+                </div>
+
+                {/* Timeline Content */}
+                <div className="relative z-10">
+                  <div className={`relative border-l-2 ml-3.5 pl-6 space-y-4 py-1 ${isLight ? 'border-[#b89742]/30' : 'border-[#d4af37]/30'}`}>
                     {schedules.map((sched) => (
-                      <div key={sched.id} className="relative">
-                        <span className={`absolute -left-[31px] top-1.5 flex h-4 w-4 items-center justify-center rounded-full border ${isLight ? 'border-[#b89742] bg-[#FAF8F5]' : 'border-[#d4af37] bg-[#0d0d0f]'}`}>
+                      <div key={sched.id} className="relative group">
+                        {/* Node circle on timeline */}
+                        <span 
+                          className={`absolute -left-[33px] top-3 flex h-4 w-4 items-center justify-center rounded-full border shadow-sm transition-all ${
+                            isLight 
+                              ? 'border-[#b89742] bg-[#FAF8F5]' 
+                              : 'border-[#d4af37] bg-[#121215]'
+                          }`}
+                        >
                           <span className={`h-1.5 w-1.5 rounded-full ${isLight ? 'bg-[#b89742]' : 'bg-[#d4af37]'}`} />
                         </span>
-                        <div className="space-y-1 text-left">
-                          <span className={`inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider ${isLight ? 'text-[#8A6D2B]' : 'text-[#f3e0aa]'}`}>
-                            <Clock className="h-3 w-3" /> {sched.time}
-                          </span>
-                          <h4 className={`text-sm font-semibold ${isLight ? 'text-stone-900' : 'text-white'}`}>{sched.title}</h4>
-                          {sched.location && (
-                            <span className={`text-xs flex items-center gap-1 ${isLight ? 'text-stone-600' : 'text-zinc-300'}`}>
-                              <MapPin className="h-3.5 w-3.5 opacity-70" /> {sched.location}
+
+                        {/* Schedule Item Card with palette identical to "Detalhes" */}
+                        <div 
+                          className={`p-4 rounded-2xl border transition-all ${
+                            isLight 
+                              ? 'bg-stone-50 border-stone-200/80 text-stone-800 shadow-sm' 
+                              : 'bg-white/5 border-white/10 text-white/90 shadow-sm'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2 mb-1.5">
+                            <span className={`inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider ${
+                              isLight ? 'text-[#8A6D2B]' : 'text-[#f3e0aa]'
+                            }`}>
+                              <Clock className="h-3 w-3" /> {sched.time}
                             </span>
+                          </div>
+                          <h4 className={`text-sm font-semibold tracking-wide ${isLight ? 'text-stone-900' : 'text-white'}`}>
+                            {sched.title}
+                          </h4>
+                          {sched.location && (
+                            <p className={`text-xs flex items-center gap-1.5 mt-1.5 ${isLight ? 'text-stone-600' : 'text-zinc-300'}`}>
+                              <MapPin className={`h-3.5 w-3.5 shrink-0 ${isLight ? 'text-[#997328]' : 'text-[#d4af37]'}`} /> 
+                              <span>{sched.location}</span>
+                            </p>
                           )}
                         </div>
                       </div>
                     ))}
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             )}
 
             {/* Custom Info Blocks */}
