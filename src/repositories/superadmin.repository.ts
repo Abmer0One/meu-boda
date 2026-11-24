@@ -95,6 +95,27 @@ export function saveLocalVendorStatusOverride(
   }
 }
 
+export const LOCAL_PLATFORM_PAYMENTS_KEY = 'meuboda_local_platform_payments';
+
+export function getLocalPlatformPayments(): PlatformPayment[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(LOCAL_PLATFORM_PAYMENTS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveLocalPlatformPayments(payments: PlatformPayment[]) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(LOCAL_PLATFORM_PAYMENTS_KEY, JSON.stringify(payments));
+  } catch (e) {
+    console.error('Failed to save local platform payments:', e);
+  }
+}
+
 export const SuperAdminRepository = {
   // -------------------------------------------------------------
   // USERS & LICENSING
@@ -499,89 +520,240 @@ export const SuperAdminRepository = {
   // COMPROVATIVOS & PAGAMENTOS DE PLATAFORMA
   // -------------------------------------------------------------
   async getPlatformPayments(): Promise<PlatformPayment[]> {
+    let remoteList: PlatformPayment[] = [];
     try {
       const { data, error } = await supabase
         .from('platform_payments')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) {
-        // Fallback: Return empty list if table not created yet
-        return [];
+      if (!error && Array.isArray(data)) {
+        remoteList = data as PlatformPayment[];
       }
-      return (data as PlatformPayment[]) || [];
     } catch (e) {
-      return [];
+      console.warn('Could not query platform_payments table:', e);
     }
+
+    // Merge with local payments mirror
+    const localList = getLocalPlatformPayments();
+    const map = new Map<string, PlatformPayment>();
+
+    // First load remote
+    remoteList.forEach((p) => map.set(p.id, p));
+
+    // Overlay local items
+    localList.forEach((lp) => {
+      const existing = map.get(lp.id);
+      if (!existing) {
+        map.set(lp.id, lp);
+      } else {
+        // If local has more recent review or explicit update, prioritize it
+        if (lp.reviewed_at && (!existing.reviewed_at || lp.reviewed_at >= existing.reviewed_at)) {
+          map.set(lp.id, { ...existing, ...lp });
+        }
+      }
+    });
+
+    return Array.from(map.values()).sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
   },
 
   async updatePaymentStatus(
     paymentId: string,
     status: 'Aprovado' | 'Recusado',
     userId?: string,
-    planType?: string
+    planType?: string,
+    targetEventId?: string
   ): Promise<boolean> {
+    const nowIso = new Date().toISOString();
+
+    // 1. Update in local mirror immediately
+    const localPayments = getLocalPlatformPayments();
+    let matchedEventId = targetEventId;
+    let matchedUserId = userId;
+    let matchedPlanType = planType;
+
+    const updatedLocal = localPayments.map((p) => {
+      if (p.id === paymentId) {
+        if (!matchedEventId && p.event_id) matchedEventId = p.event_id;
+        if (!matchedUserId && p.user_id) matchedUserId = p.user_id;
+        if (!matchedPlanType && p.plan_type) matchedPlanType = p.plan_type;
+        return {
+          ...p,
+          status,
+          reviewed_at: nowIso,
+          reviewed_by: 'Super Admin',
+        };
+      }
+      return p;
+    });
+    saveLocalPlatformPayments(updatedLocal);
+
+    // 2. Update Supabase platform_payments table
     try {
-      const { error } = await supabase
+      await supabase
         .from('platform_payments')
         .update({
           status,
-          reviewed_at: new Date().toISOString(),
+          reviewed_at: nowIso,
+          reviewed_by: 'Super Admin',
         })
         .eq('id', paymentId);
+    } catch (e) {
+      console.warn('DB update warning for platform_payments:', e);
+    }
 
-      if (error) {
-        console.error('Error updating payment status:', error);
-        return false;
+    // 3. If approved, automatically credit slots/roles and mark event as licensed
+    if (status === 'Aprovado') {
+      const isPlanner = (matchedPlanType || '').toLowerCase().includes('planner') ||
+                        (matchedPlanType || '').toLowerCase().includes('b2b') ||
+                        (matchedPlanType || '').toLowerCase().includes('starter') ||
+                        (matchedPlanType || '').toLowerCase().includes('pro');
+
+      if (matchedUserId) {
+        if (isPlanner) {
+          const slots = (matchedPlanType || '').toLowerCase().includes('pro') ? 15 : 5;
+          await this.updateUserMeta(matchedUserId, 'planner', slots);
+        } else {
+          await this.updateUserMeta(matchedUserId, 'user', 2);
+        }
       }
 
-      // If approved, automatically credit slots/roles and mark event as licensed
-      if (status === 'Aprovado') {
-        if (userId) {
-          if (planType?.toLowerCase().includes('planner')) {
-            await this.updateUserMeta(userId, 'planner', 5);
-          } else {
-            await this.updateUserMeta(userId, 'user', 2);
-          }
-        }
-
+      // Try to find event_id if not known
+      if (!matchedEventId) {
         try {
           const { data: pData } = await supabase
             .from('platform_payments')
             .select('event_id')
             .eq('id', paymentId)
             .single();
+          if (pData?.event_id) matchedEventId = pData.event_id;
+        } catch {}
+      }
 
-          if (pData?.event_id) {
-            const { data: ev } = await supabase
-              .from('events')
-              .select('template_config')
-              .eq('id', pData.event_id)
-              .single();
+      if (matchedEventId) {
+        try {
+          const { data: ev } = await supabase
+            .from('events')
+            .select('template_config')
+            .eq('id', matchedEventId)
+            .single();
 
-            if (ev) {
-              await supabase
-                .from('events')
-                .update({
-                  template_config: {
-                    ...(ev.template_config || {}),
-                    is_licensed: true,
-                    payment_status: 'Aprovado',
-                  },
-                })
-                .eq('id', pData.event_id);
-            }
-          }
+          const currentConfig = ev?.template_config || {};
+          await supabase
+            .from('events')
+            .update({
+              template_config: {
+                ...currentConfig,
+                is_licensed: true,
+                payment_status: 'Aprovado',
+                licensed_at: nowIso,
+              },
+            })
+            .eq('id', matchedEventId);
         } catch (evErr) {
           console.warn('Could not update event is_licensed in template_config:', evErr);
         }
       }
 
-      return true;
-    } catch (e) {
-      console.error('Failed to update payment status:', e);
-      return false;
+      // Send confirmation notification
+      if (matchedUserId) {
+        try {
+          await supabase.from('notifications').insert({
+            user_id: matchedUserId,
+            title: 'Pagamento e Licença Aprovados',
+            message: `O seu pagamento para o plano "${matchedPlanType || 'Licença Meu Boda'}" foi validado e ativado com sucesso!`,
+            type: 'info',
+            read: false,
+          });
+        } catch {}
+      }
     }
+
+    return true;
+  },
+
+  async createManualPayment(params: {
+    userEmail: string;
+    userId?: string;
+    eventId?: string;
+    eventTitle?: string;
+    planType: string;
+    amount: number;
+    referenceCode?: string;
+    notes?: string;
+  }): Promise<{ success: boolean; payment?: PlatformPayment; error?: string }> {
+    const nowIso = new Date().toISOString();
+    const paymentId = 'pay_adm_' + Date.now();
+
+    const newPayment: PlatformPayment = {
+      id: paymentId,
+      user_id: params.userId || 'admin_user_' + Date.now(),
+      user_email: params.userEmail,
+      event_id: params.eventId || null,
+      event_title: params.eventTitle || null,
+      plan_type: params.planType,
+      amount: params.amount,
+      payment_method: 'Validação Manual (Super Admin)',
+      reference_code: params.referenceCode || `ADM-${Date.now().toString().slice(-6)}`,
+      receipt_url: null,
+      status: 'Aprovado',
+      notes: params.notes || 'Ativado manualmente na consola Super Admin',
+      created_at: nowIso,
+      reviewed_at: nowIso,
+      reviewed_by: 'Super Admin',
+    };
+
+    // 1. Save to local mirror immediately
+    const local = getLocalPlatformPayments();
+    saveLocalPlatformPayments([newPayment, ...local]);
+
+    // 2. Save to Supabase
+    try {
+      await supabase.from('platform_payments').insert(newPayment);
+    } catch (e: any) {
+      console.warn('Supabase insert warning for manual payment, saved locally:', e);
+    }
+
+    // 3. If event_id is supplied, activate license on event
+    if (params.eventId) {
+      try {
+        const { data: ev } = await supabase
+          .from('events')
+          .select('template_config')
+          .eq('id', params.eventId)
+          .single();
+
+        const currentConfig = ev?.template_config || {};
+        await supabase
+          .from('events')
+          .update({
+            template_config: {
+              ...currentConfig,
+              is_licensed: true,
+              payment_status: 'Aprovado',
+              licensed_at: nowIso,
+            },
+          })
+          .eq('id', params.eventId);
+      } catch (evErr) {
+        console.warn('Failed to update event template_config for manual payment:', evErr);
+      }
+    }
+
+    // 4. If planner plan, upgrade user meta
+    const isPlanner = params.planType.toLowerCase().includes('planner') ||
+                      params.planType.toLowerCase().includes('b2b') ||
+                      params.planType.toLowerCase().includes('starter') ||
+                      params.planType.toLowerCase().includes('pro');
+
+    if (params.userId && isPlanner) {
+      const slots = params.planType.toLowerCase().includes('pro') ? 15 : 5;
+      await this.updateUserMeta(params.userId, 'planner', slots);
+    }
+
+    return { success: true, payment: newPayment };
   },
 
   // -------------------------------------------------------------
