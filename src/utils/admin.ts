@@ -23,10 +23,20 @@ export function isSuperAdmin(user: User | null | undefined): boolean {
   const defaultAdminEmails = [
     'amota@meuboda.com',
     'admin@meuboda.com',
+    'abiudmota2010@live.com.pt',
   ];
 
   const allowedEmails = new Set([...envAdminEmails, ...defaultAdminEmails]);
   const userEmail = user.email.trim().toLowerCase();
 
-  return allowedEmails.has(userEmail);
+  if (allowedEmails.has(userEmail)) {
+    return true;
+  }
+
+  // Any verified corporate account @meuboda.com
+  if (userEmail.endsWith('@meuboda.com')) {
+    return true;
+  }
+
+  return false;
 }

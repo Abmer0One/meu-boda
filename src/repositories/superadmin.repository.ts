@@ -1,5 +1,11 @@
 import { supabase } from '@/lib/supabase';
 import { SystemBroadcast, PlatformPayment, LiveCheckinFeed, VendorProfile } from '@/types';
+import {
+  fetchCloudPaymentsFromStorage,
+  saveCloudPaymentsToStorage,
+  PLATFORM_PAYMENT_BLOCK_TITLE,
+} from '@/repositories/platformPayment.repository';
+import { CANVA_CONFIG_BLOCK_TITLE, persistCanvaConfig } from '@/utils/canvaConfig';
 
 export interface AdminUser {
   id: string;
@@ -517,10 +523,96 @@ export const SuperAdminRepository = {
   },
 
   // -------------------------------------------------------------
-  // COMPROVATIVOS & PAGAMENTOS DE PLATAFORMA
+  // COMPROVATIVOS & PAGAMENTOS DE PLATAFORMA (CLOUD SYNC MULTI-DEVICE)
   // -------------------------------------------------------------
   async getPlatformPayments(): Promise<PlatformPayment[]> {
-    let remoteList: PlatformPayment[] = [];
+    const map = new Map<string, PlatformPayment>();
+
+    // 1. Fetch Global Cloud Storage Sync master (Cross-device cloud truth!)
+    try {
+      const cloudList = await fetchCloudPaymentsFromStorage();
+      if (Array.isArray(cloudList)) {
+        cloudList.forEach((p) => {
+          if (p && (p.id || p.event_id)) {
+            const key = p.id || `pay_${p.event_id}`;
+            map.set(key, p);
+          }
+        });
+      }
+    } catch (e) {
+      console.warn('Could not load cloud storage payments:', e);
+    }
+
+    // 2. Query event_info_blocks for persistent payment records
+    try {
+      const { data: paymentBlocks } = await supabase
+        .from('event_info_blocks')
+        .select('event_id, content')
+        .eq('title', PLATFORM_PAYMENT_BLOCK_TITLE);
+
+      if (Array.isArray(paymentBlocks)) {
+        paymentBlocks.forEach((b: any) => {
+          try {
+            if (b.content) {
+              const parsed: PlatformPayment = JSON.parse(b.content);
+              if (parsed && (parsed.id || parsed.status)) {
+                const key = parsed.id || `pay_${b.event_id}`;
+                const existing = map.get(key);
+                if (!existing || (parsed.reviewed_at && (!existing.reviewed_at || parsed.reviewed_at >= existing.reviewed_at))) {
+                  map.set(key, { ...parsed, event_id: parsed.event_id || b.event_id });
+                }
+              }
+            }
+          } catch {}
+        });
+      }
+    } catch (blockErr) {
+      console.warn('Could not query event_info_blocks payment records:', blockErr);
+    }
+
+    // 3. Query event_info_blocks for Canva configs with payment metadata
+    try {
+      const { data: canvaBlocks } = await supabase
+        .from('event_info_blocks')
+        .select('event_id, content')
+        .eq('title', CANVA_CONFIG_BLOCK_TITLE);
+
+      if (Array.isArray(canvaBlocks)) {
+        canvaBlocks.forEach((b: any) => {
+          try {
+            if (b.content) {
+              const cfg = JSON.parse(b.content);
+              if (cfg.payment_status || cfg.payment_submitted_at || cfg.receipt_url || cfg.is_licensed) {
+                const evPaymentId = cfg.payment_id || `pay_ev_${b.event_id}`;
+                const existing = map.get(evPaymentId);
+                const paymentItem: PlatformPayment = {
+                  id: evPaymentId,
+                  user_id: existing?.user_id || 'user_' + b.event_id,
+                  user_email: cfg.payment_email || existing?.user_email || `utilizador-${b.event_id.slice(0, 8)}@meuboda.com`,
+                  event_id: b.event_id,
+                  event_title: existing?.event_title || 'Casamento',
+                  plan_type: cfg.plan_type || existing?.plan_type || 'Licença Casamento B2C (45.000 Kz)',
+                  amount: Number(cfg.payment_amount) || existing?.amount || 45000,
+                  payment_method: cfg.payment_method || existing?.payment_method || 'Transferência Bancária / Multicaixa Express',
+                  reference_code: cfg.reference_code || existing?.reference_code || null,
+                  receipt_url: cfg.receipt_url || existing?.receipt_url || null,
+                  status: cfg.is_licensed ? 'Aprovado' : (cfg.payment_status || existing?.status || 'Pendente'),
+                  notes: cfg.payment_notes || existing?.notes || 'Submetido no painel de ativação do evento',
+                  created_at: cfg.payment_submitted_at || existing?.created_at || new Date().toISOString(),
+                  reviewed_at: cfg.payment_reviewed_at || (cfg.is_licensed ? cfg.licensed_at : null) || existing?.reviewed_at || null,
+                  reviewed_by: cfg.payment_reviewed_by || (cfg.is_licensed ? 'Super Admin' : null) || existing?.reviewed_by || null,
+                };
+                map.set(evPaymentId, { ...(existing || {}), ...paymentItem });
+              }
+            }
+          } catch {}
+        });
+      }
+    } catch (canvaErr) {
+      console.warn('Could not extract payments from canvaBlocks:', canvaErr);
+    }
+
+    // 4. Query platform_payments table if it exists
     try {
       const { data, error } = await supabase
         .from('platform_payments')
@@ -528,96 +620,60 @@ export const SuperAdminRepository = {
         .order('created_at', { ascending: false });
 
       if (!error && Array.isArray(data)) {
-        remoteList = data as PlatformPayment[];
-      }
-    } catch (e) {
-      console.warn('Could not query platform_payments table:', e);
-    }
-
-    // Merge with local payments mirror
-    const localList = getLocalPlatformPayments();
-    const map = new Map<string, PlatformPayment>();
-
-    // First load remote
-    remoteList.forEach((p) => {
-      if (p && p.id) {
-        map.set(p.id, p);
-      }
-    });
-
-    // Extract pending/reviewed payments recorded directly in events.template_config
-    try {
-      const { data: eventsWithPayment } = await supabase
-        .from('events')
-        .select('id, title, user_id, template_config, created_at');
-
-      if (Array.isArray(eventsWithPayment)) {
-        eventsWithPayment.forEach((ev: any) => {
-          const cfg = ev.template_config || {};
-          // If the event has a payment status (Pendente, Aprovado, Recusado) or receipt_url or payment_submitted_at
-          if (cfg.payment_status || cfg.payment_submitted_at || cfg.receipt_url) {
-            // Check if this event already has a payment in map
-            let alreadyInMap = false;
-            for (const existing of map.values()) {
-              if (existing.event_id === ev.id) {
-                alreadyInMap = true;
-                break;
-              }
-            }
-            if (!alreadyInMap) {
-              const evPaymentId = cfg.payment_id || `pay_ev_${ev.id}`;
-              const paymentItem: PlatformPayment = {
-                id: evPaymentId,
-                user_id: ev.user_id || 'user_' + ev.id,
-                user_email: cfg.payment_email || `utilizador-${(ev.user_id || ev.id).slice(0, 8)}@meuboda.com`,
-                event_id: ev.id,
-                event_title: ev.title || 'Casamento',
-                plan_type: cfg.plan_type || 'Licença Casamento B2C (45.000 Kz)',
-                amount: Number(cfg.payment_amount) || 45000,
-                payment_method: cfg.payment_method || 'Transferência Bancária / Multicaixa Express',
-                reference_code: cfg.reference_code || null,
-                receipt_url: cfg.receipt_url || null,
-                status: (cfg.payment_status as any) || 'Pendente',
-                notes: cfg.payment_notes || 'Submetido no painel de ativação do evento',
-                created_at: cfg.payment_submitted_at || ev.created_at || new Date().toISOString(),
-                reviewed_at: cfg.payment_reviewed_at || null,
-                reviewed_by: cfg.payment_reviewed_by || null,
-              };
-              map.set(evPaymentId, paymentItem);
+        data.forEach((p: PlatformPayment) => {
+          if (p && p.id) {
+            const existing = map.get(p.id);
+            if (!existing || (p.reviewed_at && (!existing.reviewed_at || p.reviewed_at >= existing.reviewed_at))) {
+              map.set(p.id, { ...(existing || {}), ...p });
             }
           }
         });
       }
-    } catch (evErr) {
-      console.warn('Could not extract payments from events template_config:', evErr);
-    }
+    } catch {}
 
-    // Overlay local items
+    // 5. Merge with local payments mirror
+    const localList = getLocalPlatformPayments();
+    let hasLocalNewerChanges = false;
+
     localList.forEach((lp) => {
       if (!lp) return;
       const id = lp.id || `pay_loc_${lp.event_id || Math.random().toString(36).substring(2, 7)}`;
       const existing = map.get(id);
       if (!existing) {
         map.set(id, { ...lp, id });
+        hasLocalNewerChanges = true;
       } else {
-        if (lp.reviewed_at && (!existing.reviewed_at || lp.reviewed_at >= existing.reviewed_at)) {
+        // If local has an approval (e.g. validated on Computer B) not yet reflected in cloud
+        if (lp.status === 'Aprovado' && existing.status !== 'Aprovado') {
+          map.set(id, { ...existing, ...lp, id });
+          hasLocalNewerChanges = true;
+        } else if (lp.reviewed_at && (!existing.reviewed_at || lp.reviewed_at >= existing.reviewed_at)) {
           map.set(id, { ...existing, ...lp, id });
         }
       }
     });
 
-    // Ensure all items have valid and safe fields
-    const safeResults = Array.from(map.values()).map((item, idx) => ({
-      ...item,
-      id: item.id || `pay_safe_${idx}`,
-      amount: Number(item.amount) || 0,
-      status: (item.status as any) || 'Pendente',
-      created_at: item.created_at || new Date().toISOString(),
-    }));
+    const safeResults = Array.from(map.values())
+      .map((item, idx) => ({
+        ...item,
+        id: item.id || `pay_safe_${idx}`,
+        amount: Number(item.amount) || 0,
+        status: (item.status as any) || 'Pendente',
+        created_at: item.created_at || new Date().toISOString(),
+      }))
+      .sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
 
-    return safeResults.sort(
-      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    );
+    // Save updated unified list locally
+    saveLocalPlatformPayments(safeResults);
+
+    // If local had unsynced changes (like approvals on Computer B), sync to cloud storage in background!
+    if (hasLocalNewerChanges && safeResults.length > 0) {
+      saveCloudPaymentsToStorage(safeResults).catch(() => {});
+    }
+
+    return safeResults;
   },
 
   async updatePaymentStatus(
@@ -655,7 +711,38 @@ export const SuperAdminRepository = {
     });
     saveLocalPlatformPayments(updatedLocal);
 
-    // 2. Update Supabase platform_payments table
+    // 2. Update in Cloud Storage Sync Master (Cross-device cloud truth!)
+    try {
+      const cloudPayments = await fetchCloudPaymentsFromStorage();
+      const baseList = cloudPayments.length > 0 ? cloudPayments : updatedLocal;
+      let foundInCloud = false;
+
+      const updatedCloud = baseList.map((p) => {
+        if (p.id === paymentId || (matchedEventId && p.event_id === matchedEventId)) {
+          foundInCloud = true;
+          return {
+            ...p,
+            status,
+            reviewed_at: nowIso,
+            reviewed_by: 'Super Admin',
+          };
+        }
+        return p;
+      });
+
+      if (!foundInCloud) {
+        const localMatch = updatedLocal.find((p) => p.id === paymentId || (matchedEventId && p.event_id === matchedEventId));
+        if (localMatch) {
+          updatedCloud.unshift(localMatch);
+        }
+      }
+
+      await saveCloudPaymentsToStorage(updatedCloud);
+    } catch (cloudErr) {
+      console.warn('Notice updating cloud storage payments:', cloudErr);
+    }
+
+    // 3. Update Supabase platform_payments table if it exists
     try {
       await supabase
         .from('platform_payments')
@@ -665,51 +752,63 @@ export const SuperAdminRepository = {
           reviewed_by: 'Super Admin',
         })
         .eq('id', paymentId);
-    } catch (e) {
-      console.warn('DB update warning for platform_payments:', e);
-    }
+    } catch {}
 
-    // 3. Try to find event_id if not known
+    // 4. Try to find event_id if not known
     if (!matchedEventId) {
       try {
-        const { data: pData } = await supabase
-          .from('platform_payments')
-          .select('event_id')
-          .eq('id', paymentId)
-          .single();
-        if (pData?.event_id) matchedEventId = pData.event_id;
+        const found = updatedLocal.find((p) => p.id === paymentId);
+        if (found?.event_id) matchedEventId = found.event_id;
       } catch {}
     }
 
-    // 4. Update the event's template_config with licensed status or rejection
+    // 5. Update event_info_blocks for this event
     if (matchedEventId) {
+      // 5a. Update __platform_payment_record__ block
       try {
-        const { data: ev } = await supabase
-          .from('events')
-          .select('template_config')
-          .eq('id', matchedEventId)
-          .single();
+        const { data: existingBlock } = await supabase
+          .from('event_info_blocks')
+          .select('id, content')
+          .eq('event_id', matchedEventId)
+          .eq('title', PLATFORM_PAYMENT_BLOCK_TITLE)
+          .maybeSingle();
 
-        const currentConfig = ev?.template_config || {};
-        await supabase
-          .from('events')
-          .update({
-            template_config: {
-              ...currentConfig,
-              is_licensed: status === 'Aprovado' ? true : (currentConfig.is_licensed || false),
-              payment_status: status,
-              payment_reviewed_at: nowIso,
-              payment_reviewed_by: 'Super Admin',
-              licensed_at: status === 'Aprovado' ? nowIso : currentConfig.licensed_at,
-            },
-          })
-          .eq('id', matchedEventId);
-      } catch (evErr) {
-        console.warn('Could not update event is_licensed in template_config:', evErr);
+        if (existingBlock?.id) {
+          let blockData: any = {};
+          try {
+            blockData = JSON.parse(existingBlock.content);
+          } catch {}
+          await supabase
+            .from('event_info_blocks')
+            .update({
+              content: JSON.stringify({
+                ...blockData,
+                status,
+                reviewed_at: nowIso,
+                reviewed_by: 'Super Admin',
+              }),
+            })
+            .eq('id', existingBlock.id);
+        }
+      } catch (blockErr) {
+        console.warn('Could not update payment block in event_info_blocks:', blockErr);
+      }
+
+      // 5b. Update __canva_template_config__ block with licensing status
+      try {
+        await persistCanvaConfig(matchedEventId, {
+          is_licensed: status === 'Aprovado',
+          payment_status: status,
+          payment_reviewed_at: nowIso,
+          payment_reviewed_by: 'Super Admin',
+          licensed_at: status === 'Aprovado' ? nowIso : undefined,
+        });
+      } catch (canvaErr) {
+        console.warn('Could not update canva config licensing:', canvaErr);
       }
     }
 
-    // 5. If approved, automatically credit slots/roles and notify user
+    // 6. If approved, automatically credit slots/roles and notify user
     if (status === 'Aprovado') {
       const isPlanner = (matchedPlanType || '').toLowerCase().includes('planner') ||
                         (matchedPlanType || '').toLowerCase().includes('b2b') ||
@@ -777,40 +876,43 @@ export const SuperAdminRepository = {
     const local = getLocalPlatformPayments();
     saveLocalPlatformPayments([newPayment, ...local]);
 
-    // 2. Save to Supabase
+    // 2. Save to Cloud Storage Sync Master (Cross-device cloud truth!)
     try {
-      await supabase.from('platform_payments').insert(newPayment);
-    } catch (e: any) {
-      console.warn('Supabase insert warning for manual payment, saved locally:', e);
+      const cloudList = await fetchCloudPaymentsFromStorage();
+      const merged = [newPayment, ...cloudList.filter((p) => p.id !== paymentId)];
+      await saveCloudPaymentsToStorage(merged);
+    } catch (cloudErr) {
+      console.warn('Notice saving manual payment to cloud storage:', cloudErr);
     }
 
-    // 3. If event_id is supplied, activate license on event
+    // 3. Save to event_info_blocks if event_id is supplied
     if (params.eventId) {
       try {
-        const { data: ev } = await supabase
-          .from('events')
-          .select('template_config')
-          .eq('id', params.eventId)
-          .single();
+        await supabase.from('event_info_blocks').insert({
+          event_id: params.eventId,
+          title: PLATFORM_PAYMENT_BLOCK_TITLE,
+          content: JSON.stringify(newPayment),
+          sort_order: 9998,
+        });
 
-        const currentConfig = ev?.template_config || {};
-        await supabase
-          .from('events')
-          .update({
-            template_config: {
-              ...currentConfig,
-              is_licensed: true,
-              payment_status: 'Aprovado',
-              licensed_at: nowIso,
-            },
-          })
-          .eq('id', params.eventId);
-      } catch (evErr) {
-        console.warn('Failed to update event template_config for manual payment:', evErr);
+        await persistCanvaConfig(params.eventId, {
+          is_licensed: true,
+          payment_status: 'Aprovado',
+          licensed_at: nowIso,
+          payment_amount: params.amount,
+          plan_type: params.planType,
+        });
+      } catch (blockErr) {
+        console.warn('Could not persist manual payment to event_info_blocks:', blockErr);
       }
     }
 
-    // 4. If planner plan, upgrade user meta
+    // 4. Save to Supabase platform_payments table if it exists
+    try {
+      await supabase.from('platform_payments').insert(newPayment);
+    } catch {}
+
+    // 5. If planner plan, upgrade user meta
     const isPlanner = params.planType.toLowerCase().includes('planner') ||
                       params.planType.toLowerCase().includes('b2b') ||
                       params.planType.toLowerCase().includes('starter') ||
