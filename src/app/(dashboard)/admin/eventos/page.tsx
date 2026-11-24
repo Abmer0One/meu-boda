@@ -48,6 +48,7 @@ export default function EventosPage() {
   const [pdfOrientation, setPdfOrientation] = useState<'portrait' | 'landscape'>('landscape');
   const [showLocationsQr, setShowLocationsQr] = useState(true);
   const [showAccessQr, setShowAccessQr] = useState(true);
+  const [qrPage, setQrPage] = useState<'page_1' | 'page_2'>('page_2');
   const [showGuestName, setShowGuestName] = useState(false);
   const [guestNamePage, setGuestNamePage] = useState<'page_1' | 'page_2'>('page_1');
   const [guestNameCoords, setGuestNameCoords] = useState<{ left: number; top: number; width: number; height: number }>({
@@ -191,7 +192,9 @@ export default function EventosPage() {
       setCanvaInfoUrl(resolved.canva_info_url || '');
       setPdfMode(resolved.pdf_mode || 'double_page');
       setPdfOrientation(resolved.pdf_orientation || 'landscape');
-      setEditorPreviewPage(resolved.pdf_mode === 'single_page' ? 'page_1' : 'page_2');
+      const initialQrPage = resolved.qr_page || 'page_2';
+      setQrPage(initialQrPage);
+      setEditorPreviewPage(resolved.pdf_mode === 'single_page' ? 'page_1' : initialQrPage);
       setShowLocationsQr(resolved.show_locations_qr !== false);
       setShowAccessQr(resolved.show_access_qr !== false);
       setShowGuestName(Boolean(resolved.show_guest_name));
@@ -266,6 +269,10 @@ export default function EventosPage() {
           if (parsed.pdf_mode) setPdfMode(parsed.pdf_mode);
           if (parsed.show_locations_qr !== undefined) setShowLocationsQr(parsed.show_locations_qr);
           if (parsed.show_access_qr !== undefined) setShowAccessQr(parsed.show_access_qr);
+          if (parsed.qr_page) {
+            setQrPage(parsed.qr_page);
+            setEditorPreviewPage(parsed.qr_page);
+          }
           if (parsed.show_guest_name !== undefined) setShowGuestName(parsed.show_guest_name);
           if (parsed.guest_name_page) setGuestNamePage(parsed.guest_name_page);
           if (parsed.guest_name_coords) setGuestNameCoords(parsed.guest_name_coords);
@@ -355,6 +362,7 @@ export default function EventosPage() {
         pdf_orientation: detectedOrientation,
         show_locations_qr: showLocationsQr,
         show_access_qr: showAccessQr,
+        qr_page: qrPage,
       };
       await persistCanvaConfig(currentEvent.id, updatedConfig);
 
@@ -438,6 +446,7 @@ export default function EventosPage() {
         pdf_orientation: detectedOrientation,
         show_locations_qr: showLocationsQr,
         show_access_qr: showAccessQr,
+        qr_page: qrPage,
       };
       await persistCanvaConfig(currentEvent.id, updatedConfig);
 
@@ -473,6 +482,7 @@ export default function EventosPage() {
         pdf_orientation: pdfOrientation,
         show_locations_qr: showLocationsQr,
         show_access_qr: showAccessQr,
+        qr_page: qrPage,
       };
       await persistCanvaConfig(currentEvent.id, updatedConfig);
       setCurrentEvent({
@@ -504,6 +514,7 @@ export default function EventosPage() {
         pdf_orientation: pdfOrientation,
         show_locations_qr: showLocationsQr,
         show_access_qr: showAccessQr,
+        qr_page: qrPage,
       };
       await persistCanvaConfig(currentEvent.id, updatedConfig);
       setCurrentEvent({
@@ -564,6 +575,7 @@ export default function EventosPage() {
         pdf_orientation: pdfOrientation,
         show_locations_qr: showLocationsQr,
         show_access_qr: showAccessQr,
+        qr_page: qrPage,
         show_guest_name: showGuestName,
         guest_name_page: guestNamePage,
         guest_name_coords: guestNameCoords,
@@ -604,6 +616,7 @@ export default function EventosPage() {
         pdf_orientation: pdfOrientation,
         show_locations_qr: showLocationsQr,
         show_access_qr: showAccessQr,
+        qr_page: qrPage,
         show_guest_name: showGuestName,
         guest_name_page: guestNamePage,
         guest_name_coords: guestNameCoords,
@@ -830,6 +843,7 @@ export default function EventosPage() {
         pdf_orientation: pdfOrientation,
         show_locations_qr: showLocationsQr,
         show_access_qr: showAccessQr,
+        qr_page: qrPage,
         show_guest_name: showGuestName,
         guest_name_page: guestNamePage,
         guest_name_coords: guestNameCoords,
@@ -994,6 +1008,7 @@ export default function EventosPage() {
         pdf_orientation: pdfOrientation,
         show_locations_qr: showLocationsQr,
         show_access_qr: showAccessQr,
+        qr_page: qrPage,
         show_guest_name: showGuestName,
         guest_name_page: guestNamePage,
         guest_name_coords: guestNameCoords,
@@ -1530,6 +1545,49 @@ export default function EventosPage() {
                     </div>
                   </label>
                 </div>
+
+                {pdfMode === 'double_page' && (
+                  <div className="pt-3 border-t border-border-custom/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs bg-card-bg/60 p-3 rounded-xl border border-border-custom/60">
+                    <div>
+                      <span className="font-bold text-foreground block">
+                        Página onde os Códigos QR devem aparecer:
+                      </span>
+                      <span className="text-[11px] text-foreground/60">
+                        Escolha se prefere os códigos QR na capa (Frente) ou no interior/miolo (Verso).
+                      </span>
+                    </div>
+                    <div className="inline-flex p-1 bg-secondary/30 rounded-xl border border-border-custom shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setQrPage('page_1');
+                          setEditorPreviewPage('page_1');
+                        }}
+                        className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                          qrPage === 'page_1'
+                            ? 'bg-primary text-white shadow-sm'
+                            : 'text-foreground/70 hover:text-foreground'
+                        }`}
+                      >
+                        📄 Página 1 (Frente / Capa)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setQrPage('page_2');
+                          setEditorPreviewPage('page_2');
+                        }}
+                        className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                          qrPage === 'page_2'
+                            ? 'bg-primary text-white shadow-sm'
+                            : 'text-foreground/70 hover:text-foreground'
+                        }`}
+                      >
+                        📖 Página 2 (Verso / Interior)
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Seletor de Orientação do Papel (Tamanho A4) */}
@@ -1854,8 +1912,8 @@ export default function EventosPage() {
                         </div>
                       )}
 
-                      {/* Se for Página Única e Arte Personalizada, sobrepor os códigos QR configurados */}
-                      {pdfMode === 'single_page' && templateSource === 'custom' && (canvaCoverUrl || isMarinela) && (
+                      {/* Se for Página Única OU Códigos QR na Página 1 e Arte Personalizada, sobrepor os códigos QR configurados */}
+                      {(pdfMode === 'single_page' || qrPage === 'page_1') && templateSource === 'custom' && (canvaCoverUrl || isMarinela) && (
                         <>
                           {showLocationsQr && (
                             <div
@@ -2070,41 +2128,45 @@ export default function EventosPage() {
                         )}
 
                         {/* Caixas de Posição de QR para artes Canva ou Marinela em modo Personalizado */}
-                        {templateSource === 'custom' && (canvaInfoUrl || isMarinela) && (
+                        {qrPage === 'page_2' && templateSource === 'custom' && (canvaInfoUrl || isMarinela) && (
                           <>
                             {/* Caixa 1: Código QR de Localizações (Aba Esquerda) */}
-                            <div
-                              className="absolute border-2 border-emerald-500 bg-white/95 text-emerald-900 rounded-sm flex flex-col items-center justify-center p-0.5 shadow-md select-none transition-all z-20"
-                              style={{
-                                left: `${qrLocCoords.left}%`,
-                                top: `${qrLocCoords.top}%`,
-                                width: `${qrLocCoords.width}%`,
-                                height: `${qrLocCoords.height}%`,
-                              }}
-                              title="Posição do Código QR de Localizações"
-                            >
-                              <QrCode className="h-3.5 w-3.5 text-emerald-600" />
-                              <span className="text-[8px] font-bold text-emerald-800 leading-tight text-center truncate w-full px-0.5">
-                                QR Mapa
-                              </span>
-                            </div>
+                            {showLocationsQr && (
+                              <div
+                                className="absolute border-2 border-emerald-500 bg-white/95 text-emerald-900 rounded-sm flex flex-col items-center justify-center p-0.5 shadow-md select-none transition-all z-20"
+                                style={{
+                                  left: `${qrLocCoords.left}%`,
+                                  top: `${qrLocCoords.top}%`,
+                                  width: `${qrLocCoords.width}%`,
+                                  height: `${qrLocCoords.height}%`,
+                                }}
+                                title="Posição do Código QR de Localizações"
+                              >
+                                <QrCode className="h-3.5 w-3.5 text-emerald-600" />
+                                <span className="text-[8px] font-bold text-emerald-800 leading-tight text-center truncate w-full px-0.5">
+                                  QR Mapa
+                                </span>
+                              </div>
+                            )}
 
                             {/* Caixa 2: Código QR de Acesso / Portaria (Aba Direita) */}
-                            <div
-                              className="absolute border-2 border-indigo-500 bg-white/95 text-indigo-900 rounded-sm flex flex-col items-center justify-center p-0.5 shadow-md select-none transition-all z-20"
-                              style={{
-                                left: `${qrAccessCoords.left}%`,
-                                top: `${qrAccessCoords.top}%`,
-                                width: `${qrAccessCoords.width}%`,
-                                height: `${qrAccessCoords.height}%`,
-                              }}
-                              title="Posição do Código QR de Acesso à Portaria"
-                            >
-                              <QrCode className="h-3.5 w-3.5 text-indigo-600" />
-                              <span className="text-[8px] font-bold text-indigo-800 leading-tight text-center truncate w-full px-0.5">
-                                QR Acesso
-                              </span>
-                            </div>
+                            {showAccessQr && (
+                              <div
+                                className="absolute border-2 border-indigo-500 bg-white/95 text-indigo-900 rounded-sm flex flex-col items-center justify-center p-0.5 shadow-md select-none transition-all z-20"
+                                style={{
+                                  left: `${qrAccessCoords.left}%`,
+                                  top: `${qrAccessCoords.top}%`,
+                                  width: `${qrAccessCoords.width}%`,
+                                  height: `${qrAccessCoords.height}%`,
+                                }}
+                                title="Posição do Código QR de Acesso à Portaria"
+                              >
+                                <QrCode className="h-3.5 w-3.5 text-indigo-600" />
+                                <span className="text-[8px] font-bold text-indigo-800 leading-tight text-center truncate w-full px-0.5">
+                                  QR Acesso
+                                </span>
+                              </div>
+                            )}
 
                             {/* Caixa 3: Nome do Convidado (se configurado no Verso) */}
                             {showGuestName && guestNamePage === 'page_2' && (
@@ -2194,31 +2256,71 @@ export default function EventosPage() {
                     </p>
                   </div>
 
-                  {/* Seletor de Página no editor (se Frente e Verso) */}
+                  {/* Seletor de Página dos Códigos QR no editor (se Frente e Verso) */}
                   {pdfMode === 'double_page' ? (
-                    <div className="inline-flex p-1 bg-secondary/30 rounded-xl border border-border-custom shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => setEditorPreviewPage('page_2')}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                          editorPreviewPage === 'page_2'
-                            ? 'bg-primary text-white shadow-sm'
-                            : 'text-foreground/70 hover:text-foreground'
-                        }`}
-                      >
-                        📖 Página 2: Verso (Principal)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setEditorPreviewPage('page_1')}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                          editorPreviewPage === 'page_1'
-                            ? 'bg-primary text-white shadow-sm'
-                            : 'text-foreground/70 hover:text-foreground'
-                        }`}
-                      >
-                        📄 Página 1: Frente / Capa
-                      </button>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                        <span className="text-xs font-semibold text-foreground/75">
+                          Colocar Códigos QR na:
+                        </span>
+                        <div className="inline-flex p-1 bg-secondary/30 rounded-xl border border-border-custom shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setQrPage('page_1');
+                              setEditorPreviewPage('page_1');
+                            }}
+                            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                              qrPage === 'page_1'
+                                ? 'bg-primary text-white shadow-sm'
+                                : 'text-foreground/70 hover:text-foreground'
+                            }`}
+                          >
+                            📄 Página 1: Frente / Capa
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setQrPage('page_2');
+                              setEditorPreviewPage('page_2');
+                            }}
+                            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                              qrPage === 'page_2'
+                                ? 'bg-primary text-white shadow-sm'
+                                : 'text-foreground/70 hover:text-foreground'
+                            }`}
+                          >
+                            📖 Página 2: Verso (Interior)
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Alternador de visualização rápida da página */}
+                      <div className="flex items-center gap-1.5 text-xs text-foreground/60 border-l border-border-custom/80 pl-3">
+                        <span className="text-[11px]">A visualizar:</span>
+                        <button
+                          type="button"
+                          onClick={() => setEditorPreviewPage('page_1')}
+                          className={`px-2 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
+                            editorPreviewPage === 'page_1'
+                              ? 'bg-secondary text-primary underline'
+                              : 'hover:text-foreground'
+                          }`}
+                        >
+                          Pág 1
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditorPreviewPage('page_2')}
+                          className={`px-2 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
+                            editorPreviewPage === 'page_2'
+                              ? 'bg-secondary text-primary underline'
+                              : 'hover:text-foreground'
+                          }`}
+                        >
+                          Pág 2
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     <span className="text-xs font-semibold bg-primary/10 text-primary px-3 py-1.5 rounded-xl border border-primary/20 shrink-0">
@@ -2335,7 +2437,7 @@ export default function EventosPage() {
                             <p className="text-xs font-bold text-[#B89742] uppercase">Localizações</p>
                             <p className="text-[10px] text-zinc-600 line-clamp-1">{currentEvent?.ceremony_location || 'Local da Cerimónia'}</p>
                             <p className="text-[10px] text-zinc-600 line-clamp-1">{currentEvent?.party_location || 'Local da Festa'}</p>
-                            {showLocationsQr && (
+                            {showLocationsQr && (pdfMode === 'single_page' || qrPage === 'page_2') && (
                               <div className="w-16 h-16 bg-white border border-[#E8D49E] rounded flex items-center justify-center text-[10px] text-zinc-400">QR Mapa</div>
                             )}
                           </div>
@@ -2347,7 +2449,7 @@ export default function EventosPage() {
                           <div className="flex-1 p-2 flex flex-col justify-between items-center text-center">
                             <p className="text-xs font-bold text-[#B89742] uppercase">Passe Entrada</p>
                             <p className="text-[10px] font-bold text-zinc-800">Convidado</p>
-                            {showAccessQr && (
+                            {showAccessQr && (pdfMode === 'single_page' || qrPage === 'page_2') && (
                               <div className="w-16 h-16 bg-white border border-[#E8D49E] rounded flex items-center justify-center text-[10px] text-zinc-400">QR Acesso</div>
                             )}
                           </div>
@@ -2356,59 +2458,79 @@ export default function EventosPage() {
                     )
                   )}
 
-                  {/* CÓDIGOS QR ARRASTÁVEIS */}
-                  {/* 1. QR Localizações */}
-                  {showLocationsQr && (
-                    <div
-                      onPointerDown={(e) => handleStartDrag('loc', e)}
-                      className={`absolute z-30 select-none touch-none rounded-xl bg-white border-2 border-emerald-500 shadow-xl flex flex-col items-center justify-between p-1 cursor-grab active:cursor-grabbing transition-shadow ${
-                        draggedQr === 'loc' ? 'ring-4 ring-emerald-400 shadow-2xl scale-105' : 'hover:scale-[1.02]'
-                      }`}
-                      style={{
-                        left: `${qrLocCoords.left}%`,
-                        top: `${qrLocCoords.top}%`,
-                        width: `${qrLocCoords.width}%`,
-                        height: `${qrLocCoords.height}%`,
-                      }}
-                    >
-                      <div className="w-full flex items-center justify-between px-1 mb-0.5 text-[9px] font-bold text-emerald-800 bg-emerald-50 rounded">
-                        <span className="flex items-center gap-0.5 truncate"><MapPin className="h-2.5 w-2.5 text-emerald-600" /> QR Mapa</span>
-                        <Move className="h-2.5 w-2.5 text-emerald-500 shrink-0" />
-                      </div>
-                      <div className="flex-1 w-full flex items-center justify-center bg-white rounded p-0.5 overflow-hidden">
-                        <QrCode className="h-full w-full text-emerald-700 max-h-16 object-contain" />
-                      </div>
-                      <span className="text-[8px] font-mono text-emerald-700 font-semibold bg-emerald-50/80 px-1 rounded mt-0.5">
-                        {qrLocCoords.left.toFixed(1)}%, {qrLocCoords.top.toFixed(1)}%
+                  {/* Notificação no canvas se os Códigos QR estiverem na outra página */}
+                  {pdfMode === 'double_page' && editorPreviewPage !== qrPage && (showLocationsQr || showAccessQr) && (
+                    <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 bg-background/95 backdrop-blur-md border border-primary/40 px-3.5 py-1.5 rounded-xl shadow-lg flex items-center gap-2 text-xs select-none">
+                      <span className="text-foreground/80 font-medium">
+                        Códigos QR ativos na <strong>{qrPage === 'page_1' ? 'Página 1 (Frente / Capa)' : 'Página 2 (Verso / Interior)'}</strong>.
                       </span>
+                      <button
+                        type="button"
+                        onClick={() => setEditorPreviewPage(qrPage)}
+                        className="text-primary font-bold hover:underline cursor-pointer flex items-center gap-0.5"
+                      >
+                        Mudar para essa página →
+                      </button>
                     </div>
                   )}
 
-                  {/* 2. QR Acesso */}
-                  {showAccessQr && (
-                    <div
-                      onPointerDown={(e) => handleStartDrag('access', e)}
-                      className={`absolute z-30 select-none touch-none rounded-xl bg-white border-2 border-indigo-500 shadow-xl flex flex-col items-center justify-between p-1 cursor-grab active:cursor-grabbing transition-shadow ${
-                        draggedQr === 'access' ? 'ring-4 ring-indigo-400 shadow-2xl scale-105' : 'hover:scale-[1.02]'
-                      }`}
-                      style={{
-                        left: `${qrAccessCoords.left}%`,
-                        top: `${qrAccessCoords.top}%`,
-                        width: `${qrAccessCoords.width}%`,
-                        height: `${qrAccessCoords.height}%`,
-                      }}
-                    >
-                      <div className="w-full flex items-center justify-between px-1 mb-0.5 text-[9px] font-bold text-indigo-800 bg-indigo-50 rounded">
-                        <span className="flex items-center gap-0.5 truncate"><QrCode className="h-2.5 w-2.5 text-indigo-600" /> QR Acesso</span>
-                        <Move className="h-2.5 w-2.5 text-indigo-500 shrink-0" />
-                      </div>
-                      <div className="flex-1 w-full flex items-center justify-center bg-white rounded p-0.5 overflow-hidden">
-                        <QrCode className="h-full w-full text-indigo-700 max-h-16 object-contain" />
-                      </div>
-                      <span className="text-[8px] font-mono text-indigo-700 font-semibold bg-indigo-50/80 px-1 rounded mt-0.5">
-                        {qrAccessCoords.left.toFixed(1)}%, {qrAccessCoords.top.toFixed(1)}%
-                      </span>
-                    </div>
+                  {/* CÓDIGOS QR ARRASTÁVEIS */}
+                  {(pdfMode === 'single_page' || editorPreviewPage === qrPage) && (
+                    <>
+                      {/* 1. QR Localizações */}
+                      {showLocationsQr && (
+                        <div
+                          onPointerDown={(e) => handleStartDrag('loc', e)}
+                          className={`absolute z-30 select-none touch-none rounded-xl bg-white border-2 border-emerald-500 shadow-xl flex flex-col items-center justify-between p-1 cursor-grab active:cursor-grabbing transition-shadow ${
+                            draggedQr === 'loc' ? 'ring-4 ring-emerald-400 shadow-2xl scale-105' : 'hover:scale-[1.02]'
+                          }`}
+                          style={{
+                            left: `${qrLocCoords.left}%`,
+                            top: `${qrLocCoords.top}%`,
+                            width: `${qrLocCoords.width}%`,
+                            height: `${qrLocCoords.height}%`,
+                          }}
+                        >
+                          <div className="w-full flex items-center justify-between px-1 mb-0.5 text-[9px] font-bold text-emerald-800 bg-emerald-50 rounded">
+                            <span className="flex items-center gap-0.5 truncate"><MapPin className="h-2.5 w-2.5 text-emerald-600" /> QR Mapa</span>
+                            <Move className="h-2.5 w-2.5 text-emerald-500 shrink-0" />
+                          </div>
+                          <div className="flex-1 w-full flex items-center justify-center bg-white rounded p-0.5 overflow-hidden">
+                            <QrCode className="h-full w-full text-emerald-700 max-h-16 object-contain" />
+                          </div>
+                          <span className="text-[8px] font-mono text-emerald-700 font-semibold bg-emerald-50/80 px-1 rounded mt-0.5">
+                            {qrLocCoords.left.toFixed(1)}%, {qrLocCoords.top.toFixed(1)}%
+                          </span>
+                        </div>
+                      )}
+
+                      {/* 2. QR Acesso */}
+                      {showAccessQr && (
+                        <div
+                          onPointerDown={(e) => handleStartDrag('access', e)}
+                          className={`absolute z-30 select-none touch-none rounded-xl bg-white border-2 border-indigo-500 shadow-xl flex flex-col items-center justify-between p-1 cursor-grab active:cursor-grabbing transition-shadow ${
+                            draggedQr === 'access' ? 'ring-4 ring-indigo-400 shadow-2xl scale-105' : 'hover:scale-[1.02]'
+                          }`}
+                          style={{
+                            left: `${qrAccessCoords.left}%`,
+                            top: `${qrAccessCoords.top}%`,
+                            width: `${qrAccessCoords.width}%`,
+                            height: `${qrAccessCoords.height}%`,
+                          }}
+                        >
+                          <div className="w-full flex items-center justify-between px-1 mb-0.5 text-[9px] font-bold text-indigo-800 bg-indigo-50 rounded">
+                            <span className="flex items-center gap-0.5 truncate"><QrCode className="h-2.5 w-2.5 text-indigo-600" /> QR Acesso</span>
+                            <Move className="h-2.5 w-2.5 text-indigo-500 shrink-0" />
+                          </div>
+                          <div className="flex-1 w-full flex items-center justify-center bg-white rounded p-0.5 overflow-hidden">
+                            <QrCode className="h-full w-full text-indigo-700 max-h-16 object-contain" />
+                          </div>
+                          <span className="text-[8px] font-mono text-indigo-700 font-semibold bg-indigo-50/80 px-1 rounded mt-0.5">
+                            {qrAccessCoords.left.toFixed(1)}%, {qrAccessCoords.top.toFixed(1)}%
+                          </span>
+                        </div>
+                      )}
+                    </>
                   )}
 
                   {/* 3. Nome do Convidado Arrastável */}

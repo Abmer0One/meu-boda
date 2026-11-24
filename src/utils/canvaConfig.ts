@@ -16,6 +16,7 @@ export interface CanvaTemplateConfig {
   pdf_orientation?: 'portrait' | 'landscape';
   show_locations_qr?: boolean;
   show_access_qr?: boolean;
+  qr_page?: 'page_1' | 'page_2';
   qr_locations_coords?: QrCoordinates;
   qr_access_coords?: QrCoordinates;
   is_basic_template?: boolean;
@@ -185,6 +186,7 @@ export function resolveCanvaConfig(
     pdf_orientation: 'landscape',
     show_locations_qr: true,
     show_access_qr: true,
+    qr_page: 'page_2',
     qr_locations_coords: { ...DEFAULT_LOC_COORDS },
     qr_access_coords: { ...DEFAULT_ACCESS_COORDS },
     is_basic_template: false,
@@ -211,6 +213,7 @@ export function resolveCanvaConfig(
     if (templateConfig.pdf_orientation) resolved.pdf_orientation = templateConfig.pdf_orientation;
     if (templateConfig.show_locations_qr !== undefined) resolved.show_locations_qr = templateConfig.show_locations_qr;
     if (templateConfig.show_access_qr !== undefined) resolved.show_access_qr = templateConfig.show_access_qr;
+    if (templateConfig.qr_page) resolved.qr_page = templateConfig.qr_page;
     if (templateConfig.qr_locations_coords) resolved.qr_locations_coords = { ...templateConfig.qr_locations_coords };
     if (templateConfig.qr_access_coords) resolved.qr_access_coords = { ...templateConfig.qr_access_coords };
     if (templateConfig.show_guest_name !== undefined) resolved.show_guest_name = templateConfig.show_guest_name;
@@ -241,6 +244,7 @@ export function resolveCanvaConfig(
         if (parsed.pdf_orientation) resolved.pdf_orientation = parsed.pdf_orientation;
         if (parsed.show_locations_qr !== undefined) resolved.show_locations_qr = parsed.show_locations_qr;
         if (parsed.show_access_qr !== undefined) resolved.show_access_qr = parsed.show_access_qr;
+        if (parsed.qr_page) resolved.qr_page = parsed.qr_page;
         if (parsed.qr_locations_coords) resolved.qr_locations_coords = { ...parsed.qr_locations_coords };
         if (parsed.qr_access_coords) resolved.qr_access_coords = { ...parsed.qr_access_coords };
         if (parsed.show_guest_name !== undefined) resolved.show_guest_name = parsed.show_guest_name;
@@ -275,6 +279,7 @@ export function resolveCanvaConfig(
         if (parsed.pdf_orientation) resolved.pdf_orientation = parsed.pdf_orientation;
         if (parsed.show_locations_qr !== undefined) resolved.show_locations_qr = parsed.show_locations_qr;
         if (parsed.show_access_qr !== undefined) resolved.show_access_qr = parsed.show_access_qr;
+        if (parsed.qr_page) resolved.qr_page = parsed.qr_page;
         if (parsed.qr_locations_coords) resolved.qr_locations_coords = { ...parsed.qr_locations_coords };
         if (parsed.qr_access_coords) resolved.qr_access_coords = { ...parsed.qr_access_coords };
         if (parsed.show_guest_name !== undefined) resolved.show_guest_name = parsed.show_guest_name;
