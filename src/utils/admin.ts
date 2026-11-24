@@ -8,6 +8,13 @@ import { User } from '@supabase/supabase-js';
 export function isSuperAdmin(user: User | null | undefined): boolean {
   if (!user || !user.email) return false;
 
+  const userEmail = user.email.trim().toLowerCase();
+
+  // Explicit safety check: organizers / wedding planners / clients must never have Super Admin access
+  if (userEmail === 'hnzuzi@meuboda.com') {
+    return false;
+  }
+
   // 1. Check system role assigned in Supabase Auth metadata
   const appRole = user.app_metadata?.role;
   const userRole = user.user_metadata?.role;
@@ -27,14 +34,8 @@ export function isSuperAdmin(user: User | null | undefined): boolean {
   ];
 
   const allowedEmails = new Set([...envAdminEmails, ...defaultAdminEmails]);
-  const userEmail = user.email.trim().toLowerCase();
 
   if (allowedEmails.has(userEmail)) {
-    return true;
-  }
-
-  // Any verified corporate account @meuboda.com
-  if (userEmail.endsWith('@meuboda.com')) {
     return true;
   }
 
