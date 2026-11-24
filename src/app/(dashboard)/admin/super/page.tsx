@@ -76,19 +76,25 @@ export default function SuperAdminOverviewPage() {
     setLoading(true);
     try {
       const [fetchedUsers, fetchedEvents, vendors, fetchedPayments, broadcasts] = await Promise.all([
-        SuperAdminRepository.getUsers(),
-        SuperAdminRepository.getEvents(),
-        SuperAdminRepository.getVendors(),
-        SuperAdminRepository.getPlatformPayments(),
-        SuperAdminRepository.getActiveBroadcasts(),
+        SuperAdminRepository.getUsers().catch(() => []),
+        SuperAdminRepository.getEvents().catch(() => []),
+        SuperAdminRepository.getVendors().catch(() => []),
+        SuperAdminRepository.getPlatformPayments().catch(() => []),
+        SuperAdminRepository.getActiveBroadcasts().catch(() => []),
       ]);
 
-      setUsers(fetchedUsers);
-      setEvents(fetchedEvents);
-      setPayments(fetchedPayments);
-      setPendingVendorsCount(vendors.filter((v) => v.status === 'Pendente').length);
-      setPendingPaymentsCount(fetchedPayments.filter((p) => p.status === 'Pendente').length);
-      setActiveBroadcastsCount(broadcasts.length);
+      const safeUsers = Array.isArray(fetchedUsers) ? fetchedUsers : [];
+      const safeEvents = Array.isArray(fetchedEvents) ? fetchedEvents : [];
+      const safeVendors = Array.isArray(vendors) ? vendors : [];
+      const safePayments = Array.isArray(fetchedPayments) ? fetchedPayments : [];
+      const safeBroadcasts = Array.isArray(broadcasts) ? broadcasts : [];
+
+      setUsers(safeUsers);
+      setEvents(safeEvents);
+      setPayments(safePayments);
+      setPendingVendorsCount(safeVendors.filter((v) => v && v.status === 'Pendente').length);
+      setPendingPaymentsCount(safePayments.filter((p) => p && p.status === 'Pendente').length);
+      setActiveBroadcastsCount(safeBroadcasts.length);
     } catch (err) {
       console.error('Error loading super admin overview data:', err);
     } finally {
@@ -533,12 +539,15 @@ export default function SuperAdminOverviewPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border-custom/50">
-                  {filteredPayments.slice(0, 10).map((p) => {
+                  {filteredPayments.slice(0, 10).map((p, idx) => {
                     const isPlanner = isPlannerPayment(p);
                     const isProcessing = processingPaymentId === p.id;
+                    const safeRef = p.reference_code || (typeof p.id === 'string' && p.id.length > 5 ? p.id.slice(0, 8) : `P-${idx + 1}`);
+                    const safeAmount = Number(p.amount || 0).toLocaleString('pt-AO');
+                    const safeDate = p.created_at ? new Date(p.created_at).toLocaleDateString('pt-PT') : 'Recente';
 
                     return (
-                      <tr key={p.id} className="hover:bg-foreground/[0.015] transition-colors">
+                      <tr key={p.id || `pay_ov_${idx}`} className="hover:bg-foreground/[0.015] transition-colors">
                         {/* Cliente */}
                         <td className="py-3 px-3">
                           <div className="font-semibold text-foreground">{p.user_email || 'Cliente'}</div>
@@ -560,20 +569,18 @@ export default function SuperAdminOverviewPage() {
                           <div className="font-medium text-foreground">
                             {p.event_title || (isPlanner ? 'Assinatura Agência' : 'Casamento')}
                           </div>
-                          {p.reference_code && (
-                            <div className="text-[10px] text-foreground/40 font-mono mt-0.5">
-                              Ref: {p.reference_code}
-                            </div>
-                          )}
+                          <div className="text-[10px] text-foreground/40 font-mono mt-0.5">
+                            Ref: {safeRef}
+                          </div>
                         </td>
 
                         {/* Plano & Valor */}
                         <td className="py-3 px-3 whitespace-nowrap">
                           <div className="font-bold text-foreground text-sm">
-                            {Number(p.amount).toLocaleString('pt-AO')} Kz
+                            {safeAmount} Kz
                           </div>
                           <div className="text-[10px] text-primary font-medium mt-0.5">
-                            {p.plan_type}
+                            {p.plan_type || 'Licença Casamento'}
                           </div>
                         </td>
 
@@ -600,7 +607,7 @@ export default function SuperAdminOverviewPage() {
 
                         {/* Data */}
                         <td className="py-3 px-3 whitespace-nowrap text-foreground/60">
-                          {new Date(p.created_at).toLocaleDateString('pt-PT')}
+                          {safeDate}
                         </td>
 
                         {/* Estado */}

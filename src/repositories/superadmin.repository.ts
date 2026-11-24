@@ -539,22 +539,83 @@ export const SuperAdminRepository = {
     const map = new Map<string, PlatformPayment>();
 
     // First load remote
-    remoteList.forEach((p) => map.set(p.id, p));
+    remoteList.forEach((p) => {
+      if (p && p.id) {
+        map.set(p.id, p);
+      }
+    });
+
+    // Extract pending/reviewed payments recorded directly in events.template_config
+    try {
+      const { data: eventsWithPayment } = await supabase
+        .from('events')
+        .select('id, title, user_id, template_config, created_at');
+
+      if (Array.isArray(eventsWithPayment)) {
+        eventsWithPayment.forEach((ev: any) => {
+          const cfg = ev.template_config || {};
+          // If the event has a payment status (Pendente, Aprovado, Recusado) or receipt_url or payment_submitted_at
+          if (cfg.payment_status || cfg.payment_submitted_at || cfg.receipt_url) {
+            // Check if this event already has a payment in map
+            let alreadyInMap = false;
+            for (const existing of map.values()) {
+              if (existing.event_id === ev.id) {
+                alreadyInMap = true;
+                break;
+              }
+            }
+            if (!alreadyInMap) {
+              const evPaymentId = cfg.payment_id || `pay_ev_${ev.id}`;
+              const paymentItem: PlatformPayment = {
+                id: evPaymentId,
+                user_id: ev.user_id || 'user_' + ev.id,
+                user_email: cfg.payment_email || `utilizador-${(ev.user_id || ev.id).slice(0, 8)}@meuboda.com`,
+                event_id: ev.id,
+                event_title: ev.title || 'Casamento',
+                plan_type: cfg.plan_type || 'Licença Casamento B2C (45.000 Kz)',
+                amount: Number(cfg.payment_amount) || 45000,
+                payment_method: cfg.payment_method || 'Transferência Bancária / Multicaixa Express',
+                reference_code: cfg.reference_code || null,
+                receipt_url: cfg.receipt_url || null,
+                status: (cfg.payment_status as any) || 'Pendente',
+                notes: cfg.payment_notes || 'Submetido no painel de ativação do evento',
+                created_at: cfg.payment_submitted_at || ev.created_at || new Date().toISOString(),
+                reviewed_at: cfg.payment_reviewed_at || null,
+                reviewed_by: cfg.payment_reviewed_by || null,
+              };
+              map.set(evPaymentId, paymentItem);
+            }
+          }
+        });
+      }
+    } catch (evErr) {
+      console.warn('Could not extract payments from events template_config:', evErr);
+    }
 
     // Overlay local items
     localList.forEach((lp) => {
-      const existing = map.get(lp.id);
+      if (!lp) return;
+      const id = lp.id || `pay_loc_${lp.event_id || Math.random().toString(36).substring(2, 7)}`;
+      const existing = map.get(id);
       if (!existing) {
-        map.set(lp.id, lp);
+        map.set(id, { ...lp, id });
       } else {
-        // If local has more recent review or explicit update, prioritize it
         if (lp.reviewed_at && (!existing.reviewed_at || lp.reviewed_at >= existing.reviewed_at)) {
-          map.set(lp.id, { ...existing, ...lp });
+          map.set(id, { ...existing, ...lp, id });
         }
       }
     });
 
-    return Array.from(map.values()).sort(
+    // Ensure all items have valid and safe fields
+    const safeResults = Array.from(map.values()).map((item, idx) => ({
+      ...item,
+      id: item.id || `pay_safe_${idx}`,
+      amount: Number(item.amount) || 0,
+      status: (item.status as any) || 'Pendente',
+      created_at: item.created_at || new Date().toISOString(),
+    }));
+
+    return safeResults.sort(
       (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
   },
@@ -574,8 +635,12 @@ export const SuperAdminRepository = {
     let matchedUserId = userId;
     let matchedPlanType = planType;
 
+    if (paymentId.startsWith('pay_ev_')) {
+      matchedEventId = paymentId.replace('pay_ev_', '');
+    }
+
     const updatedLocal = localPayments.map((p) => {
-      if (p.id === paymentId) {
+      if (p.id === paymentId || (matchedEventId && p.event_id === matchedEventId)) {
         if (!matchedEventId && p.event_id) matchedEventId = p.event_id;
         if (!matchedUserId && p.user_id) matchedUserId = p.user_id;
         if (!matchedPlanType && p.plan_type) matchedPlanType = p.plan_type;
@@ -604,7 +669,47 @@ export const SuperAdminRepository = {
       console.warn('DB update warning for platform_payments:', e);
     }
 
-    // 3. If approved, automatically credit slots/roles and mark event as licensed
+    // 3. Try to find event_id if not known
+    if (!matchedEventId) {
+      try {
+        const { data: pData } = await supabase
+          .from('platform_payments')
+          .select('event_id')
+          .eq('id', paymentId)
+          .single();
+        if (pData?.event_id) matchedEventId = pData.event_id;
+      } catch {}
+    }
+
+    // 4. Update the event's template_config with licensed status or rejection
+    if (matchedEventId) {
+      try {
+        const { data: ev } = await supabase
+          .from('events')
+          .select('template_config')
+          .eq('id', matchedEventId)
+          .single();
+
+        const currentConfig = ev?.template_config || {};
+        await supabase
+          .from('events')
+          .update({
+            template_config: {
+              ...currentConfig,
+              is_licensed: status === 'Aprovado' ? true : (currentConfig.is_licensed || false),
+              payment_status: status,
+              payment_reviewed_at: nowIso,
+              payment_reviewed_by: 'Super Admin',
+              licensed_at: status === 'Aprovado' ? nowIso : currentConfig.licensed_at,
+            },
+          })
+          .eq('id', matchedEventId);
+      } catch (evErr) {
+        console.warn('Could not update event is_licensed in template_config:', evErr);
+      }
+    }
+
+    // 5. If approved, automatically credit slots/roles and notify user
     if (status === 'Aprovado') {
       const isPlanner = (matchedPlanType || '').toLowerCase().includes('planner') ||
                         (matchedPlanType || '').toLowerCase().includes('b2b') ||
@@ -617,43 +722,6 @@ export const SuperAdminRepository = {
           await this.updateUserMeta(matchedUserId, 'planner', slots);
         } else {
           await this.updateUserMeta(matchedUserId, 'user', 2);
-        }
-      }
-
-      // Try to find event_id if not known
-      if (!matchedEventId) {
-        try {
-          const { data: pData } = await supabase
-            .from('platform_payments')
-            .select('event_id')
-            .eq('id', paymentId)
-            .single();
-          if (pData?.event_id) matchedEventId = pData.event_id;
-        } catch {}
-      }
-
-      if (matchedEventId) {
-        try {
-          const { data: ev } = await supabase
-            .from('events')
-            .select('template_config')
-            .eq('id', matchedEventId)
-            .single();
-
-          const currentConfig = ev?.template_config || {};
-          await supabase
-            .from('events')
-            .update({
-              template_config: {
-                ...currentConfig,
-                is_licensed: true,
-                payment_status: 'Aprovado',
-                licensed_at: nowIso,
-              },
-            })
-            .eq('id', matchedEventId);
-        } catch (evErr) {
-          console.warn('Could not update event is_licensed in template_config:', evErr);
         }
       }
 

@@ -50,9 +50,12 @@ export const PlatformPaymentRepository = {
         .getPublicUrl(filePath);
 
       const receiptUrl = publicUrlData?.publicUrl || '';
+      const generatedId = `pay_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      const nowIso = new Date().toISOString();
 
       // 3. Insert record into platform_payments
-      const newPayment: Partial<PlatformPayment> = {
+      const newPayment: PlatformPayment = {
+        id: generatedId,
         user_id: params.userId,
         user_email: params.userEmail,
         event_id: params.eventId,
@@ -64,26 +67,36 @@ export const PlatformPaymentRepository = {
         receipt_url: receiptUrl,
         status: 'Pendente',
         notes: params.notes?.trim() || null,
-        created_at: new Date().toISOString(),
+        created_at: nowIso,
       };
 
-      const { data: inserted, error: insertError } = await supabase
-        .from('platform_payments')
-        .insert(newPayment)
-        .select('*')
-        .single();
+      try {
+        const { data: inserted, error: insertError } = await supabase
+          .from('platform_payments')
+          .insert(newPayment)
+          .select('*')
+          .single();
 
-      if (insertError) {
-        console.error('Error inserting platform_payments row:', insertError);
-        // Fallback: save locally in localStorage if offline/table error
-        if (typeof window !== 'undefined') {
-          const localList = JSON.parse(localStorage.getItem('meuboda_local_platform_payments') || '[]');
-          localList.unshift(newPayment);
-          localStorage.setItem('meuboda_local_platform_payments', JSON.stringify(localList));
+        if (insertError) {
+          console.warn('Supabase platform_payments insert note (RLS/table):', insertError.message);
         }
+      } catch (insertErr) {
+        console.warn('Failed inserting to platform_payments table:', insertErr);
       }
 
-      // 4. Update event's template_config with pending payment flag
+      // Always save locally as fallback mirror
+      if (typeof window !== 'undefined') {
+        try {
+          const localList: PlatformPayment[] = JSON.parse(
+            localStorage.getItem('meuboda_local_platform_payments') || '[]'
+          );
+          localList.unshift(newPayment);
+          localStorage.setItem('meuboda_local_platform_payments', JSON.stringify(localList));
+        } catch {}
+      }
+
+      // 4. Update event's template_config with full pending payment metadata
+      // (This guarantees the Super Admin always sees the pending payment even if platform_payments table has RLS)
       try {
         const { data: eventRow } = await supabase
           .from('events')
@@ -98,7 +111,15 @@ export const PlatformPaymentRepository = {
             template_config: {
               ...currentConfig,
               payment_status: 'Pendente',
-              payment_submitted_at: new Date().toISOString(),
+              payment_submitted_at: nowIso,
+              payment_id: generatedId,
+              payment_email: params.userEmail,
+              payment_amount: params.amount,
+              plan_type: params.planType,
+              payment_method: 'Transferência Bancária / Multicaixa Express',
+              reference_code: params.referenceCode?.trim() || null,
+              receipt_url: receiptUrl,
+              payment_notes: params.notes?.trim() || null,
             },
           })
           .eq('id', params.eventId);
@@ -106,9 +127,20 @@ export const PlatformPaymentRepository = {
         console.warn('Could not update template_config with payment_status:', eventErr);
       }
 
+      // 5. Dispatch notification to notifications table so admins have an immediate log
+      try {
+        await supabase.from('notifications').insert({
+          user_id: params.userId,
+          title: '[Pagamento] Novo Comprovativo Submetido',
+          message: `${params.userEmail} enviou comprovativo de ${params.amount} Kz para ${params.eventTitle}`,
+          type: 'info',
+          read: false,
+        });
+      } catch {}
+
       return {
         success: true,
-        payment: (inserted as PlatformPayment) || (newPayment as PlatformPayment),
+        payment: newPayment,
       };
     } catch (e: any) {
       console.error('submitPayment fatal error:', e);

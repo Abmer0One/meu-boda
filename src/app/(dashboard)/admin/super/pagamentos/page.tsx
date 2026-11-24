@@ -65,13 +65,21 @@ export default function SuperAdminPagamentosPage() {
     setLoading(true);
     try {
       const [paymentsData, eventsData] = await Promise.all([
-        SuperAdminRepository.getPlatformPayments(),
-        SuperAdminRepository.getEvents(),
+        SuperAdminRepository.getPlatformPayments().catch((e) => {
+          console.warn('Could not load payments:', e);
+          return [];
+        }),
+        SuperAdminRepository.getEvents().catch((e) => {
+          console.warn('Could not load events:', e);
+          return [];
+        }),
       ]);
-      setPayments(paymentsData);
-      setEvents(eventsData);
+      setPayments(Array.isArray(paymentsData) ? paymentsData : []);
+      setEvents(Array.isArray(eventsData) ? eventsData : []);
     } catch (err) {
       console.error('Error fetching payments:', err);
+      setPayments([]);
+      setEvents([]);
     } finally {
       setLoading(false);
     }
@@ -82,6 +90,7 @@ export default function SuperAdminPagamentosPage() {
   }, [isAdmin]);
 
   const isPlannerPayment = (p: PlatformPayment) => {
+    if (!p) return false;
     const plan = (p.plan_type || '').toLowerCase();
     return plan.includes('planner') || plan.includes('b2b') || plan.includes('starter') || plan.includes('pro');
   };
@@ -90,6 +99,7 @@ export default function SuperAdminPagamentosPage() {
     payment: PlatformPayment,
     decision: 'Aprovado' | 'Recusado'
   ) => {
+    if (!payment || !payment.id) return;
     setProcessingId(payment.id);
     try {
       const success = await SuperAdminRepository.updatePaymentStatus(
@@ -170,13 +180,21 @@ export default function SuperAdminPagamentosPage() {
     );
   }
 
-  // Filter payments
+  // Filter payments safely
   const filteredPayments = payments.filter((p) => {
+    if (!p) return false;
+    const userEmail = (p.user_email || '').toLowerCase();
+    const planType = (p.plan_type || '').toLowerCase();
+    const eventTitle = (p.event_title || '').toLowerCase();
+    const refCode = (p.reference_code || '').toLowerCase();
+    const q = (search || '').toLowerCase().trim();
+
     const matchesSearch =
-      (p.user_email?.toLowerCase() || '').includes(search.toLowerCase()) ||
-      (p.plan_type?.toLowerCase() || '').includes(search.toLowerCase()) ||
-      (p.event_title?.toLowerCase() || '').includes(search.toLowerCase()) ||
-      (p.reference_code?.toLowerCase() || '').includes(search.toLowerCase());
+      !q ||
+      userEmail.includes(q) ||
+      planType.includes(q) ||
+      eventTitle.includes(q) ||
+      refCode.includes(q);
 
     const matchesStatus = statusFilter === 'all' || p.status === statusFilter;
 
@@ -188,15 +206,15 @@ export default function SuperAdminPagamentosPage() {
     return matchesSearch && matchesStatus && matchesSegment;
   });
 
-  const pendingCount = payments.filter((p) => p.status === 'Pendente').length;
-  const approvedCount = payments.filter((p) => p.status === 'Aprovado').length;
-  const rejectedCount = payments.filter((p) => p.status === 'Recusado').length;
+  const pendingCount = payments.filter((p) => p && p.status === 'Pendente').length;
+  const approvedCount = payments.filter((p) => p && p.status === 'Aprovado').length;
+  const rejectedCount = payments.filter((p) => p && p.status === 'Recusado').length;
   const totalApprovedAmount = payments
-    .filter((p) => p.status === 'Aprovado')
+    .filter((p) => p && p.status === 'Aprovado')
     .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
 
-  const couplePaymentsCount = payments.filter((p) => !isPlannerPayment(p)).length;
-  const plannerPaymentsCount = payments.filter((p) => isPlannerPayment(p)).length;
+  const couplePaymentsCount = payments.filter((p) => p && !isPlannerPayment(p)).length;
+  const plannerPaymentsCount = payments.filter((p) => p && isPlannerPayment(p)).length;
 
   return (
     <div className="space-y-6">
@@ -259,16 +277,16 @@ export default function SuperAdminPagamentosPage() {
                 'Data Criação',
               ];
               const rows = payments.map((p) => [
-                p.id,
+                p.id || '',
                 p.user_email || '',
                 isPlannerPayment(p) ? 'Wedding Planner' : 'Noivo (Casamento)',
                 p.event_title || 'N/A',
-                p.plan_type,
-                p.amount,
+                p.plan_type || '',
+                Number(p.amount || 0),
                 p.payment_method || 'Multicaixa / Transferência',
                 p.reference_code || '',
-                p.status,
-                p.created_at,
+                p.status || 'Pendente',
+                p.created_at || '',
               ]);
               SuperAdminRepository.exportToCSV('pagamentos_meuboda', headers, rows);
             }}
@@ -407,12 +425,15 @@ export default function SuperAdminPagamentosPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-custom/50">
-                {filteredPayments.map((p) => {
+                {filteredPayments.map((p, idx) => {
                   const isPlanner = isPlannerPayment(p);
                   const isProcessing = processingId === p.id;
+                  const safeRef = p.reference_code || (typeof p.id === 'string' && p.id.length > 5 ? p.id.slice(0, 8) : `P-${idx + 1}`);
+                  const safeAmount = Number(p.amount || 0).toLocaleString('pt-AO');
+                  const safeDate = p.created_at ? new Date(p.created_at).toLocaleDateString('pt-PT') : 'Recente';
 
                   return (
-                    <tr key={p.id} className="hover:bg-foreground/[0.015] transition-colors">
+                    <tr key={p.id || `pay_${idx}`} className="hover:bg-foreground/[0.015] transition-colors">
                       {/* Cliente & Tipo */}
                       <td className="py-3.5 px-4">
                         <div className="font-semibold text-foreground">{p.user_email || 'Utilizador'}</div>
@@ -433,20 +454,20 @@ export default function SuperAdminPagamentosPage() {
                       <td className="py-3.5 px-4">
                         <div className="font-medium text-foreground">{p.event_title || (isPlanner ? 'Assinatura Plataforma' : 'Casamento')}</div>
                         <div className="text-[11px] text-foreground/40 font-mono mt-0.5">
-                          Ref: {p.reference_code || p.id.slice(0, 8)}
+                          Ref: {safeRef}
                         </div>
                       </td>
 
                       {/* Plan */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         <Badge variant="primary" className="font-medium text-xs">
-                          {p.plan_type}
+                          {p.plan_type || 'Licença Casamento'}
                         </Badge>
                       </td>
 
                       {/* Amount */}
                       <td className="py-3.5 px-4 whitespace-nowrap font-bold text-foreground">
-                        {Number(p.amount).toLocaleString('pt-AO')} Kz
+                        {safeAmount} Kz
                       </td>
 
                       {/* Method */}
@@ -456,7 +477,7 @@ export default function SuperAdminPagamentosPage() {
 
                       {/* Date */}
                       <td className="py-3.5 px-4 whitespace-nowrap text-xs text-foreground/60">
-                        {new Date(p.created_at).toLocaleDateString('pt-PT')}
+                        {safeDate}
                       </td>
 
                       {/* Status */}
@@ -553,17 +574,17 @@ export default function SuperAdminPagamentosPage() {
             <div className="p-3 rounded-lg bg-foreground/5 border border-border-custom flex items-center justify-between text-xs">
               <div>
                 <span className="text-foreground/50 block">Cliente:</span>
-                <span className="font-semibold text-foreground">{selectedPayment.user_email}</span>
+                <span className="font-semibold text-foreground">{selectedPayment.user_email || 'Cliente'}</span>
               </div>
               <div>
                 <span className="text-foreground/50 block">Valor:</span>
                 <span className="font-bold text-emerald-500">
-                  {Number(selectedPayment.amount).toLocaleString('pt-AO')} Kz
+                  {Number(selectedPayment.amount || 0).toLocaleString('pt-AO')} Kz
                 </span>
               </div>
               <div>
                 <span className="text-foreground/50 block">Plano:</span>
-                <span className="font-medium text-foreground">{selectedPayment.plan_type}</span>
+                <span className="font-medium text-foreground">{selectedPayment.plan_type || 'Licença'}</span>
               </div>
             </div>
 
