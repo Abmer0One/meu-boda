@@ -84,6 +84,7 @@ export default function DefaultTemplate({
   useEffect(() => {
     if (typeof window !== 'undefined' && window.location.hash === '#mapas') {
       setShowMapsModal(true);
+      setIsOpen(true);
     }
   }, []);
 

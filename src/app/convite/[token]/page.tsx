@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, use } from 'react';
+import { supabase } from '@/lib/supabase';
 import { GuestRepository } from '@/repositories/guest.repository';
 import { EventRepository } from '@/repositories/event.repository';
 import { TableRepository } from '@/repositories/table.repository';
@@ -84,7 +85,72 @@ export default function PublicRSVPPage({ params }: RSVPPageProps) {
   const loadData = async () => {
     setLoading(true);
     try {
-      const fetchedGuest = await GuestRepository.getByToken(token);
+      let fetchedGuest = await GuestRepository.getByToken(token);
+      let fetchedEvent: Event | null = null;
+
+      if (!fetchedGuest) {
+        // Suporte a links de teste / demonstração (ex: MB-TESTE-VIP, MB-TESTE-ernesto-helena, demo-*)
+        const isDemoToken =
+          token === 'MB-TESTE-VIP' ||
+          token.startsWith('MB-TESTE-') ||
+          token.startsWith('demo-') ||
+          token.toLowerCase().includes('teste') ||
+          token.toLowerCase().includes('demo');
+
+        if (isDemoToken) {
+          let eventIdentifier = '';
+          if (token.startsWith('MB-TESTE-') && token !== 'MB-TESTE-VIP') {
+            eventIdentifier = token.replace('MB-TESTE-', '');
+          } else if (token.startsWith('demo-')) {
+            eventIdentifier = token.replace('demo-', '');
+          }
+
+          if (eventIdentifier) {
+            fetchedEvent = await EventRepository.getBySlug(eventIdentifier);
+            if (!fetchedEvent) {
+              fetchedEvent = await EventRepository.getById(eventIdentifier);
+            }
+          }
+
+          // Se for token genérico 'MB-TESTE-VIP' ou evento ainda não localizado:
+          if (!fetchedEvent) {
+            // 1. Tentar verificar se o utilizador está autenticado e carregar o seu evento ativo
+            try {
+              const { data: { user } } = await supabase.auth.getUser();
+              if (user) {
+                const userEvents = await EventRepository.getByUserId(user.id);
+                if (userEvents && userEvents.length > 0) {
+                  fetchedEvent = userEvents[0];
+                }
+              }
+            } catch (e) {}
+
+            // 2. Se for MB-TESTE-VIP em acesso anónimo no telemóvel, associar ao evento ativo de Ernesto & Helena
+            if (!fetchedEvent) {
+              fetchedEvent = await EventRepository.getById('04eb84a1-864f-4faf-b836-874a579e1de7');
+            }
+          }
+
+          if (fetchedEvent) {
+            fetchedGuest = {
+              id: 'demo-guest',
+              event_id: fetchedEvent.id,
+              name: 'Convidado de Demonstração',
+              phone: '+244 923 000 000',
+              email: 'convidado@meuboda.com',
+              family_group: null,
+              status: 'Confirmed',
+              companions: 1,
+              table_id: null,
+              invitation_sent: true,
+              qr_token: token,
+              notes: null,
+              created_at: new Date().toISOString(),
+            };
+          }
+        }
+      }
+
       if (!fetchedGuest) {
         setLoading(false);
         return;
@@ -100,8 +166,8 @@ export default function PublicRSVPPage({ params }: RSVPPageProps) {
       setCompanions(fetchedGuest.companions);
       setNotes(fetchedGuest.notes || '');
 
-      const [fetchedEvent, fetchedTables, fetchedSchedules, fetchedInfoBlocks] = await Promise.all([
-        EventRepository.getById(fetchedGuest.event_id),
+      const [resolvedEvent, fetchedTables, fetchedSchedules, fetchedInfoBlocks] = await Promise.all([
+        fetchedEvent ? Promise.resolve(fetchedEvent) : EventRepository.getById(fetchedGuest.event_id),
         TableRepository.getAll(fetchedGuest.event_id),
         ScheduleRepository.getAll(fetchedGuest.event_id),
         InfoBlockRepository.getAll(fetchedGuest.event_id),
@@ -110,11 +176,11 @@ export default function PublicRSVPPage({ params }: RSVPPageProps) {
       setSchedules(fetchedSchedules);
       setInfoBlocks(fetchedInfoBlocks);
 
-      setEvent(fetchedEvent);
+      setEvent(resolvedEvent);
 
-      if (fetchedEvent) {
+      if (resolvedEvent) {
         // Resolve default theme defined by the couple in Canva Template Config
-        const canvaCfg = resolveCanvaConfig(fetchedEvent.id, fetchedEvent.template_config, fetchedInfoBlocks, null, fetchedEvent);
+        const canvaCfg = resolveCanvaConfig(resolvedEvent.id, resolvedEvent.template_config, fetchedInfoBlocks, null, resolvedEvent);
         if (canvaCfg?.invitation_theme) {
           setInvitationTheme(canvaCfg.invitation_theme);
         }
@@ -208,6 +274,16 @@ export default function PublicRSVPPage({ params }: RSVPPageProps) {
     if (!guest) return;
     setSaving(true);
     try {
+      if (guest.id === 'demo-guest' || guest.qr_token.startsWith('MB-TESTE') || guest.qr_token === 'MB-TESTE-VIP') {
+        setRsvpStatus(status);
+        if (status === 'Confirmed') {
+          triggerConfetti();
+        }
+        alert('Modo Demonstração: Resposta registada como teste com sucesso!');
+        setSaving(false);
+        return;
+      }
+
       const updated = await GuestRepository.update(guest.id, {
         status,
         companions: status === 'Confirmed' ? Number(companions) : 0,

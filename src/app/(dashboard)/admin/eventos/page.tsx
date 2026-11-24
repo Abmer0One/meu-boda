@@ -803,6 +803,7 @@ export default function EventosPage() {
     if (!currentEvent) return;
     setIsGeneratingTestPdf(true);
     try {
+      const testToken = `MB-TESTE-${currentEvent.slug || currentEvent.id.slice(0, 8)}`;
       const dummyGuest: Guest = {
         id: 'teste-convidado',
         event_id: currentEvent.id,
@@ -814,7 +815,7 @@ export default function EventosPage() {
         companions: 1,
         table_id: null,
         invitation_sent: false,
-        qr_token: 'MB-TESTE-VIP',
+        qr_token: testToken,
         notes: null,
         created_at: new Date().toISOString(),
       };
