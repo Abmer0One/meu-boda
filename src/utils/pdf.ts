@@ -1320,8 +1320,8 @@ export async function generateGuestPDF(
       event,
       effectiveGuest,
       tableName,
-      finalAccessQr,
-      locationsQrCodeUrl,
+      canvaConfig.show_access_qr !== false ? finalAccessQr : '',
+      canvaConfig.show_locations_qr !== false ? locationsQrCodeUrl : '',
       isSinglePage ? 'single' : 'cover',
       schedules,
       orientation
@@ -1336,10 +1336,10 @@ export async function generateGuestPDF(
         coords: { left: number; top: number; width: number; height: number };
       }> = [];
 
-      if (locationsQrCodeUrl) {
+      if (locationsQrCodeUrl && canvaConfig.show_locations_qr !== false) {
         page2Overlays.push({ qrDataUrl: locationsQrCodeUrl, coords: locCoords });
       }
-      if (finalAccessQr) {
+      if (finalAccessQr && canvaConfig.show_access_qr !== false) {
         page2Overlays.push({ qrDataUrl: finalAccessQr, coords: accessCoords });
       }
 
@@ -1355,8 +1355,8 @@ export async function generateGuestPDF(
         event,
         effectiveGuest,
         tableName,
-        finalAccessQr,
-        locationsQrCodeUrl,
+        canvaConfig.show_access_qr !== false ? finalAccessQr : '',
+        canvaConfig.show_locations_qr !== false ? locationsQrCodeUrl : '',
         'info',
         schedules,
         orientation

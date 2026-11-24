@@ -991,8 +991,17 @@ export default function EventosPage() {
         qr_locations_coords: qrLocCoords,
         qr_access_coords: qrAccessCoords,
         pdf_mode: pdfMode,
+        pdf_orientation: pdfOrientation,
         show_locations_qr: showLocationsQr,
         show_access_qr: showAccessQr,
+        show_guest_name: showGuestName,
+        guest_name_page: guestNamePage,
+        guest_name_coords: guestNameCoords,
+        guest_name_font_size: guestNameFontSize,
+        guest_name_color: guestNameColor,
+        guest_name_align: guestNameAlign,
+        guest_name_font_family: guestNameFontFamily,
+        guest_name_font_weight: guestNameFontWeight,
         invitation_theme: invitationTheme,
       };
 
@@ -1458,31 +1467,69 @@ export default function EventosPage() {
                     </button>
                   </div>
                 </div>
+              </div>
 
-                {/* Opções de QR para Página Única */}
-                {pdfMode === 'single_page' && (
-                  <div className="pt-2 border-t border-border-custom/50 flex flex-wrap items-center gap-4 text-xs animate-in fade-in">
-                    <span className="text-[11px] font-semibold text-foreground/70">Códigos QR a sobrepor na página:</span>
-                    <label className="flex items-center gap-2 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={showAccessQr}
-                        onChange={(e) => setShowAccessQr(e.target.checked)}
-                        className="rounded border-border-custom text-primary focus:ring-primary h-4 w-4"
-                      />
-                      <span className="text-foreground">QR de Acesso / Portaria</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={showLocationsQr}
-                        onChange={(e) => setShowLocationsQr(e.target.checked)}
-                        className="rounded border-border-custom text-primary focus:ring-primary h-4 w-4"
-                      />
-                      <span className="text-foreground">QR de Localização (Mapas)</span>
+              {/* Habilitar / Desabilitar Códigos QR no Convite Impresso (Visível em todos os modos) */}
+              <div className="bg-secondary/15 p-4 rounded-2xl border border-border-custom space-y-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <QrCode className="h-4 w-4 text-primary" />
+                    <label className="text-xs font-bold text-foreground uppercase tracking-wider">
+                      Códigos QR no Convite Impresso (PDF)
                     </label>
                   </div>
-                )}
+                  <p className="text-[11px] text-foreground/60 mt-0.5">
+                    Selecione quais códigos QR devem estar visíveis no convite para impressão. Se desativados, não serão impressos nem exibidos no editor visual.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  {/* QR de Localização */}
+                  <label className={`flex items-start gap-3 p-3 rounded-xl border transition-all cursor-pointer select-none ${
+                    showLocationsQr 
+                      ? 'bg-card-bg border-emerald-500/40 shadow-sm' 
+                      : 'bg-card-bg/40 border-border-custom opacity-70'
+                  }`}>
+                    <input
+                      type="checkbox"
+                      checked={showLocationsQr}
+                      onChange={(e) => setShowLocationsQr(e.target.checked)}
+                      className="rounded border-border-custom text-emerald-600 focus:ring-emerald-500 h-4 w-4 mt-0.5 cursor-pointer"
+                    />
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-1.5">
+                        <MapPin className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                        <span className="text-xs font-bold text-foreground">QR de Localização (Google Maps)</span>
+                      </div>
+                      <p className="text-[11px] text-foreground/60 leading-tight">
+                        Permite aos convidados escanear o trajeto para a cerimónia e copo-de-água diretamente no mapa.
+                      </p>
+                    </div>
+                  </label>
+
+                  {/* QR de Acesso */}
+                  <label className={`flex items-start gap-3 p-3 rounded-xl border transition-all cursor-pointer select-none ${
+                    showAccessQr 
+                      ? 'bg-card-bg border-indigo-500/40 shadow-sm' 
+                      : 'bg-card-bg/40 border-border-custom opacity-70'
+                  }`}>
+                    <input
+                      type="checkbox"
+                      checked={showAccessQr}
+                      onChange={(e) => setShowAccessQr(e.target.checked)}
+                      className="rounded border-border-custom text-indigo-600 focus:ring-indigo-500 h-4 w-4 mt-0.5 cursor-pointer"
+                    />
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-1.5">
+                        <QrCode className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
+                        <span className="text-xs font-bold text-foreground">QR de Acesso (Portaria & Check-in)</span>
+                      </div>
+                      <p className="text-[11px] text-foreground/60 leading-tight">
+                        Código individual de cada convidado para validação rápida na entrada pela portaria.
+                      </p>
+                    </div>
+                  </label>
+                </div>
               </div>
 
               {/* Seletor de Orientação do Papel (Tamanho A4) */}
@@ -2288,7 +2335,9 @@ export default function EventosPage() {
                             <p className="text-xs font-bold text-[#B89742] uppercase">Localizações</p>
                             <p className="text-[10px] text-zinc-600 line-clamp-1">{currentEvent?.ceremony_location || 'Local da Cerimónia'}</p>
                             <p className="text-[10px] text-zinc-600 line-clamp-1">{currentEvent?.party_location || 'Local da Festa'}</p>
-                            <div className="w-16 h-16 bg-white border border-[#E8D49E] rounded flex items-center justify-center text-[10px] text-zinc-400">QR Mapa</div>
+                            {showLocationsQr && (
+                              <div className="w-16 h-16 bg-white border border-[#E8D49E] rounded flex items-center justify-center text-[10px] text-zinc-400">QR Mapa</div>
+                            )}
                           </div>
                           <div className="flex-1 border-r border-[#E8D49E] p-2 flex flex-col justify-between items-center text-center">
                             <p className="text-xs font-bold text-[#B89742] uppercase">Celebração</p>
@@ -2298,7 +2347,9 @@ export default function EventosPage() {
                           <div className="flex-1 p-2 flex flex-col justify-between items-center text-center">
                             <p className="text-xs font-bold text-[#B89742] uppercase">Passe Entrada</p>
                             <p className="text-[10px] font-bold text-zinc-800">Convidado</p>
-                            <div className="w-16 h-16 bg-white border border-[#E8D49E] rounded flex items-center justify-center text-[10px] text-zinc-400">QR Acesso</div>
+                            {showAccessQr && (
+                              <div className="w-16 h-16 bg-white border border-[#E8D49E] rounded flex items-center justify-center text-[10px] text-zinc-400">QR Acesso</div>
+                            )}
                           </div>
                         </div>
                       )
