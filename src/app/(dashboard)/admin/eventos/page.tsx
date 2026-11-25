@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Dialog } from '@/components/ui/Dialog';
-import { Heart, MapPin, Calendar, Palette, Loader2, Plus, Trash2, Clock, Users, Gift, Link2, Shirt, Info, Pencil, Sparkles, Upload, Sliders, CheckCircle2, RotateCcw, QrCode, FileText, AlertCircle, Move, Download, CreditCard, User, AlignLeft, AlignCenter, AlignRight, Type } from 'lucide-react';
+import { Heart, MapPin, Calendar, Palette, Loader2, Plus, Trash2, Clock, Users, Gift, Link2, Shirt, Info, Pencil, Sparkles, Upload, Sliders, CheckCircle2, RotateCcw, QrCode, FileText, AlertCircle, Move, Download, CreditCard, User, AlignLeft, AlignCenter, AlignRight, Type, Check, ChevronLeft, ChevronRight } from 'lucide-react';
 import {
   resolveCanvaConfig,
   persistCanvaConfig,
@@ -33,6 +33,25 @@ import { parseEventInitials } from '@/utils/eventHelpers';
 import { generateGuestPDF } from '@/utils/pdf';
 import { generateQRCode } from '@/utils/qr';
 
+export type EventTab = 'details' | 'guide' | 'agenda' | 'design' | 'qr';
+
+interface TabDefinition {
+  id: EventTab;
+  label: string;
+  shortLabel: string;
+  stepNumber: number;
+  icon: React.ElementType;
+  description: string;
+}
+
+const EVENT_TABS: TabDefinition[] = [
+  { id: 'details', label: 'Detalhes & Locais', shortLabel: '1. Detalhes', stepNumber: 1, icon: MapPin, description: 'Informações básicas e mapas GPS' },
+  { id: 'guide', label: 'Guia dos Convidados', shortLabel: '2. Guia', stepNumber: 2, icon: Shirt, description: 'Dress code, RSVP, regras e presentes' },
+  { id: 'agenda', label: 'Agenda & Informações', shortLabel: '3. Agenda', stepNumber: 3, icon: Clock, description: 'Cronograma do dia e blocos extra' },
+  { id: 'design', label: 'Design do Convite', shortLabel: '4. Design', stepNumber: 4, icon: Palette, description: 'Tema, páginas, A4 e artes Canva' },
+  { id: 'qr', label: 'Posicionamento QR', shortLabel: '5. QR & Amostra', stepNumber: 5, icon: QrCode, description: 'Editor visual, drag & drop e teste PDF' },
+];
+
 export default function EventosPage() {
   const { currentEvent, refreshEvents, setCurrentEvent } = useEvent();
   const isMarinela = isMarinelaAbiudEvent(currentEvent);
@@ -40,6 +59,36 @@ export default function EventosPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [slugStatus, setSlugStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
+
+  // Tab / Stepper Workflow State
+  const [activeTab, setActiveTab] = useState<EventTab>('details');
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const hash = window.location.hash.toLowerCase();
+    if (hash === '#detalhes' || hash === '#details') setActiveTab('details');
+    else if (hash === '#guia' || hash === '#guide') setActiveTab('guide');
+    else if (hash === '#agenda' || hash === '#program' || hash === '#cronograma') setActiveTab('agenda');
+    else if (hash === '#design' || hash === '#convite') setActiveTab('design');
+    else if (hash === '#qr' || hash === '#posicionamento-qr' || hash === '#qrcode') setActiveTab('qr');
+  }, []);
+
+  const handleTabChange = (tab: EventTab) => {
+    setActiveTab(tab);
+    if (typeof window !== 'undefined') {
+      const hashMap: Record<EventTab, string> = {
+        details: '#detalhes',
+        guide: '#guia',
+        agenda: '#agenda',
+        design: '#design',
+        qr: '#qr',
+      };
+      window.history.replaceState(null, '', hashMap[tab]);
+    }
+  };
+
+  const currentStepIndex = EVENT_TABS.findIndex((t) => t.id === activeTab);
+  const currentTabInfo = EVENT_TABS[currentStepIndex] || EVENT_TABS[0];
 
   // Canva Template States
   const [invitationTheme, setInvitationTheme] = useState<'dark' | 'light'>('dark');
@@ -1085,15 +1134,91 @@ export default function EventosPage() {
         </p>
       </div>
 
+      {/* Workflow Stepper Bar */}
+      <div className="bg-card-bg border border-border-custom rounded-2xl p-3 sm:p-4 shadow-xs space-y-3">
+        {/* Header Info: Passo X de 5 + Progresso */}
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="flex items-center justify-center h-6 w-6 rounded-full bg-primary/10 text-primary text-xs font-bold shrink-0">
+              {currentStepIndex + 1}
+            </span>
+            <span className="text-xs sm:text-sm font-bold text-foreground truncate">
+              Passo {currentStepIndex + 1} de 5: <span className="text-primary">{currentTabInfo.label}</span>
+            </span>
+          </div>
+          <span className="text-[11px] font-semibold text-foreground/50 shrink-0">
+            {Math.round(((currentStepIndex + 1) / 5) * 100)}% Concluído
+          </span>
+        </div>
+
+        {/* Progress Bar Track */}
+        <div className="w-full h-1.5 bg-secondary/30 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-gradient-to-r from-amber-500 via-primary to-emerald-500 transition-all duration-300 rounded-full"
+            style={{ width: `${((currentStepIndex + 1) / 5) * 100}%` }}
+          />
+        </div>
+
+        {/* Steps Navigation Buttons */}
+        <div className="flex sm:grid sm:grid-cols-5 gap-1.5 overflow-x-auto no-scrollbar pt-1">
+          {EVENT_TABS.map((tab, idx) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            const isPast = idx < currentStepIndex;
+
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => handleTabChange(tab.id)}
+                className={`flex items-center gap-2 p-2 sm:p-2.5 rounded-xl border text-left transition-all cursor-pointer shrink-0 min-w-[130px] sm:min-w-0 ${
+                  isActive
+                    ? 'bg-primary/10 border-primary text-primary font-bold shadow-xs ring-1 ring-primary/20'
+                    : isPast
+                    ? 'bg-secondary/10 border-border-custom/80 text-foreground/80 hover:bg-secondary/20 hover:text-foreground'
+                    : 'bg-transparent border-transparent text-foreground/45 hover:text-foreground hover:bg-secondary/15'
+                }`}
+              >
+                <div
+                  className={`flex items-center justify-center h-6 w-6 rounded-lg text-xs font-bold shrink-0 transition-colors ${
+                    isActive
+                      ? 'bg-primary text-white dark:text-black shadow-xs'
+                      : isPast
+                      ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
+                      : 'bg-secondary/40 text-foreground/50'
+                  }`}
+                >
+                  {isPast ? <Check className="h-3.5 w-3.5 stroke-[2.5]" /> : tab.stepNumber}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-semibold truncate leading-tight flex items-center gap-1">
+                    <Icon className="h-3.5 w-3.5 shrink-0 opacity-70 hidden xl:inline" />
+                    <span>{tab.shortLabel}</span>
+                  </p>
+                  <p className="text-[10px] text-foreground/40 truncate hidden lg:block leading-none mt-0.5">
+                    {tab.label}
+                  </p>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Side: Form */}
+        {/* Left Side: Active Step Content */}
         <div className="lg:col-span-8 space-y-6">
-          <Card className="bg-card-bg">
-            <CardHeader>
-              <CardTitle>Editar Detalhes do Evento</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form id="event-main-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          {/* Main Form for Step 1 (Details) and Step 2 (Guest Guide) */}
+          <form id="event-main-form" onSubmit={handleSubmit(onSubmit)}>
+            {/* ETAPA 1: DETALHES & LOCAIS */}
+            <div className={activeTab === 'details' ? 'space-y-6 animate-in fade-in duration-200' : 'hidden'}>
+              <Card className="bg-card-bg">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <MapPin className="h-5 w-5 text-primary" /> Editar Detalhes do Evento
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
                 {successMessage && (
                   <div className="rounded-xl bg-success/15 p-3 text-xs text-success font-medium">
                     {successMessage}
@@ -1277,19 +1402,186 @@ export default function EventosPage() {
                   />
                 </div>
 
-                <div className="flex justify-end pt-2">
-                  <Button
-                    type="submit"
-                    isLoading={isSaving}
-                    disabled={isSaving || slugStatus === 'taken' || slugStatus === 'checking'}
-                  >
-                    Guardar Alterações
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
+            {/* Step 1 Navigation Footer */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 bg-card-bg rounded-2xl border border-border-custom shadow-xs">
+              <span className="text-xs text-foreground/50 hidden sm:inline">
+                Passo 1 de 5: Detalhes & Locais
+              </span>
+              <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
+                <Button
+                  type="submit"
+                  isLoading={isSaving}
+                  disabled={isSaving || slugStatus === 'taken' || slugStatus === 'checking'}
+                  className="w-full sm:w-auto"
+                >
+                  Guardar Alterações
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => handleTabChange('guide')}
+                  rightIcon={<ChevronRight className="h-4 w-4" />}
+                  className="w-full sm:w-auto bg-[#d4af37] hover:bg-[#b8972e] text-black font-semibold cursor-pointer"
+                >
+                  Próximo: Guia dos Convidados
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* ETAPA 2: GUIA DOS CONVIDADOS */}
+          <div className={activeTab === 'guide' ? 'space-y-6 animate-in fade-in duration-200' : 'hidden'}>
+            <Card className="bg-card-bg">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Shirt className="h-5 w-5 text-primary" /> Manual do Convidado & Informações Importantes
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-xs text-foreground/60 mb-4">
+                  Estas informações aparecerão no convite digital do convidado. Preencha apenas o que for relevante para o seu evento.
+                </p>
+
+                {successMessage && (
+                  <div className="rounded-xl bg-success/15 p-3 text-xs text-success font-medium mb-4">
+                    {successMessage}
+                  </div>
+                )}
+                {errorMessage && (
+                  <div className="rounded-xl bg-error/15 p-3 text-xs text-error font-medium mb-4">
+                    {errorMessage}
+                  </div>
+                )}
+
+                <div className="space-y-6">
+                  {/* Dress Code */}
+                  <div className="space-y-3 border-t border-border-custom pt-4">
+                    <h4 className="text-sm font-semibold text-primary flex items-center gap-2">
+                      <Shirt className="h-4 w-4" /> Dress Code
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <Input
+                        label="Estilo (ex: Formal, Esporte Fino)"
+                        placeholder="Formal"
+                        {...register('dress_code_style')}
+                      />
+                      <Input
+                        label="Restrições de Cores"
+                        placeholder="Não usar a cor branca"
+                        {...register('dress_code_colors')}
+                      />
+                    </div>
+                  </div>
+
+                  {/* RSVP Deadline */}
+                  <div className="space-y-3 border-t border-border-custom pt-4">
+                    <h4 className="text-sm font-semibold text-primary flex items-center gap-2">
+                      <Clock className="h-4 w-4" /> Data Limite de RSVP
+                    </h4>
+                    <Input
+                      label="Confirmar Presença até (Data Limite)"
+                      type="date"
+                      helperText="Aparecerá no formulário de confirmação de presença do convidado."
+                      {...register('rsvp_deadline')}
+                    />
+                  </div>
+
+                  {/* Kids */}
+                  <div className="space-y-3 border-t border-border-custom pt-4">
+                    <h4 className="text-sm font-semibold text-primary flex items-center gap-2">
+                      <Users className="h-4 w-4" /> Nota sobre Crianças (Opcional)
+                    </h4>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold text-foreground/75 tracking-wide">
+                        Mensagem sobre Crianças
+                      </label>
+                      <textarea
+                        rows={2}
+                        placeholder="Ex: Esta é uma celebração reservada a adultos. Com os mais novos celebraremos noutro momento especial."
+                        className="w-full rounded-xl border border-border-custom bg-card-bg px-3.5 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                        {...register('kids_restriction_note')}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Instagram */}
+                  <div className="space-y-3 border-t border-border-custom pt-4">
+                    <h4 className="text-sm font-semibold text-primary flex items-center gap-2">
+                      <Link2 className="h-4 w-4" /> Redes Sociais (Instagram)
+                    </h4>
+                    <p className="text-xs text-foreground/50">Apenas o nome de utilizador sem o @. Os convidados verão botões que abrem diretamente a app do Instagram.</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <Input
+                        label="Instagram Anfitrião 1"
+                        placeholder="vivalda.tito"
+                        {...register('instagram_host_1')}
+                      />
+                      <Input
+                        label="Instagram Anfitrião 2 (Opcional)"
+                        placeholder="typsichvivi"
+                        {...register('instagram_host_2')}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Gifts */}
+                  <div className="space-y-3 border-t border-border-custom pt-4">
+                    <h4 className="text-sm font-semibold text-primary flex items-center gap-2">
+                      <Gift className="h-4 w-4" /> Sugestões de Presente
+                    </h4>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold text-foreground/75 tracking-wide">
+                        Mensagem e sugestões (uma por linha)
+                      </label>
+                      <textarea
+                        rows={4}
+                        placeholder={`A sua presença já é um presente inestimável, mas caso queira presentear:\nPerfume\nCosméticos\nVale-presente\nAcessórios`}
+                        className="w-full rounded-xl border border-border-custom bg-card-bg px-3.5 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                        {...register('gift_suggestions')}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Step 2 Navigation Footer */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 bg-card-bg rounded-2xl border border-border-custom shadow-xs">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => handleTabChange('details')}
+                leftIcon={<ChevronLeft className="h-4 w-4" />}
+                className="w-full sm:w-auto"
+              >
+                Anterior: Detalhes
+              </Button>
+              <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
+                <Button
+                  type="submit"
+                  isLoading={isSaving}
+                  disabled={isSaving || slugStatus === 'taken' || slugStatus === 'checking'}
+                  className="w-full sm:w-auto"
+                >
+                  Guardar Alterações
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => handleTabChange('agenda')}
+                  rightIcon={<ChevronRight className="h-4 w-4" />}
+                  className="w-full sm:w-auto bg-[#d4af37] hover:bg-[#b8972e] text-black font-semibold cursor-pointer"
+                >
+                  Próximo: Agenda & Informações
+                </Button>
+              </div>
+            </div>
+          </div>
+        </form>
+
+        {/* ETAPA 4: DESIGN DO CONVITE */}
+        <div className={activeTab === 'design' ? 'space-y-6 animate-in fade-in duration-200' : 'hidden'}>
           {/* Template Canva para Convite Impresso / PDF */}
           <Card className="bg-card-bg border border-border-custom overflow-hidden">
             <CardHeader className="border-b border-border-custom bg-secondary/5 pb-4">
@@ -2243,6 +2535,63 @@ export default function EventosPage() {
                   </div>
                 )}
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Step 4 Navigation Footer */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 bg-card-bg rounded-2xl border border-border-custom shadow-xs">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => handleTabChange('agenda')}
+              leftIcon={<ChevronLeft className="h-4 w-4" />}
+              className="w-full sm:w-auto"
+            >
+              Anterior: Agenda & Informações
+            </Button>
+            <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
+              <Button
+                type="button"
+                onClick={handleSaveCanvaConfig}
+                isLoading={isSavingCanva}
+                className="w-full sm:w-auto"
+              >
+                Guardar Configurações
+              </Button>
+              <Button
+                type="button"
+                onClick={() => handleTabChange('qr')}
+                rightIcon={<ChevronRight className="h-4 w-4" />}
+                className="w-full sm:w-auto bg-[#d4af37] hover:bg-[#b8972e] text-black font-semibold cursor-pointer"
+              >
+                Próximo: Posicionamento QR
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* ETAPA 5: POSICIONAMENTO QR & AMOSTRA */}
+        <div className={activeTab === 'qr' ? 'space-y-6 animate-in fade-in duration-200' : 'hidden'}>
+          <Card className="bg-card-bg border border-border-custom overflow-hidden">
+            <CardHeader className="border-b border-border-custom bg-secondary/5 pb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <QrCode className="h-5 w-5 text-primary" /> Posicionamento Visual dos Códigos QR & Amostra
+                  </CardTitle>
+                  <p className="text-xs text-foreground/60 mt-1">
+                    Arraste os códigos QR e o nome do convidado diretamente sobre a arte e gere o PDF de teste para validação física.
+                  </p>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6 space-y-6">
+              {canvaSuccessMessage && (
+                <div className="flex items-center gap-2 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-600 dark:text-emerald-400 text-xs font-semibold animate-in fade-in">
+                  <CheckCircle2 className="h-4 w-4 shrink-0" />
+                  <span>{canvaSuccessMessage}</span>
+                </div>
+              )}
 
               {/* Posicionamento Visual dos Códigos QR no Convite (Arrastar e Soltar) */}
               <div className="border border-border-custom rounded-2xl p-4 sm:p-5 bg-card-bg shadow-sm space-y-4 overflow-hidden">
@@ -2864,6 +3213,45 @@ export default function EventosPage() {
             </CardContent>
           </Card>
 
+          {/* Step 5 Navigation Footer */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 bg-card-bg rounded-2xl border border-border-custom shadow-xs">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => handleTabChange('design')}
+              leftIcon={<ChevronLeft className="h-4 w-4" />}
+              className="w-full sm:w-auto"
+            >
+              Anterior: Design do Convite
+            </Button>
+            <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
+              <button
+                type="button"
+                onClick={handleDownloadTestPdf}
+                disabled={isGeneratingTestPdf}
+                className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-border-custom bg-secondary/20 hover:bg-secondary/40 text-foreground font-semibold text-xs transition-all cursor-pointer shadow-xs w-full sm:w-auto"
+              >
+                {isGeneratingTestPdf ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                ) : (
+                  <Download className="h-4 w-4 text-primary" />
+                )}
+                <span>Descarregar Teste em PDF (A4)</span>
+              </button>
+              <Button
+                type="button"
+                onClick={handleSaveCanvaConfig}
+                isLoading={isSavingCanva}
+                className="w-full sm:w-auto"
+              >
+                Guardar Configuração Canva
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* ETAPA 3: AGENDA & INFORMAÇÕES EXTRA */}
+        <div className={activeTab === 'agenda' ? 'space-y-6 animate-in fade-in duration-200' : 'hidden'}>
           {/* Agenda do Dia Card */}
           <Card className="bg-card-bg">
             <CardHeader>
@@ -2957,117 +3345,6 @@ export default function EventosPage() {
             </CardContent>
           </Card>
 
-          {/* Manual do Convidado & Informações Importantes Card */}
-          <Card className="bg-card-bg">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Info className="h-5 w-5 text-primary" /> Manual do Convidado & Informações Importantes
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-xs text-foreground/60 mb-4">
-                Estas informações aparecerão no convite digital do convidado. Preencha apenas o que for relevante para o seu evento.
-              </p>
-              <div className="space-y-6">
-
-                {/* Dress Code */}
-                <div className="space-y-3 border-t border-border-custom pt-4">
-                  <h4 className="text-sm font-semibold text-primary flex items-center gap-2">
-                    <Shirt className="h-4 w-4" /> Dress Code
-                  </h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <Input
-                      label="Estilo (ex: Formal, Esporte Fino)"
-                      placeholder="Formal"
-                      {...register('dress_code_style')}
-                    />
-                    <Input
-                      label="Restrições de Cores"
-                      placeholder="Não usar a cor branca"
-                      {...register('dress_code_colors')}
-                    />
-                  </div>
-                </div>
-
-                {/* RSVP Deadline */}
-                <div className="space-y-3 border-t border-border-custom pt-4">
-                  <h4 className="text-sm font-semibold text-primary flex items-center gap-2">
-                    <Clock className="h-4 w-4" /> Data Limite de RSVP
-                  </h4>
-                  <Input
-                    label="Confirmar Presença até (Data Limite)"
-                    type="date"
-                    helperText="Aparecerá no formulário de confirmação de presença do convidado."
-                    {...register('rsvp_deadline')}
-                  />
-                </div>
-
-                {/* Kids */}
-                <div className="space-y-3 border-t border-border-custom pt-4">
-                  <h4 className="text-sm font-semibold text-primary flex items-center gap-2">
-                    <Users className="h-4 w-4" /> Nota sobre Crianças (Opcional)
-                  </h4>
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-semibold text-foreground/75 tracking-wide">
-                      Mensagem sobre Crianças
-                    </label>
-                    <textarea
-                      rows={2}
-                      placeholder="Ex: Esta é uma celebração reservada a adultos. Com os mais novos celebraremos noutro momento especial."
-                      className="w-full rounded-xl border border-border-custom bg-card-bg px-3.5 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                      {...register('kids_restriction_note')}
-                    />
-                  </div>
-                </div>
-
-                {/* Instagram */}
-                <div className="space-y-3 border-t border-border-custom pt-4">
-                  <h4 className="text-sm font-semibold text-primary flex items-center gap-2">
-                    <Link2 className="h-4 w-4" /> Redes Sociais (Instagram)
-                  </h4>
-                  <p className="text-xs text-foreground/50">Apenas o nome de utilizador sem o @. Os convidados verão botões que abrem diretamente a app do Instagram.</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <Input
-                      label="Instagram Anfitrião 1"
-                      placeholder="vivalda.tito"
-                      {...register('instagram_host_1')}
-                    />
-                    <Input
-                      label="Instagram Anfitrião 2 (Opcional)"
-                      placeholder="typsichvivi"
-                      {...register('instagram_host_2')}
-                    />
-                  </div>
-                </div>
-
-                {/* Gifts */}
-                <div className="space-y-3 border-t border-border-custom pt-4">
-                  <h4 className="text-sm font-semibold text-primary flex items-center gap-2">
-                    <Gift className="h-4 w-4" /> Sugestões de Presente
-                  </h4>
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-semibold text-foreground/75 tracking-wide">
-                      Mensagem e sugestões (uma por linha)
-                    </label>
-                    <textarea
-                      rows={4}
-                      placeholder={`A sua presença já é um presente inestimável, mas caso queira presentear:\nPerfume\nCosméticos\nVale-presente\nAcessórios`}
-                      className="w-full rounded-xl border border-border-custom bg-card-bg px-3.5 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                      {...register('gift_suggestions')}
-                    />
-                  </div>
-                </div>
-
-              </div>
-
-              <div className="flex justify-end pt-4 border-t border-border-custom mt-6">
-                <Button type="submit" form="event-main-form" isLoading={isSaving}>
-                  Guardar Alterações
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
           {/* Informações Extra (Blocos Dinâmicos) */}
           <Card className="bg-card-bg">
             <CardHeader className="flex flex-row items-center justify-between">
@@ -3133,10 +3410,37 @@ export default function EventosPage() {
               )}
             </CardContent>
           </Card>
-        </div>
 
-        {/* Right Side: Preview Card */}
-        <div className="lg:col-span-4 space-y-4">
+          {/* Step 3 Navigation Footer */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 bg-card-bg rounded-2xl border border-border-custom shadow-xs">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => handleTabChange('guide')}
+              leftIcon={<ChevronLeft className="h-4 w-4" />}
+              className="w-full sm:w-auto"
+            >
+              Anterior: Guia dos Convidados
+            </Button>
+            <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
+              <span className="text-xs text-foreground/50 hidden md:inline">
+                Salvo automaticamente ao adicionar ou editar.
+              </span>
+              <Button
+                type="button"
+                onClick={() => handleTabChange('design')}
+                rightIcon={<ChevronRight className="h-4 w-4" />}
+                className="w-full sm:w-auto bg-[#d4af37] hover:bg-[#b8972e] text-black font-semibold cursor-pointer"
+              >
+                Próximo: Design do Convite
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Right Side: Preview Card */}
+      <div className="lg:col-span-4 space-y-4">
           <Card className="bg-card-bg overflow-hidden p-0 border border-border-custom lg:sticky lg:top-8">
             <div className="h-32 bg-primary/20 relative">
               {(canvaCoverUrl || currentEvent.cover_image) ? (
