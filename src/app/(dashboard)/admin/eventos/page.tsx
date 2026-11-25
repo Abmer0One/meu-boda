@@ -1557,20 +1557,20 @@ export default function EventosPage() {
                         Escolha se prefere os códigos QR na capa (Frente) ou no interior/miolo (Verso).
                       </span>
                     </div>
-                    <div className="inline-flex p-1 bg-secondary/30 rounded-xl border border-border-custom shrink-0">
+                    <div className="grid grid-cols-2 sm:inline-flex p-1 bg-secondary/30 rounded-xl border border-border-custom gap-1 w-full sm:w-auto">
                       <button
                         type="button"
                         onClick={() => {
                           setQrPage('page_1');
                           setEditorPreviewPage('page_1');
                         }}
-                        className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                        className={`px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer text-center min-w-0 ${
                           qrPage === 'page_1'
                             ? 'bg-primary text-white shadow-sm'
                             : 'text-foreground/70 hover:text-foreground'
                         }`}
                       >
-                        📄 Página 1 (Frente / Capa)
+                        <span className="truncate">📄 Página 1 <span className="hidden xs:inline">(Frente)</span></span>
                       </button>
                       <button
                         type="button"
@@ -1578,13 +1578,13 @@ export default function EventosPage() {
                           setQrPage('page_2');
                           setEditorPreviewPage('page_2');
                         }}
-                        className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                        className={`px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer text-center min-w-0 ${
                           qrPage === 'page_2'
                             ? 'bg-primary text-white shadow-sm'
                             : 'text-foreground/70 hover:text-foreground'
                         }`}
                       >
-                        📖 Página 2 (Verso / Interior)
+                        <span className="truncate">📖 Página 2 <span className="hidden xs:inline">(Verso)</span></span>
                       </button>
                     </div>
                   </div>
@@ -1665,20 +1665,20 @@ export default function EventosPage() {
                         <span className="text-[11px] font-semibold text-foreground/75">
                           Página onde o nome do convidado deve aparecer:
                         </span>
-                        <div className="inline-flex p-1 bg-secondary/30 rounded-xl border border-border-custom shrink-0">
+                        <div className="grid grid-cols-2 sm:inline-flex p-1 bg-secondary/30 rounded-xl border border-border-custom gap-1 w-full sm:w-auto">
                           <button
                             type="button"
                             onClick={() => {
                               setGuestNamePage('page_1');
                               setEditorPreviewPage('page_1');
                             }}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                            className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer text-center min-w-0 ${
                               guestNamePage === 'page_1'
                                 ? 'bg-amber-600 text-white shadow-sm'
                                 : 'text-foreground/70 hover:text-foreground'
                             }`}
                           >
-                            📄 Página 1 (Frente / Capa)
+                            <span className="truncate">📄 Página 1 <span className="hidden xs:inline">(Frente)</span></span>
                           </button>
                           <button
                             type="button"
@@ -1686,13 +1686,13 @@ export default function EventosPage() {
                               setGuestNamePage('page_2');
                               setEditorPreviewPage('page_2');
                             }}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                            className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer text-center min-w-0 ${
                               guestNamePage === 'page_2'
                                 ? 'bg-amber-600 text-white shadow-sm'
                                 : 'text-foreground/70 hover:text-foreground'
                             }`}
                           >
-                            📖 Página 2 (Verso / Miolo)
+                            <span className="truncate">📖 Página 2 <span className="hidden xs:inline">(Verso)</span></span>
                           </button>
                         </div>
                       </div>
@@ -2245,39 +2245,39 @@ export default function EventosPage() {
               </div>
 
               {/* Posicionamento Visual dos Códigos QR no Convite (Arrastar e Soltar) */}
-              <div className="border border-border-custom rounded-2xl p-5 bg-card-bg shadow-sm space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="border border-border-custom rounded-2xl p-4 sm:p-5 bg-card-bg shadow-sm space-y-4 overflow-hidden">
+                <div className="flex flex-col gap-3.5">
                   <div>
                     <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
-                      <Move className="h-4 w-4 text-primary" />
-                      Posicionamento Visual dos Códigos QR (Arrastar & Soltar)
+                      <Move className="h-4 w-4 text-primary shrink-0" />
+                      <span>Posicionamento Visual dos Códigos QR (Arrastar & Soltar)</span>
                     </h3>
-                    <p className="text-xs text-foreground/60 mt-0.5">
+                    <p className="text-xs text-foreground/60 mt-0.5 leading-relaxed">
                       Clique e <strong>arraste</strong> as caixas dos códigos QR diretamente sobre a arte do convite. O PDF descarregado é rigorosamente no formato <strong>A4 Paisagem (297 × 210 mm)</strong>.
                     </p>
                   </div>
 
                   {/* Seletor de Página dos Códigos QR no editor (se Frente e Verso) */}
                   {pdfMode === 'double_page' ? (
-                    <div className="flex flex-wrap items-center gap-3">
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                        <span className="text-xs font-semibold text-foreground/75">
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 p-3 bg-secondary/15 rounded-xl border border-border-custom/70">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full lg:w-auto">
+                        <span className="text-xs font-semibold text-foreground/80 shrink-0">
                           Colocar Códigos QR na:
                         </span>
-                        <div className="inline-flex p-1 bg-secondary/30 rounded-xl border border-border-custom shrink-0">
+                        <div className="grid grid-cols-2 sm:inline-flex p-1 bg-secondary/30 rounded-xl border border-border-custom gap-1 w-full sm:w-auto">
                           <button
                             type="button"
                             onClick={() => {
                               setQrPage('page_1');
                               setEditorPreviewPage('page_1');
                             }}
-                            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                            className={`px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1 text-center min-w-0 ${
                               qrPage === 'page_1'
                                 ? 'bg-primary text-white shadow-sm'
                                 : 'text-foreground/70 hover:text-foreground'
                             }`}
                           >
-                            📄 Página 1: Frente / Capa
+                            <span className="truncate">📄 Página 1 <span className="hidden xs:inline">(Frente)</span></span>
                           </button>
                           <button
                             type="button"
@@ -2285,48 +2285,52 @@ export default function EventosPage() {
                               setQrPage('page_2');
                               setEditorPreviewPage('page_2');
                             }}
-                            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                            className={`px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1 text-center min-w-0 ${
                               qrPage === 'page_2'
                                 ? 'bg-primary text-white shadow-sm'
                                 : 'text-foreground/70 hover:text-foreground'
                             }`}
                           >
-                            📖 Página 2: Verso (Interior)
+                            <span className="truncate">📖 Página 2 <span className="hidden xs:inline">(Verso)</span></span>
                           </button>
                         </div>
                       </div>
 
                       {/* Alternador de visualização rápida da página */}
-                      <div className="flex items-center gap-1.5 text-xs text-foreground/60 border-l border-border-custom/80 pl-3">
-                        <span className="text-[11px]">A visualizar:</span>
-                        <button
-                          type="button"
-                          onClick={() => setEditorPreviewPage('page_1')}
-                          className={`px-2 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
-                            editorPreviewPage === 'page_1'
-                              ? 'bg-secondary text-primary underline'
-                              : 'hover:text-foreground'
-                          }`}
-                        >
-                          Pág 1
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setEditorPreviewPage('page_2')}
-                          className={`px-2 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
-                            editorPreviewPage === 'page_2'
-                              ? 'bg-secondary text-primary underline'
-                              : 'hover:text-foreground'
-                          }`}
-                        >
-                          Pág 2
-                        </button>
+                      <div className="flex items-center justify-between sm:justify-start gap-2 text-xs text-foreground/60 pt-2 border-t border-border-custom/50 lg:pt-0 lg:border-t-0 lg:border-l lg:border-border-custom/80 lg:pl-3 shrink-0">
+                        <span className="text-[11px] font-medium">A visualizar:</span>
+                        <div className="inline-flex p-0.5 bg-secondary/30 rounded-lg border border-border-custom/60">
+                          <button
+                            type="button"
+                            onClick={() => setEditorPreviewPage('page_1')}
+                            className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
+                              editorPreviewPage === 'page_1'
+                                ? 'bg-primary text-white shadow-xs'
+                                : 'text-foreground/70 hover:text-foreground'
+                            }`}
+                          >
+                            Pág. 1 (Frente)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditorPreviewPage('page_2')}
+                            className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
+                              editorPreviewPage === 'page_2'
+                                ? 'bg-primary text-white shadow-xs'
+                                : 'text-foreground/70 hover:text-foreground'
+                            }`}
+                          >
+                            Pág. 2 (Verso)
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ) : (
-                    <span className="text-xs font-semibold bg-primary/10 text-primary px-3 py-1.5 rounded-xl border border-primary/20 shrink-0">
-                      📄 Página Única Ativa
-                    </span>
+                    <div className="inline-flex">
+                      <span className="text-xs font-semibold bg-primary/10 text-primary px-3 py-1.5 rounded-xl border border-primary/20">
+                        📄 Página Única Ativa
+                      </span>
+                    </div>
                   )}
                 </div>
 
